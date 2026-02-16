@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Current Position
 
 Phase: 2 of 9 (Language Parsing)
-Plan: 1 of 3 in current phase
-Status: Plan 02-01 complete — parsing infrastructure built
-Last activity: 2026-02-16 -- Completed 02-01-PLAN.md
+Plan: 3 of 3 in current phase
+Status: Plan 02-03 complete — Rust/Go extractors, regex fallback, public API
+Last activity: 2026-02-16 -- Completed 02-03-PLAN.md
 
-Progress: [████████░░] 44%
+Progress: [█████████░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 4min
-- Total execution time: 15min
+- Total plans completed: 5
+- Average duration: 5min
+- Total execution time: 24min
 
 **By Phase:**
 
@@ -31,10 +31,11 @@ Progress: [████████░░] 44%
 | 01-02 | 2 tasks | 3min | 3min |
 | 01-03 | 3 tasks | 4min | 4min |
 | 02-01 | 3 tasks | 5min | 5min |
+| 02-03 | 3 tasks | 9min | 9min |
 
 **Recent Trend:**
-- Last 5 plans: 3min, 3min, 4min, 5min
-- Trend: stable
+- Last 5 plans: 3min, 3min, 4min, 5min, 9min
+- Trend: slight increase (more complex extractors)
 
 *Updated after each plan completion*
 
@@ -51,6 +52,9 @@ Recent decisions affecting current work:
 - [Phase 02]: tree-sitter-wasms prebuilt WASM grammars over self-building (avoids Docker requirement)
 - [Phase 02]: New ParsedFileSchema in src/parsing/types.ts, existing SourceFileSchema kept for backward compatibility
 - [Phase 02]: createRequire for WASM path resolution in ESM context
+- [Phase 02]: Per-language RegexFallbackExtractor instances (langId pre-configured, since extractFromSource has no langId param)
+- [Phase 02]: Dynamic import with try-catch for TS/Python extractors in createParserService() (graceful when 02-02 not yet run)
+- [Phase 02]: getNamedChildren() null-safe utility for web-tree-sitter namedChildren iteration
 
 ### Pending Todos
 
@@ -63,5 +67,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 02-01-PLAN.md
-Resume file: .planning/phases/02-language-parsing/02-01-SUMMARY.md
+Stopped at: Completed 02-03-PLAN.md
+Resume file: .planning/phases/02-language-parsing/02-03-SUMMARY.md
