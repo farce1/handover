@@ -25,6 +25,17 @@ program
   .option('-v, --verbose', 'Show detailed output')
   .action(runGenerate);
 
+program
+  .command('analyze')
+  .description('Run static analysis on the codebase')
+  .option('--json', 'Output JSON to stdout instead of markdown file')
+  .option('--git-depth <depth>', 'Git history depth: "default" (6 months) or "full"', 'default')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (opts) => {
+    const { runAnalyze } = await import('./analyze.js');
+    await runAnalyze(opts);
+  });
+
 // Default action: run generate when no command specified
 program
   .option('--provider <provider>', 'LLM provider override')

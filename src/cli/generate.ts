@@ -1,9 +1,16 @@
 import pc from 'picocolors';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { loadConfig, resolveApiKey } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
 import { HandoverError } from '../utils/errors.js';
 import { DAGOrchestrator } from '../orchestrator/dag.js';
 import { createStep } from '../orchestrator/step.js';
+import { runStaticAnalysis } from '../analyzers/coordinator.js';
+import {
+  formatMarkdownReport,
+  formatTerminalSummary,
+} from '../analyzers/report.js';
 
 export interface GenerateOptions {
   provider?: string;
@@ -35,6 +42,36 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
     const config = loadConfig(cliOverrides);
 
+    // Static-only mode: run only static analysis, skip AI steps entirely
+    if (options.staticOnly) {
+      const rootDir = resolve(process.cwd());
+
+      logger.blank();
+      logger.info(
+        `${pc.bold('handover')} v0.1.0 — static analysis only`,
+      );
+      logger.blank();
+      logger.info(`Analyzing ${pc.cyan(rootDir)}...`);
+      logger.blank();
+
+      const result = await runStaticAnalysis(rootDir, config);
+
+      const outputDir = resolve(config.output);
+      await mkdir(outputDir, { recursive: true });
+
+      const outputPath = join(outputDir, 'static-analysis.md');
+      const markdown = formatMarkdownReport(result);
+      await writeFile(outputPath, markdown, 'utf-8');
+
+      logger.blank();
+      logger.success('Static analysis complete');
+      logger.blank();
+      console.log(formatTerminalSummary(result));
+      logger.blank();
+      logger.info(`Report written to: ${pc.cyan(outputPath)}`);
+      return;
+    }
+
     // Resolve API key (validates it exists — fail fast)
     resolveApiKey(config);
 
@@ -55,8 +92,9 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     }
     logger.blank();
 
-    // Build the DAG pipeline with placeholder steps
+    // Build the DAG pipeline
     const startTime = Date.now();
+    const rootDir = resolve(process.cwd());
 
     const orchestrator = new DAGOrchestrator({
       onStepStart: (_id, name) => logger.step(name, 'start'),
@@ -81,8 +119,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         name: 'Static Analysis',
         deps: [],
         execute: async () => {
-          logger.log('Static analysis will run here (Phase 3)');
-          return { analyzers: 8 };
+          const result = await runStaticAnalysis(rootDir, config);
+          return result;
         },
       }),
       createStep({
@@ -152,7 +190,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     }
 
     logger.log(
-      'Pipeline foundation ready. Implement analyzers in Phase 2-3.',
+      'Static analysis pipeline active. AI steps pending Phase 5.',
     );
   } catch (err) {
     if (err instanceof HandoverError) {
