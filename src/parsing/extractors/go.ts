@@ -10,7 +10,7 @@ import type {
   Parameter,
 } from '../types.js';
 import { LanguageExtractor, type ExtractorResult } from './base.js';
-import { walkChildren, findChildByType, findChildrenByType, getFieldNode } from '../utils/node-helpers.js';
+import { walkChildren, findChildByType, findChildrenByType, getFieldNode, getNamedChildren } from '../utils/node-helpers.js';
 import { getText, getTextTrimmed, getDocstringAbove } from '../utils/text-extract.js';
 
 // ─── Go Extractor ────────────────────────────────────────────────────────────
@@ -121,14 +121,14 @@ export class GoExtractor extends LanguageExtractor {
 
     const params: Parameter[] = [];
 
-    for (const child of paramsNode.namedChildren) {
+    for (const child of getNamedChildren(paramsNode)) {
       if (child.type === 'parameter_declaration') {
         const typeNode = getFieldNode(child, 'type');
         const typeText = typeNode ? getTextTrimmed(typeNode, source) : undefined;
 
         // Go allows multiple names per type: func(a, b int)
         const names: string[] = [];
-        for (const nameChild of child.namedChildren) {
+        for (const nameChild of getNamedChildren(child)) {
           if (nameChild.type === 'identifier') {
             names.push(getText(nameChild, source));
           }
@@ -186,7 +186,7 @@ export class GoExtractor extends LanguageExtractor {
     if (!typeParamsNode) return [];
 
     const params: string[] = [];
-    for (const child of typeParamsNode.namedChildren) {
+    for (const child of getNamedChildren(typeParamsNode)) {
       if (child.type === 'type_parameter_declaration') {
         params.push(getTextTrimmed(child, source));
       }
@@ -229,7 +229,7 @@ export class GoExtractor extends LanguageExtractor {
     source: string,
   ): string | null {
     // receiver is a parameter_list with a single parameter_declaration
-    for (const child of node.namedChildren) {
+    for (const child of getNamedChildren(node)) {
       if (child.type === 'parameter_declaration') {
         const typeNode = getFieldNode(child, 'type');
         if (typeNode) {
@@ -249,7 +249,7 @@ export class GoExtractor extends LanguageExtractor {
     classMap: Map<string, ClassSymbol>,
   ): void {
     // type_declaration may contain multiple type_spec children
-    for (const child of node.namedChildren) {
+    for (const child of getNamedChildren(node)) {
       if (child.type === 'type_spec') {
         this.extractTypeSpec(child, node, source, result, classMap);
       }
@@ -307,14 +307,14 @@ export class GoExtractor extends LanguageExtractor {
 
     const fieldListNode = findChildByType(structTypeNode, 'field_declaration_list');
     if (fieldListNode) {
-      for (const child of fieldListNode.namedChildren) {
+      for (const child of getNamedChildren(fieldListNode)) {
         if (child.type === 'field_declaration') {
           const fieldNames: string[] = [];
           const fieldTypeNode = getFieldNode(child, 'type');
           const fieldType = fieldTypeNode ? getTextTrimmed(fieldTypeNode, source) : undefined;
 
           // Collect field names
-          for (const fc of child.namedChildren) {
+          for (const fc of getNamedChildren(child)) {
             if (fc.type === 'field_identifier') {
               fieldNames.push(getText(fc, source));
             }
@@ -385,7 +385,7 @@ export class GoExtractor extends LanguageExtractor {
     const methods: FunctionSymbol[] = [];
     const extendsArr: string[] = [];
 
-    for (const child of interfaceTypeNode.namedChildren) {
+    for (const child of getNamedChildren(interfaceTypeNode)) {
       if (child.type === 'method_spec') {
         const methodName = getFieldNode(child, 'name');
         if (methodName) {
@@ -444,11 +444,11 @@ export class GoExtractor extends LanguageExtractor {
     result: ExtractorResult,
   ): void {
     // import_declaration contains import_spec or import_spec_list
-    for (const child of node.namedChildren) {
+    for (const child of getNamedChildren(node)) {
       if (child.type === 'import_spec') {
         this.extractImportSpec(child, source, result, node.startPosition.row + 1);
       } else if (child.type === 'import_spec_list') {
-        for (const spec of child.namedChildren) {
+        for (const spec of getNamedChildren(child)) {
           if (spec.type === 'import_spec') {
             this.extractImportSpec(spec, source, result, spec.startPosition.row + 1);
           }
@@ -512,7 +512,7 @@ export class GoExtractor extends LanguageExtractor {
     source: string,
     result: ExtractorResult,
   ): void {
-    for (const child of node.namedChildren) {
+    for (const child of getNamedChildren(node)) {
       if (child.type === 'const_spec') {
         this.extractConstSpec(child, source, result);
       }
@@ -527,7 +527,7 @@ export class GoExtractor extends LanguageExtractor {
     const names: string[] = [];
     const typeNode = getFieldNode(node, 'type');
 
-    for (const child of node.namedChildren) {
+    for (const child of getNamedChildren(node)) {
       if (child.type === 'identifier') {
         names.push(getText(child, source));
       }
@@ -564,7 +564,7 @@ export class GoExtractor extends LanguageExtractor {
     source: string,
     result: ExtractorResult,
   ): void {
-    for (const child of node.namedChildren) {
+    for (const child of getNamedChildren(node)) {
       if (child.type === 'var_spec') {
         this.extractVarSpec(child, source, result);
       }
@@ -579,7 +579,7 @@ export class GoExtractor extends LanguageExtractor {
     const names: string[] = [];
     const typeNode = getFieldNode(node, 'type');
 
-    for (const child of node.namedChildren) {
+    for (const child of getNamedChildren(node)) {
       if (child.type === 'identifier') {
         names.push(getText(child, source));
       }

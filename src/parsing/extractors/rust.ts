@@ -10,7 +10,7 @@ import type {
   Parameter,
 } from '../types.js';
 import { LanguageExtractor, type ExtractorResult } from './base.js';
-import { walkChildren, findChildByType, findChildrenByType, getFieldNode } from '../utils/node-helpers.js';
+import { walkChildren, findChildByType, findChildrenByType, getFieldNode, getNamedChildren } from '../utils/node-helpers.js';
 import { getText, getTextTrimmed, getDocstringAbove, getDecoratorTexts } from '../utils/text-extract.js';
 
 // ─── Rust Extractor ──────────────────────────────────────────────────────────
@@ -134,7 +134,8 @@ export class RustExtractor extends LanguageExtractor {
 
     const params: Parameter[] = [];
 
-    for (const child of paramsNode.namedChildren) {
+    for (const child of getNamedChildren(paramsNode)) {
+      if (!child) continue;
       if (child.type === 'self_parameter') {
         // Skip self parameter from parameter list (it's implicit)
         continue;
@@ -174,7 +175,8 @@ export class RustExtractor extends LanguageExtractor {
     if (!typeParamsNode) return [];
 
     const params: string[] = [];
-    for (const child of typeParamsNode.namedChildren) {
+    for (const child of getNamedChildren(typeParamsNode)) {
+      if (!child) continue;
       if (
         child.type === 'type_identifier' ||
         child.type === 'constrained_type_parameter' ||
@@ -194,6 +196,7 @@ export class RustExtractor extends LanguageExtractor {
 
   private hasKeyword(node: SyntaxNode, keyword: string): boolean {
     for (const child of node.children) {
+      if (!child) continue;
       if (!child.isNamed && child.type === keyword) return true;
     }
     return false;
@@ -245,7 +248,8 @@ export class RustExtractor extends LanguageExtractor {
     const bodyNode = findChildByType(node, 'field_declaration_list');
     if (!bodyNode) return fields;
 
-    for (const child of bodyNode.namedChildren) {
+    for (const child of getNamedChildren(bodyNode)) {
+      if (!child) continue;
       if (child.type === 'field_declaration') {
         const nameNode = getFieldNode(child, 'name');
         const typeNode = getFieldNode(child, 'type');
@@ -323,7 +327,8 @@ export class RustExtractor extends LanguageExtractor {
     const bodyNode = findChildByType(node, 'enum_variant_list');
     if (!bodyNode) return fields;
 
-    for (const child of bodyNode.namedChildren) {
+    for (const child of getNamedChildren(bodyNode)) {
+      if (!child) continue;
       if (child.type === 'enum_variant') {
         const nameNode = getFieldNode(child, 'name');
         if (nameNode) {
@@ -366,7 +371,8 @@ export class RustExtractor extends LanguageExtractor {
     const extendsArr: string[] = [];
     if (boundsNode) {
       // bounds is a trait_bounds node containing type identifiers
-      for (const child of boundsNode.namedChildren) {
+      for (const child of getNamedChildren(boundsNode)) {
+        if (!child) continue;
         extendsArr.push(getTextTrimmed(child, source));
       }
     }
@@ -375,7 +381,8 @@ export class RustExtractor extends LanguageExtractor {
     const methods: FunctionSymbol[] = [];
     const bodyNode = findChildByType(node, 'declaration_list');
     if (bodyNode) {
-      for (const child of bodyNode.namedChildren) {
+      for (const child of getNamedChildren(bodyNode)) {
+        if (!child) continue;
         if (child.type === 'function_item' || child.type === 'function_signature_item') {
           const fn = this.buildFunctionSymbol(child, source);
           if (fn) methods.push(fn);
@@ -422,7 +429,8 @@ export class RustExtractor extends LanguageExtractor {
     const methods: FunctionSymbol[] = [];
     const bodyNode = findChildByType(node, 'declaration_list');
     if (bodyNode) {
-      for (const child of bodyNode.namedChildren) {
+      for (const child of getNamedChildren(bodyNode)) {
+        if (!child) continue;
         if (child.type === 'function_item') {
           const fn = this.buildFunctionSymbol(child, source);
           if (fn) methods.push(fn);
@@ -524,7 +532,8 @@ export class RustExtractor extends LanguageExtractor {
       }
 
       case 'use_list': {
-        for (const child of node.namedChildren) {
+        for (const child of getNamedChildren(node)) {
+          if (!child) continue;
           const sub = this.parseUseArgument(child, source, prefix);
           results.push(...sub);
         }
@@ -539,7 +548,8 @@ export class RustExtractor extends LanguageExtractor {
         const fullPrefix = prefix ? `${prefix}::${scopePath}` : scopePath;
 
         if (listNode) {
-          for (const child of listNode.namedChildren) {
+          for (const child of getNamedChildren(listNode)) {
+            if (!child) continue;
             const sub = this.parseUseArgument(child, source, fullPrefix);
             results.push(...sub);
           }
@@ -548,8 +558,8 @@ export class RustExtractor extends LanguageExtractor {
       }
 
       case 'use_as_clause': {
-        const pathChild = node.namedChildren[0];
-        const aliasChild = node.namedChildren[1];
+        const pathChild = getNamedChildren(node)[0];
+        const aliasChild = getNamedChildren(node)[1];
         if (pathChild) {
           const fullPath = getTextTrimmed(pathChild, source);
           const parts = fullPath.split('::');

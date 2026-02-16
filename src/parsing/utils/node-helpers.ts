@@ -3,6 +3,16 @@ import type { Node as SyntaxNode } from 'web-tree-sitter';
 // ─── Tree-sitter AST walking utilities ──────────────────────────────────────
 
 /**
+ * Get the named children of a node, filtering out nulls.
+ * Needed because some web-tree-sitter versions type namedChildren as (Node | null)[].
+ */
+export function getNamedChildren(node: SyntaxNode): SyntaxNode[] {
+  return (node.namedChildren as (SyntaxNode | null)[]).filter(
+    (c): c is SyntaxNode => c != null,
+  );
+}
+
+/**
  * Walk the named children of a node using the cursor API for efficiency.
  * More efficient than iterating node.namedChildren for large ASTs.
  */
@@ -28,7 +38,7 @@ export function findChildByType(
   node: SyntaxNode,
   type: string,
 ): SyntaxNode | null {
-  for (const child of node.namedChildren) {
+  for (const child of getNamedChildren(node)) {
     if (child.type === type) return child;
   }
   return null;
@@ -42,7 +52,7 @@ export function findChildrenByType(
   type: string,
 ): SyntaxNode[] {
   const results: SyntaxNode[] = [];
-  for (const child of node.namedChildren) {
+  for (const child of getNamedChildren(node)) {
     if (child.type === type) results.push(child);
   }
   return results;
@@ -63,7 +73,7 @@ export function getFieldNode(
  * Check if a node has any child of the given type.
  */
 export function hasChildOfType(node: SyntaxNode, type: string): boolean {
-  for (const child of node.namedChildren) {
+  for (const child of getNamedChildren(node)) {
     if (child.type === type) return true;
   }
   return false;

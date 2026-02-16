@@ -1,5 +1,7 @@
 import type { Node as SyntaxNode } from 'web-tree-sitter';
 
+import { getNamedChildren } from './node-helpers.js';
+
 // ─── Safe text extraction utilities ─────────────────────────────────────────
 
 /**
@@ -61,7 +63,7 @@ export function getDecoratorTexts(
   // Pattern 1: Parent is a decorated_definition (Python)
   const parent = node.parent;
   if (parent && parent.type === 'decorated_definition') {
-    for (const child of parent.namedChildren) {
+    for (const child of getNamedChildren(parent)) {
       if (child.type === 'decorator') {
         decorators.push(getText(child, source));
       }
