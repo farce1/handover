@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Current Position
 
 Phase: 3 of 9 (Static Analysis Pipeline)
-Plan: 1 of 4 in current phase (03-01 complete)
-Status: Analyzer foundation built -- types, file discovery, cache, context
-Last activity: 2026-02-16 -- Completed 03-01-PLAN.md (analyzer foundation)
+Plan: 3 of 4 in current phase (03-01, 03-02, 03-03 complete)
+Status: All 8 analyzers built -- ready for coordinator, report, and CLI wiring
+Last activity: 2026-02-16 -- Completed 03-03-PLAN.md (complex analyzers)
 
 Progress: [█████████░] 70%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 6min
-- Total execution time: 43min
+- Total plans completed: 9
+- Average duration: 5min
+- Total execution time: 49min
 
 **By Phase:**
 
@@ -34,10 +34,11 @@ Progress: [█████████░] 70%
 | 02-02 | 2 tasks | 15min | 15min |
 | 02-03 | 3 tasks | 9min | 9min |
 | 03-01 | 3 tasks | 4min | 4min |
+| 03-02 | 2 tasks | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 4min, 5min, 15min, 9min, 4min
-- Trend: stabilizing, foundation plans remain fast
+- Last 5 plans: 5min, 15min, 9min, 4min, 3min
+- Trend: stabilizing, simple analyzers are fast implementations
 
 *Updated after each plan completion*
 
@@ -64,6 +65,9 @@ Recent decisions affecting current work:
 - [Phase 03]: AnalyzerResult<T> as both Zod schema factory and TS interface for flexibility
 - [Phase 03]: fast-glob ALWAYS_IGNORE for traversal exclusion + ignore for .gitignore post-filter
 - [Phase 03]: Object.freeze for immutable shared context (STAT-09 requirement)
+- [Phase 03]: Batch-50 file processing pattern for memory-bounded concurrency in analyzers
+- [Phase 03]: CATEGORY_MAP with TodoItem['category'] type for compile-time safe marker-to-category mapping
+- [Phase 03]: Combined multi-language ENV_REFERENCE_REGEX with alternation for single-pass env var scanning
 
 ### Pending Todos
 
@@ -76,5 +80,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 03-01-PLAN.md
-Resume file: .planning/phases/03-static-analysis-pipeline/03-02-PLAN.md
+Stopped at: Completed 03-02-PLAN.md
+Resume file: .planning/phases/03-static-analysis-pipeline/03-03-PLAN.md
