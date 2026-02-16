@@ -1,0 +1,44 @@
+{
+  "name": "handover",
+  "version": "0.1.0",
+  "description": "Generate comprehensive codebase documentation for handover",
+  "type": "module",
+  "bin": {
+    "handover": "./dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx src/cli/index.ts",
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "documentation",
+    "handover",
+    "codebase",
+    "llm",
+    "analysis"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@clack/prompts": "^0.10.0",
+    "commander": "^13.0.0",
+    "picocolors": "^1.1.0",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.0",
+    "zod-to-json-schema": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
