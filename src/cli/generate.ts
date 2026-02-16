@@ -2,6 +2,8 @@ import pc from 'picocolors';
 import { loadConfig, resolveApiKey } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
 import { HandoverError } from '../utils/errors.js';
+import { DAGOrchestrator } from '../orchestrator/dag.js';
+import { createStep } from '../orchestrator/step.js';
 
 export interface GenerateOptions {
   provider?: string;
@@ -13,9 +15,10 @@ export interface GenerateOptions {
 
 /**
  * Generate command handler.
- * Loads config, validates API key, and invokes the pipeline.
+ * Loads config, validates API key, and runs the DAG pipeline.
  *
- * CLI-02: User can run `handover generate` to produce documentation.
+ * CLI-02: User can run `handover generate` and see the DAG orchestrator
+ * execute placeholder steps in dependency order.
  * SEC-03: Terminal indicates when code sent to cloud.
  */
 export async function runGenerate(options: GenerateOptions): Promise<void> {
@@ -32,8 +35,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
     const config = loadConfig(cliOverrides);
 
-    // Resolve API key (validates it exists)
-    const apiKey = resolveApiKey(config);
+    // Resolve API key (validates it exists — fail fast)
+    resolveApiKey(config);
 
     // Display header
     logger.blank();
@@ -52,22 +55,104 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     }
     logger.blank();
 
-    // Placeholder: Pipeline execution (Plans 03 wires this to the DAG orchestrator)
-    logger.step('Static Analysis', 'start');
-    logger.log('Static analysis will run here (Phase 3)');
-    logger.step('Static Analysis', 'done');
+    // Build the DAG pipeline with placeholder steps
+    const startTime = Date.now();
 
-    logger.step('AI Round 1: Project Overview', 'start');
-    logger.log('AI analysis will run here (Phase 5)');
-    logger.step('AI Round 1: Project Overview', 'done');
+    const orchestrator = new DAGOrchestrator({
+      onStepStart: (_id, name) => logger.step(name, 'start'),
+      onStepComplete: (result) => {
+        const step = result.stepId;
+        const name = stepNames.get(step) ?? step;
+        logger.step(name, 'done');
+      },
+      onStepFail: (result) => {
+        const step = result.stepId;
+        const name = stepNames.get(step) ?? step;
+        logger.step(name, 'fail');
+      },
+    });
 
-    logger.step('Document Rendering', 'start');
-    logger.log('Document rendering will run here (Phase 6)');
-    logger.step('Document Rendering', 'done');
+    // Step name lookup (events only get IDs)
+    const stepNames = new Map<string, string>();
+
+    const steps = [
+      createStep({
+        id: 'static-analysis',
+        name: 'Static Analysis',
+        deps: [],
+        execute: async () => {
+          logger.log('Static analysis will run here (Phase 3)');
+          return { analyzers: 8 };
+        },
+      }),
+      createStep({
+        id: 'ai-round-1',
+        name: 'AI Round 1: Project Overview',
+        deps: ['static-analysis'],
+        execute: async () => {
+          logger.log('AI analysis will run here (Phase 5)');
+          return {};
+        },
+      }),
+      createStep({
+        id: 'ai-round-2',
+        name: 'AI Round 2: Module Detection',
+        deps: ['ai-round-1'],
+        execute: async () => {
+          logger.log('Module detection will run here (Phase 5)');
+          return {};
+        },
+      }),
+      createStep({
+        id: 'render',
+        name: 'Document Rendering',
+        deps: ['ai-round-2'],
+        execute: async () => {
+          logger.log('Document rendering will run here (Phase 6)');
+          return {};
+        },
+      }),
+    ];
+
+    for (const step of steps) {
+      stepNames.set(step.id, step.name);
+    }
+
+    orchestrator.addSteps(steps);
+
+    // Validate and execute
+    const validation = orchestrator.validate();
+    if (!validation.valid) {
+      throw new HandoverError(
+        'Invalid pipeline configuration',
+        validation.errors.join('; '),
+        'This is a bug — please report it',
+      );
+    }
+
+    const results = await orchestrator.execute(config);
+
+    const elapsed = Date.now() - startTime;
+    const completed = [...results.values()].filter(
+      (r) => r.status === 'completed',
+    ).length;
+    const failed = [...results.values()].filter(
+      (r) => r.status === 'failed',
+    ).length;
 
     logger.blank();
-    logger.success(
-      `Pipeline foundation ready. Implement analyzers in Phase 2-3.`,
+    if (failed === 0) {
+      logger.success(
+        `Pipeline complete — ${completed} steps in ${elapsed}ms`,
+      );
+    } else {
+      logger.warn(
+        `Pipeline finished with ${failed} failure(s) — ${completed}/${results.size} steps completed`,
+      );
+    }
+
+    logger.log(
+      'Pipeline foundation ready. Implement analyzers in Phase 2-3.',
     );
   } catch (err) {
     if (err instanceof HandoverError) {
