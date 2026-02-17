@@ -37,6 +37,17 @@ program
     await runAnalyze(opts);
   });
 
+program
+  .command('estimate')
+  .description('Estimate token count and cost before running')
+  .option('--provider <provider>', 'Provider to estimate for')
+  .option('--model <model>', 'Model to estimate for')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (opts) => {
+    const { runEstimate } = await import('./estimate.js');
+    await runEstimate(opts);
+  });
+
 // Default action: run generate when no command specified
 program
   .option('--provider <provider>', 'LLM provider override')
