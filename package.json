@@ -28,6 +28,7 @@
     "commander": "^13.0.0",
     "fast-glob": "^3.3.3",
     "ignore": "^7.0.5",
+    "openai": "^5.23.2",
     "picocolors": "^1.1.0",
     "simple-git": "^3.31.1",
     "smol-toml": "^1.6.0",

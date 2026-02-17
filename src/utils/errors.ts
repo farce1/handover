@@ -89,6 +89,10 @@ export class ProviderError extends HandoverError {
     const envVarMap: Record<string, string> = {
       anthropic: 'ANTHROPIC_API_KEY',
       openai: 'OPENAI_API_KEY',
+      groq: 'GROQ_API_KEY',
+      together: 'TOGETHER_API_KEY',
+      deepseek: 'DEEPSEEK_API_KEY',
+      'azure-openai': 'AZURE_OPENAI_API_KEY',
       custom: 'LLM_API_KEY',
     };
 
@@ -130,14 +134,6 @@ export class ProviderError extends HandoverError {
     );
   }
 
-  static notImplemented(provider: string): ProviderError {
-    return new ProviderError(
-      `${provider} provider not yet implemented`,
-      `The ${provider} provider is planned for Phase 8`,
-      `Use ${pc.cyan('anthropic')} provider for now (default)`,
-      'PROVIDER_NOT_IMPLEMENTED',
-    );
-  }
 }
 
 /**
