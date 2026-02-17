@@ -85,11 +85,12 @@ Plans:
   2. High-priority files are included with full content, medium-priority files as signatures only, and low-priority files are skipped -- all within the provider's token budget
   3. Oversized files get two-pass treatment: signatures first, then deep-dive on important sections
   4. Inter-round context uses summarization/compression rather than raw concatenation
-**Plans**: TBD
+**Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [ ] 04-01-PLAN.md — Zod schemas, token estimation, file priority scorer with six CTX-02 factors (Wave 1)
+- [ ] 04-02-PLAN.md — Greedy context packer with signature extraction and oversized file two-pass (Wave 2)
+- [ ] 04-03-PLAN.md — Deterministic context compressor, token usage tracker, config extensions (Wave 2)
 
 ### Phase 5: AI Analysis Rounds
 **Goal**: Six progressive AI rounds transform static facts into structured understanding -- project overview, module boundaries, features, architecture patterns, edge cases, and deployment info -- with hallucination validation against AST-derived facts
