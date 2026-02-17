@@ -155,12 +155,12 @@ Plans:
   3. User can run `handover estimate` to see token count and cost estimate before any API calls are made
   4. LLM calls retry with exponential backoff (3 attempts: 30s, 60s, 120s) and intermediate results are cached to disk so the pipeline can resume from the last successful step after a crash
   5. No code is stored beyond the local filesystem at any point in the pipeline
-**Plans**: TBD
+**Plans**: 3 plans in 3 waves
 
 Plans:
-- [ ] 08-01: TBD
-- [ ] 08-02: TBD
-- [ ] 08-03: TBD
+- [ ] 08-01-PLAN.md — Provider presets registry, OpenAI-compatible provider, expanded factory with fail-fast validation (Wave 1)
+- [ ] 08-02-PLAN.md — Round cache for crash recovery, `handover estimate` command with cost comparison (Wave 2)
+- [ ] 08-03-PLAN.md — Generate.ts cache integration, --no-cache flag, LOCAL badge, cost omission for local providers (Wave 3)
 
 ### Phase 9: Integration and Hardening
 **Goal**: The complete pipeline works reliably on diverse real-world codebases (TypeScript, Python, Go, Rust), meets performance targets, handles edge cases gracefully, and is ready for npm publish

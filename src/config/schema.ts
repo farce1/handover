@@ -6,10 +6,12 @@ import { z } from 'zod';
  */
 export const HandoverConfigSchema = z.object({
   provider: z
-    .enum(['anthropic', 'openai', 'ollama', 'custom'])
+    .enum(['anthropic', 'openai', 'ollama', 'groq', 'together', 'deepseek', 'azure-openai', 'custom'])
     .default('anthropic'),
   model: z.string().optional(),
   apiKeyEnv: z.string().optional(),
+  baseUrl: z.string().url().optional(),
+  timeout: z.number().int().positive().optional(),
   output: z.string().default('./handover'),
   audience: z.enum(['human', 'ai']).default('human'),
   include: z.array(z.string()).default(['**/*']),
