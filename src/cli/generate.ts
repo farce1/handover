@@ -1,4 +1,3 @@
-import pc from 'picocolors';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { loadConfig, resolveApiKey } from '../config/loader.js';
@@ -7,26 +6,20 @@ import { HandoverError } from '../utils/errors.js';
 import { DAGOrchestrator } from '../orchestrator/dag.js';
 import { createStep } from '../orchestrator/step.js';
 import { runStaticAnalysis } from '../analyzers/coordinator.js';
-import {
-  formatMarkdownReport,
-  formatTerminalSummary,
-} from '../analyzers/report.js';
+import { formatMarkdownReport } from '../analyzers/report.js';
 import { createRound1Step } from '../ai-rounds/round-1-overview.js';
 import { createRound2Step } from '../ai-rounds/round-2-modules.js';
 import { createRound3Step } from '../ai-rounds/round-3-features.js';
 import { createRound4Step } from '../ai-rounds/round-4-architecture.js';
 import { createRound5Step } from '../ai-rounds/round-5-edge-cases.js';
 import { createRound6Step } from '../ai-rounds/round-6-deployment.js';
-import {
-  buildValidationSummary,
-  formatValidationLine,
-  buildFailureReport,
-} from '../ai-rounds/summary.js';
 import { TokenUsageTracker } from '../context/tracker.js';
 import { scoreFiles } from '../context/scorer.js';
 import { packFiles } from '../context/packer.js';
 import { computeTokenBudget } from '../context/token-counter.js';
 import { createProvider } from '../providers/factory.js';
+import { createRenderer } from '../ui/renderer.js';
+import { ROUND_NAMES } from '../ai-rounds/types.js';
 import {
   DOCUMENT_REGISTRY,
   ROUND_DEPS,
@@ -39,6 +32,8 @@ import { determineDocStatus } from '../renderers/utils.js';
 import type { RoundExecutionResult } from '../ai-rounds/types.js';
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 import type { PackedContext } from '../context/types.js';
+import type { DisplayState, AnalyzerStatus } from '../ui/types.js';
+import type { DAGEvents } from '../domain/types.js';
 import type {
   Round1Output,
   Round2Output,
@@ -58,14 +53,43 @@ export interface GenerateOptions {
 }
 
 /**
+ * Map a file extension to a human-readable language name.
+ */
+function extToLanguage(ext: string): string {
+  switch (ext) {
+    case '.ts':
+    case '.tsx':
+      return 'TypeScript';
+    case '.js':
+    case '.jsx':
+      return 'JavaScript';
+    case '.py':
+      return 'Python';
+    case '.rs':
+      return 'Rust';
+    case '.go':
+      return 'Go';
+    case '.java':
+      return 'Java';
+    case '.rb':
+      return 'Ruby';
+    default:
+      // Capitalize the extension without the dot
+      return ext.replace(/^\./, '').charAt(0).toUpperCase() + ext.replace(/^\./, '').slice(1);
+  }
+}
+
+/**
  * Generate command handler.
  * Loads config, validates API key, and runs the DAG pipeline.
  *
  * CLI-02: User can run `handover generate` and see the DAG orchestrator
- * execute placeholder steps in dependency order.
- * SEC-03: Terminal indicates when code sent to cloud.
+ * execute steps in dependency order with rich terminal progress.
+ * SEC-03: Terminal indicates when code sent to cloud (via banner).
  */
 export async function runGenerate(options: GenerateOptions): Promise<void> {
+  const renderer = createRenderer();
+
   try {
     // Set verbosity
     if (options.verbose) {
@@ -79,55 +103,89 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
     const config = loadConfig(cliOverrides);
 
+    // Mutable display state -- updated throughout the pipeline, renderer reads it
+    const displayState: DisplayState = {
+      phase: 'startup',
+      projectName: config.project.name ?? 'project',
+      provider: config.provider,
+      model: config.model ?? 'default',
+      fileCount: 0,
+      language: '',
+      analyzers: new Map(),
+      analyzerElapsedMs: 0,
+      rounds: new Map(),
+      totalTokens: 0,
+      totalCost: 0,
+      costWarningThreshold: config.costWarningThreshold ?? 1.0,
+      elapsedMs: 0,
+      renderedDocs: [],
+      completionDocs: 0,
+      errors: [],
+    };
+
+    // Suppress logger during renderer-managed output
+    logger.setSuppressed(true);
+
     // Static-only mode: run only static analysis, skip AI steps entirely
     if (options.staticOnly) {
       const rootDir = resolve(process.cwd());
 
-      logger.blank();
-      logger.info(
-        `${pc.bold('handover')} v0.1.0 — static analysis only`,
-      );
-      logger.blank();
-      logger.info(`Analyzing ${pc.cyan(rootDir)}...`);
-      logger.blank();
+      // Initialize analyzers for progress display
+      const ANALYZER_NAMES = ['file-tree', 'dependencies', 'git-history', 'todos', 'env', 'ast', 'tests', 'docs'];
+      for (const name of ANALYZER_NAMES) {
+        displayState.analyzers.set(name, 'pending');
+      }
+      displayState.phase = 'static-analysis';
 
-      const result = await runStaticAnalysis(rootDir, config);
+      // Show banner (file count / language updated later)
+      renderer.onBanner(displayState);
 
+      const analyzerStart = Date.now();
+      const result = await runStaticAnalysis(rootDir, config, {
+        onProgress: (analyzer, status) => {
+          const mapped: AnalyzerStatus = status === 'start' ? 'running'
+            : status === 'fail' ? 'failed'
+            : 'done';
+          displayState.analyzers.set(analyzer, mapped);
+          displayState.analyzerElapsedMs = Date.now() - analyzerStart;
+          if (status === 'fail') {
+            displayState.errors.push({
+              source: `Analyzer: ${analyzer}`,
+              message: `${analyzer} failed during static analysis`,
+            });
+          }
+          renderer.onAnalyzerUpdate(displayState);
+        },
+      });
+
+      // Detect language from file extensions
+      const exts = result.fileTree.filesByExtension;
+      const topExt = Object.entries(exts).sort((a, b) => b[1] - a[1])[0];
+      displayState.language = topExt ? extToLanguage(topExt[0]) : 'Unknown';
+      displayState.fileCount = result.metadata.fileCount;
+      displayState.analyzerElapsedMs = Date.now() - analyzerStart;
+      renderer.onAnalyzersDone(displayState);
+
+      // Write static analysis report
       const outputDir = resolve(config.output);
       await mkdir(outputDir, { recursive: true });
-
       const outputPath = join(outputDir, 'static-analysis.md');
       const markdown = formatMarkdownReport(result);
       await writeFile(outputPath, markdown, 'utf-8');
 
-      logger.blank();
-      logger.success('Static analysis complete');
-      logger.blank();
-      console.log(formatTerminalSummary(result));
-      logger.blank();
-      logger.info(`Report written to: ${pc.cyan(outputPath)}`);
+      // Completion
+      displayState.phase = 'complete';
+      displayState.elapsedMs = Date.now() - analyzerStart;
+      displayState.completionDocs = 1;
+      renderer.onComplete(displayState);
       return;
     }
 
-    // Resolve API key (validates it exists — fail fast)
+    // Resolve API key (validates it exists -- fail fast)
     resolveApiKey(config);
 
-    // Display header
-    logger.blank();
-    logger.info(
-      `${pc.bold('handover')} v0.1.0 — analyzing ${pc.cyan(config.project.name ?? 'project')}`,
-    );
-    logger.blank();
-
-    // SEC-03: Clear indication when code is sent to cloud
-    if (config.provider !== 'ollama') {
-      logger.warn(
-        `Code will be sent to ${pc.bold(config.provider)} (${pc.cyan(config.model ?? 'default')}) for analysis`,
-      );
-    } else {
-      logger.success('Using Ollama — all analysis runs locally');
-    }
-    logger.blank();
+    // Show startup banner (SEC-03: provider/model in banner serves as cloud indicator)
+    renderer.onBanner(displayState);
 
     // Resolve audience mode: CLI --audience overrides config
     const audience: 'human' | 'ai' =
@@ -143,7 +201,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
     // Create the LLM provider and token tracker
     const provider = createProvider(config);
-    const tracker = new TokenUsageTracker();
+    const tracker = new TokenUsageTracker(0.85, config.model ?? 'claude-opus-4-6');
     const estimateTokensFn = (text: string) => provider.estimateTokens(text);
 
     // Shared mutable state for inter-round result passing.
@@ -168,27 +226,112 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       get: (_target, prop) => (packedContext as unknown as Record<string | symbol, unknown>)?.[prop],
     });
 
-    const orchestrator = new DAGOrchestrator({
-      onStepStart: (_id, name) => logger.step(name, 'start'),
-      onStepComplete: (result) => {
-        const step = result.stepId;
-        const name = stepNames.get(step) ?? step;
-        logger.step(name, 'done');
-      },
-      onStepFail: (result) => {
-        const step = result.stepId;
-        const name = stepNames.get(step) ?? step;
-        logger.step(name, 'fail');
-      },
-    });
-
-    // Step name lookup (events only get IDs)
-    const stepNames = new Map<string, string>();
-
     // Helper to get typed round results from the shared Map
     type RoundResultOf<T> = RoundExecutionResult<T> | undefined;
     const getRound = <T>(n: number): RoundResultOf<T> =>
       roundResults.get(n) as RoundResultOf<T>;
+
+    // Create per-round onRetry callbacks that delegate to the orchestrator's onStepRetry event
+    const makeOnRetry = (roundNum: number) => (attempt: number, delayMs: number, reason: string) => {
+      orchestratorEvents.onStepRetry?.(`ai-round-${roundNum}`, attempt, delayMs, reason);
+    };
+
+    // DAG orchestrator events -- update display state and call renderer
+    const orchestratorEvents: DAGEvents = {
+      onStepStart: (id, name) => {
+        // AI round steps start with 'ai-round-'
+        const match = id.match(/^ai-round-(\d+)$/);
+        if (match) {
+          const roundNum = parseInt(match[1], 10);
+          const roundName = ROUND_NAMES[roundNum] ?? name;
+          displayState.rounds.set(roundNum, {
+            roundNumber: roundNum,
+            name: roundName,
+            status: 'running',
+            elapsedMs: 0,
+          });
+          renderer.onRoundUpdate(displayState);
+        }
+      },
+      onStepComplete: (result) => {
+        const match = result.stepId.match(/^ai-round-(\d+)$/);
+        if (match && result.data) {
+          const roundNum = parseInt(match[1], 10);
+          roundResults.set(roundNum, result.data as RoundExecutionResult<unknown>);
+
+          // Update display state with round completion info
+          const rd = displayState.rounds.get(roundNum);
+          const roundData = result.data as RoundExecutionResult<unknown>;
+          if (rd) {
+            // Degraded rounds returned a result but failed quality checks -- show as failed (red X), not done (green check)
+            rd.status = roundData.status === 'degraded' ? 'failed' : 'done';
+            rd.tokens = roundData.tokens;
+            rd.cost = roundData.cost;
+            rd.elapsedMs = result.duration;
+            rd.retrying = false; // Clear any retry state from a preceding retry attempt
+          }
+
+          // If degraded, also record an error and affected docs
+          if (roundData.status === 'degraded') {
+            const affectedDocs = DOCUMENT_REGISTRY
+              .filter(d => d.requiredRounds.includes(roundNum))
+              .map(d => d.filename);
+            displayState.errors.push({
+              source: `Round ${roundNum}`,
+              message: 'Degraded: round completed but failed quality checks',
+              affectedDocs,
+            });
+          }
+
+          displayState.totalTokens = tracker.getTotalUsage().input + tracker.getTotalUsage().output;
+          displayState.totalCost = tracker.getTotalCost();
+          renderer.onRoundUpdate(displayState);
+        }
+      },
+      onStepFail: (result) => {
+        const match = result.stepId.match(/^ai-round-(\d+)$/);
+        if (match) {
+          const roundNum = parseInt(match[1], 10);
+          const rd = displayState.rounds.get(roundNum);
+          if (rd) {
+            rd.status = 'failed';
+          }
+          // Determine affected documents
+          const affectedDocs = DOCUMENT_REGISTRY
+            .filter(d => d.requiredRounds.includes(roundNum))
+            .map(d => d.filename);
+          displayState.errors.push({
+            source: `Round ${roundNum}`,
+            message: result.error instanceof Error ? result.error.message : String(result.error),
+            affectedDocs,
+          });
+          renderer.onRoundUpdate(displayState);
+        }
+      },
+      onStepRetry: (stepId, attempt, delayMs, reason) => {
+        const match = stepId.match(/^ai-round-(\d+)$/);
+        if (match) {
+          const roundNum = parseInt(match[1], 10);
+          const rd = displayState.rounds.get(roundNum);
+          if (rd) {
+            rd.retrying = true;
+            rd.retryDelayMs = delayMs;
+            rd.retryStartMs = Date.now();
+            rd.retryReason = reason;
+          }
+          renderer.onRoundUpdate(displayState);
+        }
+      },
+    };
+
+    const orchestrator = new DAGOrchestrator(orchestratorEvents);
+
+    // Initialize analyzer map and run static analysis with progress
+    const ANALYZER_NAMES = ['file-tree', 'dependencies', 'git-history', 'todos', 'env', 'ast', 'tests', 'docs'];
+    for (const name of ANALYZER_NAMES) {
+      displayState.analyzers.set(name, 'pending');
+    }
+    displayState.phase = 'static-analysis';
 
     const steps = [
       // Step 1: Static Analysis + Context Packing (always runs)
@@ -197,8 +340,32 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         name: 'Static Analysis',
         deps: [],
         execute: async () => {
-          const result = await runStaticAnalysis(rootDir, config);
+          const analyzerStart = Date.now();
+          const result = await runStaticAnalysis(rootDir, config, {
+            onProgress: (analyzer, status) => {
+              const mapped: AnalyzerStatus = status === 'start' ? 'running'
+                : status === 'fail' ? 'failed'
+                : 'done';
+              displayState.analyzers.set(analyzer, mapped);
+              displayState.analyzerElapsedMs = Date.now() - analyzerStart;
+              if (status === 'fail') {
+                displayState.errors.push({
+                  source: `Analyzer: ${analyzer}`,
+                  message: `${analyzer} failed during static analysis`,
+                });
+              }
+              renderer.onAnalyzerUpdate(displayState);
+            },
+          });
           staticAnalysisResult = result;
+
+          // Detect language from file extensions
+          const exts = result.fileTree.filesByExtension;
+          const topExt = Object.entries(exts).sort((a, b) => b[1] - a[1])[0];
+          displayState.language = topExt ? extToLanguage(topExt[0]) : 'Unknown';
+          displayState.fileCount = result.metadata.fileCount;
+          displayState.analyzerElapsedMs = Date.now() - analyzerStart;
+          renderer.onAnalyzersDone(displayState);
 
           // Context packing: score files and pack into token budget
           const scored = scoreFiles(result);
@@ -214,12 +381,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             getFileContent,
           );
 
-          logger.log(
-            `Context packed: ${packedContext.metadata.fullFiles} full, ` +
-              `${packedContext.metadata.signatureFiles} signatures, ` +
-              `${packedContext.metadata.skippedFiles} skipped ` +
-              `(${packedContext.metadata.utilizationPercent}% budget)`,
-          );
+          // Transition to AI rounds phase
+          displayState.phase = 'ai-rounds';
 
           return result;
         },
@@ -236,6 +399,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           config,
           tracker,
           estimateTokensFn,
+          makeOnRetry(1),
         ),
       );
     }
@@ -250,6 +414,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           tracker,
           estimateTokensFn,
           () => getRound<Round1Output>(1),
+          makeOnRetry(2),
         ),
       );
     }
@@ -267,6 +432,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             round1: getRound<Round1Output>(1),
             round2: getRound<Round2Output>(2),
           }),
+          makeOnRetry(3),
         ),
       );
     }
@@ -285,6 +451,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             round2: getRound<Round2Output>(2),
             round3: getRound<Round3Output>(3),
           }),
+          makeOnRetry(4),
         ),
       );
     }
@@ -302,6 +469,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             round1: getRound<Round1Output>(1),
             round2: getRound<Round2Output>(2),
           }),
+          makeOnRetry(5),
         ),
       );
     }
@@ -319,6 +487,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             round1: getRound<Round1Output>(1),
             round2: getRound<Round2Output>(2),
           }),
+          makeOnRetry(6),
         ),
       );
     }
@@ -343,6 +512,11 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         name: 'Document Rendering',
         deps: renderDeps,
         execute: async () => {
+          displayState.phase = 'rendering';
+
+          // Signal rounds done before transitioning to rendering
+          renderer.onRoundsDone(displayState);
+
           // Build the RenderContext from pipeline results
           const ctx: RenderContext = {
             rounds: {
@@ -389,7 +563,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
             // Write document to disk
             await writeFile(join(outputDir, doc.filename), content, 'utf-8');
-            logger.log(`  Generated ${doc.filename}`);
+
+            // Update display state and notify renderer
+            displayState.renderedDocs.push(doc.filename);
+            renderer.onDocRendered(displayState);
 
             // Determine status based on round availability
             const roundStatus = determineDocStatus(
@@ -422,25 +599,19 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           // Generate INDEX last (it needs all statuses)
           const indexContent = renderIndex(ctx, statuses);
           await writeFile(join(outputDir, '00-INDEX.md'), indexContent, 'utf-8');
-          logger.log('  Generated 00-INDEX.md');
 
-          // Summary
-          const generated =
-            statuses.filter((s) => s.status !== 'not-generated').length + 1; // +1 for INDEX
-          logger.success(`Rendered ${generated} documents to ${outputDir}`);
+          // Notify renderer of INDEX completion
+          displayState.renderedDocs.push('00-INDEX.md');
+          renderer.onDocRendered(displayState);
 
           return { generatedDocs: statuses, outputDir };
         },
       }),
     );
 
-    for (const step of steps) {
-      stepNames.set(step.id, step.name);
-    }
-
     orchestrator.addSteps(steps);
 
-    // Validate and execute
+    // Validate pipeline
     const validation = orchestrator.validate();
     if (!validation.valid) {
       throw new HandoverError(
@@ -450,68 +621,15 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       );
     }
 
-    // Hook into step completion to store round results for inter-round passing
-    const originalOnStepComplete = orchestrator['events'].onStepComplete;
-    orchestrator['events'].onStepComplete = (result) => {
-      originalOnStepComplete?.(result);
-
-      // Extract round number from step ID (e.g., 'ai-round-1' -> 1)
-      const match = result.stepId.match(/^ai-round-(\d+)$/);
-      if (match && result.data) {
-        const roundNumber = parseInt(match[1], 10);
-        roundResults.set(roundNumber, result.data as RoundExecutionResult<unknown>);
-      }
-    };
-
     const dagResults = await orchestrator.execute(config);
 
-    const elapsed = Date.now() - startTime;
-    const completed = [...dagResults.values()].filter(
-      (r) => r.status === 'completed',
-    ).length;
-    const failed = [...dagResults.values()].filter(
-      (r) => r.status === 'failed',
-    ).length;
-
-    logger.blank();
-    if (failed === 0) {
-      logger.success(
-        `Pipeline complete — ${completed} steps in ${elapsed}ms`,
-      );
-    } else {
-      logger.warn(
-        `Pipeline finished with ${failed} failure(s) — ${completed}/${dagResults.size} steps completed`,
-      );
-    }
-
-    // Validation summary and failure report
-    const pipelineSummary = buildValidationSummary(roundResults);
-    logger.info(formatValidationLine(pipelineSummary));
-
-    // Token usage summary
-    logger.log(tracker.toSummary());
-
-    // If any rounds are degraded/failed/skipped: log the failure report
-    const hasProblemRounds = pipelineSummary.roundSummaries.some(
-      (r) => r.status === 'degraded' || r.status === 'skipped' || r.status === 'failed',
-    );
-    if (hasProblemRounds) {
-      logger.warn(buildFailureReport(roundResults));
-    }
-
-    // Document generation info
-    const renderResult = dagResults.get('render');
-    if (renderResult?.status === 'completed' && renderResult.data) {
-      const renderData = renderResult.data as {
-        generatedDocs: DocumentStatus[];
-        outputDir: string;
-      };
-      const renderedCount =
-        renderData.generatedDocs.filter((s) => s.status !== 'not-generated').length + 1;
-      logger.info(
-        `Documents: ${renderedCount} generated in ${pc.cyan(renderData.outputDir)}`,
-      );
-    }
+    // Completion summary
+    displayState.phase = 'complete';
+    displayState.elapsedMs = Date.now() - startTime;
+    displayState.completionDocs = displayState.renderedDocs.length;
+    displayState.totalTokens = tracker.getTotalUsage().input + tracker.getTotalUsage().output;
+    displayState.totalCost = tracker.getTotalCost();
+    renderer.onComplete(displayState);
   } catch (err) {
     if (err instanceof HandoverError) {
       logger.error(err);
@@ -525,5 +643,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     );
     logger.error(wrapped);
     process.exit(1);
+  } finally {
+    renderer.destroy();
+    logger.setSuppressed(false);
   }
 }
