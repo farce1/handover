@@ -343,9 +343,93 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         name: 'Document Rendering',
         deps: renderDeps,
         execute: async () => {
-          // Placeholder: Task 3 replaces this with real document generation
-          logger.log('Document rendering will run here (Task 3)');
-          return {};
+          // Build the RenderContext from pipeline results
+          const ctx: RenderContext = {
+            rounds: {
+              r1: getRound<Round1Output>(1),
+              r2: getRound<Round2Output>(2),
+              r3: getRound<Round3Output>(3),
+              r4: getRound<Round4Output>(4),
+              r5: getRound<Round5Output>(5),
+              r6: getRound<Round6Output>(6),
+            },
+            staticAnalysis: staticAnalysisResult!,
+            config,
+            audience,
+            generatedAt: new Date().toISOString(),
+            projectName:
+              getRound<Round1Output>(1)?.data?.projectName
+              ?? config.project.name
+              ?? 'Unknown Project',
+          };
+
+          // Create output directory
+          const outputDir = resolve(config.output);
+          await mkdir(outputDir, { recursive: true });
+
+          // Render each selected document (except INDEX, generated last)
+          const statuses: DocumentStatus[] = [];
+
+          for (const doc of selectedDocs) {
+            if (doc.id === '00-index') continue; // INDEX generated last
+
+            const content = doc.render(ctx);
+
+            // Renderer returned empty = document cannot be generated (missing AI data)
+            if (content === '') {
+              statuses.push({
+                id: doc.id,
+                filename: doc.filename,
+                title: doc.title,
+                status: 'not-generated',
+                reason: 'Required AI analysis unavailable',
+              });
+              continue;
+            }
+
+            // Write document to disk
+            await writeFile(join(outputDir, doc.filename), content, 'utf-8');
+            logger.log(`  Generated ${doc.filename}`);
+
+            // Determine status based on round availability
+            const roundStatus = determineDocStatus(
+              doc.requiredRounds,
+              roundResults,
+              true,
+            );
+            statuses.push({
+              id: doc.id,
+              filename: doc.filename,
+              title: doc.title,
+              status: roundStatus,
+            });
+          }
+
+          // Add statuses for non-selected documents (for INDEX completeness)
+          for (const doc of DOCUMENT_REGISTRY) {
+            if (doc.id === '00-index') continue;
+            if (!selectedDocs.find((d) => d.id === doc.id)) {
+              statuses.push({
+                id: doc.id,
+                filename: doc.filename,
+                title: doc.title,
+                status: 'not-generated',
+                reason: 'Not included in --only selection',
+              });
+            }
+          }
+
+          // Generate INDEX last (it needs all statuses)
+          const indexContent = renderIndex(ctx, statuses);
+          await writeFile(join(outputDir, '00-INDEX.md'), indexContent, 'utf-8');
+          logger.log('  Generated 00-INDEX.md');
+
+          // Summary
+          const generated =
+            statuses.filter((s) => s.status !== 'not-generated').length + 1; // +1 for INDEX
+          logger.success(`Rendered ${generated} documents to ${outputDir}`);
+
+          return { generatedDocs: statuses, outputDir };
         },
       }),
     );
@@ -413,6 +497,20 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     );
     if (hasProblemRounds) {
       logger.warn(buildFailureReport(roundResults));
+    }
+
+    // Document generation info
+    const renderResult = dagResults.get('render');
+    if (renderResult?.status === 'completed' && renderResult.data) {
+      const renderData = renderResult.data as {
+        generatedDocs: DocumentStatus[];
+        outputDir: string;
+      };
+      const renderedCount =
+        renderData.generatedDocs.filter((s) => s.status !== 'not-generated').length + 1;
+      logger.info(
+        `Documents: ${renderedCount} generated in ${pc.cyan(renderData.outputDir)}`,
+      );
     }
   } catch (err) {
     if (err instanceof HandoverError) {
