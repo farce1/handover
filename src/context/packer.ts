@@ -15,6 +15,11 @@ export const OVERSIZED_THRESHOLD_TOKENS = 8000;
 /** Batch size for concurrent file reads (memory-bounded, consistent with Phase 3) */
 const BATCH_SIZE = 50;
 
+/** Safe utilization percentage calculation (avoids divide-by-zero) */
+function calcUtilization(used: number, total: number): number {
+  return total > 0 ? Math.round((used / total) * 100) : 0;
+}
+
 // ─── Signature extraction ───────────────────────────────────────────────────
 
 /**
@@ -227,6 +232,23 @@ export async function packFiles(
   estimateTokensFn: (text: string) => number,
   getFileContent: (path: string) => Promise<string>,
 ): Promise<PackedContext> {
+  // ── Empty input guard ──────────────────────────────────────────────────
+  if (scored.length === 0) {
+    return {
+      files: [],
+      budget,
+      metadata: {
+        totalFiles: 0,
+        fullFiles: 0,
+        signatureFiles: 0,
+        skippedFiles: 0,
+        usedTokens: 0,
+        budgetTokens: budget.fileContentBudget,
+        utilizationPercent: 0,
+      },
+    };
+  }
+
   // Build AST lookup map
   const astMap = new Map<string, ParsedFile>();
   for (const file of astResult.files) {
@@ -286,9 +308,7 @@ export async function packFiles(
         skippedFiles: 0,
         usedTokens,
         budgetTokens: budget.fileContentBudget,
-        utilizationPercent: Math.round(
-          (usedTokens / budget.fileContentBudget) * 100,
-        ),
+        utilizationPercent: calcUtilization(usedTokens, budget.fileContentBudget),
       },
     };
   }
