@@ -37,6 +37,7 @@ export const HandoverConfigSchema = z.object({
       boost: z.array(z.string()).default([]),
     })
     .default({}),
+  costWarningThreshold: z.number().positive().optional(),
 });
 
 export type HandoverConfig = z.infer<typeof HandoverConfigSchema>;

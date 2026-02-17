@@ -11,7 +11,17 @@ export class TokenUsageTracker {
   private rounds: TokenUsage[] = [];
   private readonly warnThreshold: number;
 
-  constructor(warnThreshold = 0.85) {
+  private static readonly MODEL_COSTS: Record<string, { inputPerMillion: number; outputPerMillion: number }> = {
+    'claude-opus-4-6': { inputPerMillion: 15, outputPerMillion: 75 },
+    'claude-opus-4-5': { inputPerMillion: 5, outputPerMillion: 25 },
+    'claude-sonnet-4-5': { inputPerMillion: 3, outputPerMillion: 15 },
+    'claude-haiku-4-5': { inputPerMillion: 1, outputPerMillion: 5 },
+    'gpt-4o': { inputPerMillion: 2.5, outputPerMillion: 10 },
+    'gpt-4o-mini': { inputPerMillion: 0.15, outputPerMillion: 0.6 },
+    'default': { inputPerMillion: 15, outputPerMillion: 75 },
+  };
+
+  constructor(warnThreshold = 0.85, private readonly model: string = 'default') {
     this.warnThreshold = warnThreshold;
   }
 
@@ -96,5 +106,43 @@ export class TokenUsageTracker {
     );
 
     return lines.join('\n');
+  }
+
+  /**
+   * Estimate the dollar cost for a given number of input and output tokens
+   * based on the configured model's pricing.
+   */
+  estimateCost(inputTokens: number, outputTokens: number): number {
+    const costs = TokenUsageTracker.MODEL_COSTS[this.model] ?? TokenUsageTracker.MODEL_COSTS['default'];
+    return (inputTokens / 1_000_000) * costs.inputPerMillion + (outputTokens / 1_000_000) * costs.outputPerMillion;
+  }
+
+  /**
+   * Get the estimated cost for a specific round by round number.
+   * Returns 0 if the round has not been recorded.
+   */
+  getRoundCost(roundNumber: number): number {
+    const usage = this.rounds.find((r) => r.round === roundNumber);
+    if (!usage) return 0;
+    return this.estimateCost(usage.inputTokens, usage.outputTokens);
+  }
+
+  /**
+   * Get the total estimated cost across all recorded rounds.
+   */
+  getTotalCost(): number {
+    let total = 0;
+    for (const r of this.rounds) {
+      total += this.estimateCost(r.inputTokens, r.outputTokens);
+    }
+    return total;
+  }
+
+  /**
+   * Get the token usage entry for a specific round by round number.
+   * Returns undefined if the round has not been recorded.
+   */
+  getRoundUsage(roundNumber: number): TokenUsage | undefined {
+    return this.rounds.find((r) => r.round === roundNumber);
   }
 }
