@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** A single `handover generate` command produces a complete, cross-referenced knowledge base that eliminates the 2-4 week onboarding gap when codebases change hands.
-**Current focus:** Phase 8 in progress -- Multi-provider ecosystem. Plan 1 (provider foundation) complete.
+**Current focus:** Phase 8 in progress -- Multi-provider ecosystem. Plans 1-2 complete (foundation + cache/estimate).
 
 ## Current Position
 
 Phase: 8 of 9 (Provider Ecosystem and Reliability)
-Plan: 1 of 3 in current phase (08-01 complete)
-Status: Multi-provider foundation built -- 7 named providers with OpenAICompatibleProvider and fail-fast validation
-Last activity: 2026-02-17 -- Completed 08-01-PLAN.md (multi-provider foundation)
+Plan: 2 of 3 in current phase (08-02 complete)
+Status: Round cache and estimate command built -- content-hash cache for crash recovery, styled cost comparison CLI
+Last activity: 2026-02-17 -- Completed 08-02-PLAN.md (round cache and estimate command)
 
-Progress: [██████████████░] 93%
+Progress: [██████████████░] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 25
+- Total plans completed: 26
 - Average duration: 5min
-- Total execution time: 114min
+- Total execution time: 118min
 
 **By Phase:**
 
@@ -53,10 +53,11 @@ Progress: [██████████████░] 93%
 | 07-03 | 2 tasks | 5min | 5min |
 
 | 08-01 | 2 tasks | 6min | 6min |
+| 08-02 | 2 tasks | 4min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 4min, 5min, 5min, 5min, 6min
-- Trend: consistent fast execution; Phase 8 provider foundation complete
+- Last 5 plans: 5min, 5min, 5min, 6min, 4min
+- Trend: consistent fast execution; Phase 8 cache and estimate complete
 
 *Updated after each plan completion*
 
@@ -155,6 +156,10 @@ Recent decisions affecting current work:
 - [Phase 08]: Validation order: provider-specific checks before generic API key check for most specific error first
 - [Phase 08]: Tool call type narrowing via toolCall.type !== 'function' for openai v5 union type
 - [Phase 08]: Ollama gets dummy apiKey 'ollama' (required by SDK, ignored by server)
+- [Phase 08]: Output tokens estimated at 20% of input tokens for cost heuristic in estimate command
+- [Phase 08]: Estimate command uses console.log directly, not terminal renderer (simple command, not pipeline)
+- [Phase 08]: Cost entries sorted: current provider first, then ascending cost, local providers last
+- [Phase 08]: Ollama label uses provider name as model since defaultModel is empty string
 
 ### Pending Todos
 
@@ -167,5 +172,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 08-01-PLAN.md (multi-provider foundation)
-Resume file: .planning/phases/08-provider-ecosystem-and-reliability/08-02-PLAN.md
+Stopped at: Completed 08-02-PLAN.md (round cache and estimate command)
+Resume file: .planning/phases/08-provider-ecosystem-and-reliability/08-03-PLAN.md
