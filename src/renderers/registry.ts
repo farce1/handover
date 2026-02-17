@@ -1,17 +1,29 @@
-import type { DocumentSpec, RenderContext } from './types.js';
+import type { DocumentSpec } from './types.js';
 import { HandoverError } from '../utils/errors.js';
 
-// ─── Placeholder render ─────────────────────────────────────────────────────
+// ─── Renderer Imports ───────────────────────────────────────────────────────
 
-/** Placeholder renderer replaced by individual document renderers in plans 02/03. */
-const placeholderRender = (_ctx: RenderContext): string => '';
+import { renderIndex } from './render-00-index.js';
+import { renderOverview } from './render-01-overview.js';
+import { renderGettingStarted } from './render-02-getting-started.js';
+import { renderArchitecture } from './render-03-architecture.js';
+import { renderFileStructure } from './render-04-file-structure.js';
+import { renderFeatures } from './render-05-features.js';
+import { renderModules } from './render-06-modules.js';
+import { renderDependencies } from './render-07-dependencies.js';
+import { renderEnvironment } from './render-08-environment.js';
+import { renderEdgeCases } from './render-09-edge-cases.js';
+import { renderTechDebt } from './render-10-tech-debt.js';
+import { renderConventions } from './render-11-conventions.js';
+import { renderTesting } from './render-12-testing.js';
+import { renderDeployment } from './render-13-deployment.js';
 
 // ─── Document Registry ──────────────────────────────────────────────────────
 
 /**
  * Central registry of all 14 handover documents.
  * Each entry maps the document to its aliases (for --only), required AI rounds,
- * and render function. Render functions are placeholders until plans 02/03.
+ * and render function.
  */
 export const DOCUMENT_REGISTRY: DocumentSpec[] = [
   {
@@ -21,7 +33,10 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'index',
     aliases: ['index', 'idx'],
     requiredRounds: [],
-    render: placeholderRender,
+    // NOTE: renderIndex has a different signature (extra `statuses` param).
+    // This shim satisfies the DocumentSpec render type; the actual statuses
+    // are passed at render-time in generate.ts which calls renderIndex directly.
+    render: (ctx) => renderIndex(ctx, []),
   },
   {
     id: '01-project-overview',
@@ -30,7 +45,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'overview',
     aliases: ['overview'],
     requiredRounds: [1],
-    render: placeholderRender,
+    render: renderOverview,
   },
   {
     id: '02-getting-started',
@@ -39,7 +54,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'guide',
     aliases: ['getting-started', 'start'],
     requiredRounds: [1, 6],
-    render: placeholderRender,
+    render: renderGettingStarted,
   },
   {
     id: '03-architecture',
@@ -48,7 +63,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'architecture',
     aliases: ['arch', 'architecture'],
     requiredRounds: [1, 2, 3, 4],
-    render: placeholderRender,
+    render: renderArchitecture,
   },
   {
     id: '04-file-structure',
@@ -57,7 +72,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'structure',
     aliases: ['files', 'file-structure'],
     requiredRounds: [1, 2],
-    render: placeholderRender,
+    render: renderFileStructure,
   },
   {
     id: '05-features',
@@ -66,7 +81,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'features',
     aliases: ['features'],
     requiredRounds: [1, 2, 3],
-    render: placeholderRender,
+    render: renderFeatures,
   },
   {
     id: '06-modules',
@@ -75,7 +90,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'modules',
     aliases: ['modules', 'mods'],
     requiredRounds: [1, 2],
-    render: placeholderRender,
+    render: renderModules,
   },
   {
     id: '07-dependencies',
@@ -84,7 +99,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'dependencies',
     aliases: ['deps', 'dependencies'],
     requiredRounds: [1],
-    render: placeholderRender,
+    render: renderDependencies,
   },
   {
     id: '08-environment',
@@ -93,7 +108,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'environment',
     aliases: ['env', 'environment'],
     requiredRounds: [1, 2, 6],
-    render: placeholderRender,
+    render: renderEnvironment,
   },
   {
     id: '09-edge-cases',
@@ -102,7 +117,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'edge-cases',
     aliases: ['edge-cases', 'gotchas'],
     requiredRounds: [1, 2, 5],
-    render: placeholderRender,
+    render: renderEdgeCases,
   },
   {
     id: '10-tech-debt',
@@ -111,7 +126,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'tech-debt',
     aliases: ['tech-debt', 'todos'],
     requiredRounds: [1, 2, 5],
-    render: placeholderRender,
+    render: renderTechDebt,
   },
   {
     id: '11-conventions',
@@ -120,7 +135,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'conventions',
     aliases: ['conventions'],
     requiredRounds: [1, 2, 5],
-    render: placeholderRender,
+    render: renderConventions,
   },
   {
     id: '12-testing',
@@ -129,7 +144,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'testing',
     aliases: ['testing', 'tests'],
     requiredRounds: [1, 2, 5],
-    render: placeholderRender,
+    render: renderTesting,
   },
   {
     id: '13-deployment',
@@ -138,7 +153,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'deployment',
     aliases: ['deploy', 'deployment'],
     requiredRounds: [1, 2, 6],
-    render: placeholderRender,
+    render: renderDeployment,
   },
 ];
 
