@@ -2,35 +2,82 @@
  * Shared test utilities for integration tests.
  *
  * Provides helpers for creating synthetic fixtures, running the CLI as a
- * subprocess, and cleaning up after tests. All fixtures are created in
- * a temp directory for speed and determinism.
+ * subprocess, and cleaning up after tests.
+ *
+ * Each call to `createFixtureScope()` returns an isolated scope with its own
+ * temp directory, preventing parallel test file cleanup from interfering
+ * with other test files' fixtures.
  *
  * NOTE: Tests require `npm run build` first -- the CLI runs from dist/.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 
 /** Path to the built CLI entry point. */
 export const CLI_PATH = join(__dirname, '../../dist/index.js');
 
-/** Temp directory for all test fixtures. */
+/** Base temp directory prefix for test fixtures. */
 export const FIXTURES_DIR = join(tmpdir(), 'handover-test-fixtures');
 
 /**
- * Create a synthetic fixture directory with the given files.
+ * Create an isolated fixture scope for a test file.
  *
- * @param name - Unique name for this fixture (used as subdirectory)
- * @param files - Map of relative path to file content
- * @returns Absolute path to the created fixture directory
+ * Returns `createFixture` and `cleanup` functions that operate on
+ * an isolated temp directory, safe for parallel test execution.
+ */
+export function createFixtureScope(): {
+  createFixture: (name: string, files: Record<string, string>) => string;
+  addBinaryFile: (fixtureDir: string, relativePath: string, content: Buffer) => void;
+  cleanup: () => void;
+} {
+  mkdirSync(FIXTURES_DIR, { recursive: true });
+  const scopeDir = mkdtempSync(join(FIXTURES_DIR, 'scope-'));
+
+  return {
+    createFixture(name: string, files: Record<string, string>): string {
+      const fixtureDir = join(scopeDir, name);
+      mkdirSync(fixtureDir, { recursive: true });
+
+      for (const [relativePath, content] of Object.entries(files)) {
+        const fullPath = join(fixtureDir, relativePath);
+        mkdirSync(dirname(fullPath), { recursive: true });
+        writeFileSync(fullPath, content, 'utf-8');
+      }
+
+      return fixtureDir;
+    },
+
+    addBinaryFile(fixtureDir: string, relativePath: string, content: Buffer): void {
+      const fullPath = join(fixtureDir, relativePath);
+      mkdirSync(dirname(fullPath), { recursive: true });
+      writeFileSync(fullPath, content);
+    },
+
+    cleanup(): void {
+      try {
+        rmSync(scopeDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    },
+  };
+}
+
+/**
+ * Legacy API: Create a fixture directory directly.
+ * Each fixture gets a unique directory under FIXTURES_DIR.
+ *
+ * WARNING: Use `createFixtureScope()` for parallel-safe test files.
+ * This function is kept for simple single-file usage.
  */
 export function createFixture(
   name: string,
   files: Record<string, string>,
 ): string {
-  const fixtureDir = join(FIXTURES_DIR, name);
-  mkdirSync(fixtureDir, { recursive: true });
+  mkdirSync(FIXTURES_DIR, { recursive: true });
+  const fixtureDir = mkdtempSync(join(FIXTURES_DIR, `${name}-`));
 
   for (const [relativePath, content] of Object.entries(files)) {
     const fullPath = join(fixtureDir, relativePath);
@@ -42,12 +89,7 @@ export function createFixture(
 }
 
 /**
- * Create a synthetic fixture with binary file content.
- * Separated from createFixture because binary content is a Buffer, not a string.
- *
- * @param fixtureDir - Existing fixture directory path
- * @param relativePath - Relative path for the binary file
- * @param content - Binary content as a Buffer
+ * Legacy API: Add binary file content to an existing fixture directory.
  */
 export function addBinaryFile(
   fixtureDir: string,
@@ -82,7 +124,7 @@ export function runCLI(
   const env = { ...process.env, NO_COLOR: '1', ...options?.env };
 
   try {
-    const stdout = execFileSync('node', [CLI_PATH, ...args], {
+    const stdout = execFileSync(process.execPath, [CLI_PATH, ...args], {
       cwd,
       timeout,
       env,
@@ -107,8 +149,13 @@ export function runCLI(
 }
 
 /**
- * Remove all test fixtures.
+ * Remove all test fixtures under FIXTURES_DIR.
+ * Only use in global teardown or when no other test files are running.
  */
 export function cleanupFixtures(): void {
-  rmSync(FIXTURES_DIR, { recursive: true, force: true });
+  try {
+    rmSync(FIXTURES_DIR, { recursive: true, force: true });
+  } catch {
+    // Ignore cleanup errors
+  }
 }

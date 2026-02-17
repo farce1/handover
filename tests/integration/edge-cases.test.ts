@@ -13,17 +13,19 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createFixture, addBinaryFile, runCLI, cleanupFixtures } from './setup.js';
+import { createFixtureScope, runCLI } from './setup.js';
+
+const scope = createFixtureScope();
 
 afterAll(() => {
-  cleanupFixtures();
+  scope.cleanup();
 });
 
 describe('empty repository', () => {
   let fixtureDir: string;
 
   beforeEach(() => {
-    fixtureDir = createFixture(`empty-repo-${Date.now()}`, {
+    fixtureDir = scope.createFixture(`empty-repo-${Date.now()}`, {
       // README is not a source file for analysis purposes
       'README.md': '# Empty Project\n\nThis repo has no source code.',
     });
@@ -63,7 +65,7 @@ describe('enormous file skipping', () => {
     // Generate 2.1MB of content to exceed the 2MB threshold
     const enormousContent = 'x'.repeat(2.1 * 1024 * 1024);
 
-    fixtureDir = createFixture(`enormous-file-${Date.now()}`, {
+    fixtureDir = scope.createFixture(`enormous-file-${Date.now()}`, {
       'normal.ts': normalContent,
       'enormous.js': enormousContent,
     });
@@ -98,17 +100,17 @@ describe('binary-only directory', () => {
   let fixtureDir: string;
 
   beforeEach(() => {
-    fixtureDir = createFixture(`binary-only-${Date.now()}`, {
+    fixtureDir = scope.createFixture(`binary-only-${Date.now()}`, {
       'src/app.ts': 'export const main = (): void => { console.log("hello"); };',
     });
 
     // Add binary files using the dedicated helper
-    addBinaryFile(
+    scope.addBinaryFile(
       fixtureDir,
       'assets/logo.png',
       Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
     );
-    addBinaryFile(
+    scope.addBinaryFile(
       fixtureDir,
       'assets/icon.ico',
       Buffer.from([0x00, 0x00, 0x01, 0x00, 0x01, 0x00]),
@@ -143,7 +145,7 @@ describe('no git history', () => {
 
   beforeEach(() => {
     // Create fixture with TypeScript files but NO .git/ directory
-    fixtureDir = createFixture(`no-git-${Date.now()}`, {
+    fixtureDir = scope.createFixture(`no-git-${Date.now()}`, {
       'src/index.ts': 'export const version = "1.0.0";',
       'src/utils.ts': 'export function add(a: number, b: number): number { return a + b; }',
       'package.json': JSON.stringify({ name: 'no-git-project', version: '1.0.0' }),
