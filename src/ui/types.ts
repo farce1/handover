@@ -13,7 +13,7 @@ export type AnalyzerStatus = 'pending' | 'running' | 'done' | 'failed';
 export interface RoundDisplayState {
   roundNumber: number;
   name: string;
-  status: 'pending' | 'running' | 'done' | 'failed';
+  status: 'pending' | 'running' | 'done' | 'failed' | 'cached';
   elapsedMs: number;
   tokens?: number;
   cost?: number;
@@ -48,6 +48,7 @@ export interface DisplayState {
   model: string;
   fileCount: number;
   language: string;
+  isLocal: boolean;
   analyzers: Map<string, AnalyzerStatus>;
   analyzerElapsedMs: number;
   rounds: Map<number, RoundDisplayState>;

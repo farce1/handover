@@ -17,7 +17,9 @@ import { TokenUsageTracker } from '../context/tracker.js';
 import { scoreFiles } from '../context/scorer.js';
 import { packFiles } from '../context/packer.js';
 import { computeTokenBudget } from '../context/token-counter.js';
-import { createProvider } from '../providers/factory.js';
+import { createProvider, validateProviderConfig } from '../providers/factory.js';
+import { PROVIDER_PRESETS } from '../providers/presets.js';
+import { RoundCache } from '../cache/round-cache.js';
 import { createRenderer } from '../ui/renderer.js';
 import { ROUND_NAMES } from '../ai-rounds/types.js';
 import {
@@ -33,7 +35,7 @@ import type { RoundExecutionResult } from '../ai-rounds/types.js';
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 import type { PackedContext } from '../context/types.js';
 import type { DisplayState, AnalyzerStatus } from '../ui/types.js';
-import type { DAGEvents } from '../domain/types.js';
+import type { DAGEvents, StepDefinition } from '../domain/types.js';
 import type {
   Round1Output,
   Round2Output,
@@ -50,6 +52,7 @@ export interface GenerateOptions {
   audience?: string;
   staticOnly?: boolean;
   verbose?: boolean;
+  noCache?: boolean;
 }
 
 /**
@@ -103,6 +106,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
     const config = loadConfig(cliOverrides);
 
+    // Determine if provider is local (drives LOCAL badge and cost omission)
+    const preset = PROVIDER_PRESETS[config.provider];
+    const isLocal = preset?.isLocal ?? false;
+
     // Mutable display state -- updated throughout the pipeline, renderer reads it
     const displayState: DisplayState = {
       phase: 'startup',
@@ -111,6 +118,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       model: config.model ?? 'default',
       fileCount: 0,
       language: '',
+      isLocal,
       analyzers: new Map(),
       analyzerElapsedMs: 0,
       rounds: new Map(),
@@ -181,8 +189,17 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       return;
     }
 
+    // Fail-fast validation before pipeline starts (PROV-05)
+    validateProviderConfig(config);
+
     // Resolve API key (validates it exists -- fail fast)
     resolveApiKey(config);
+
+    // Initialize round cache for crash recovery
+    const roundCache = new RoundCache();
+    if (options.noCache) {
+      await roundCache.clear();
+    }
 
     // Show startup banner (SEC-03: provider/model in banner serves as cloud indicator)
     renderer.onBanner(displayState);
@@ -217,6 +234,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     // the static-analysis step completes before any ai-round step executes.
     let staticAnalysisResult: StaticAnalysisResult | undefined;
     let packedContext: PackedContext | undefined;
+    let analysisFingerprint = '';
 
     const deferredAnalysis = new Proxy({} as StaticAnalysisResult, {
       get: (_target, prop) => (staticAnalysisResult as Record<string | symbol, unknown>)?.[prop],
@@ -258,6 +276,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         if (match && result.data) {
           const roundNum = parseInt(match[1], 10);
           roundResults.set(roundNum, result.data as RoundExecutionResult<unknown>);
+
+          // Don't overwrite cached status -- cache wrapper already set display state
+          const existingRd = displayState.rounds.get(roundNum);
+          if (existingRd?.status === 'cached') return;
 
           // Update display state with round completion info
           const rd = displayState.rounds.get(roundNum);
@@ -359,6 +381,13 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           });
           staticAnalysisResult = result;
 
+          // Compute fingerprint for round cache invalidation
+          // Use directoryTree file entries (path + size) for deterministic hashing
+          const fileEntries = result.fileTree.directoryTree
+            .filter(e => e.type === 'file')
+            .map(f => ({ path: f.path, size: f.size ?? 0 }));
+          analysisFingerprint = RoundCache.computeAnalysisFingerprint(fileEntries);
+
           // Detect language from file extensions
           const exts = result.fileTree.filesByExtension;
           const topExt = Object.entries(exts).sort((a, b) => b[1] - a[1])[0];
@@ -389,107 +418,138 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       }),
     ];
 
+    // Wrap a round step with cache awareness: check cache before executing,
+    // store result after successful execution. Cached rounds skip API calls entirely.
+    const wrapWithCache = (roundNum: number, step: StepDefinition): StepDefinition => {
+      const originalExecute = step.execute;
+      return createStep({
+        id: step.id,
+        name: step.name,
+        deps: [...step.deps],
+        execute: async (context) => {
+          const modelName = config.model ?? preset?.defaultModel ?? 'default';
+          const hash = roundCache.computeHash(roundNum, modelName, analysisFingerprint);
+          const cached = await roundCache.get(roundNum, hash);
+          if (cached) {
+            // Report cached round to display
+            const roundName = ROUND_NAMES[roundNum] ?? `Round ${roundNum}`;
+            displayState.rounds.set(roundNum, {
+              roundNumber: roundNum,
+              name: roundName,
+              status: 'cached',
+              elapsedMs: 0,
+            });
+            renderer.onRoundUpdate(displayState);
+            // Store in roundResults for downstream rounds
+            roundResults.set(roundNum, cached as RoundExecutionResult<unknown>);
+            return cached;
+          }
+          // Execute normally
+          const result = await originalExecute(context);
+          // Cache the result for future runs
+          if (result) {
+            await roundCache.set(roundNum, hash, result, modelName);
+          }
+          return result;
+        },
+      });
+    };
+
     // Conditionally register AI round steps based on requiredRounds (--only optimization)
     if (requiredRounds.has(1)) {
-      steps.push(
-        createRound1Step(
-          provider,
-          deferredAnalysis,
-          deferredContext,
-          config,
-          tracker,
-          estimateTokensFn,
-          makeOnRetry(1),
-        ),
+      const step = createRound1Step(
+        provider,
+        deferredAnalysis,
+        deferredContext,
+        config,
+        tracker,
+        estimateTokensFn,
+        makeOnRetry(1),
       );
+      steps.push(wrapWithCache(1, step));
     }
 
     if (requiredRounds.has(2)) {
-      steps.push(
-        createRound2Step(
-          provider,
-          deferredAnalysis,
-          deferredContext,
-          config,
-          tracker,
-          estimateTokensFn,
-          () => getRound<Round1Output>(1),
-          makeOnRetry(2),
-        ),
+      const step = createRound2Step(
+        provider,
+        deferredAnalysis,
+        deferredContext,
+        config,
+        tracker,
+        estimateTokensFn,
+        () => getRound<Round1Output>(1),
+        makeOnRetry(2),
       );
+      steps.push(wrapWithCache(2, step));
     }
 
     if (requiredRounds.has(3)) {
-      steps.push(
-        createRound3Step(
-          provider,
-          deferredAnalysis,
-          deferredContext,
-          config,
-          tracker,
-          estimateTokensFn,
-          () => ({
-            round1: getRound<Round1Output>(1),
-            round2: getRound<Round2Output>(2),
-          }),
-          makeOnRetry(3),
-        ),
+      const step = createRound3Step(
+        provider,
+        deferredAnalysis,
+        deferredContext,
+        config,
+        tracker,
+        estimateTokensFn,
+        () => ({
+          round1: getRound<Round1Output>(1),
+          round2: getRound<Round2Output>(2),
+        }),
+        makeOnRetry(3),
       );
+      steps.push(wrapWithCache(3, step));
     }
 
     if (requiredRounds.has(4)) {
-      steps.push(
-        createRound4Step(
-          provider,
-          deferredAnalysis,
-          deferredContext,
-          config,
-          tracker,
-          estimateTokensFn,
-          () => ({
-            round1: getRound<Round1Output>(1),
-            round2: getRound<Round2Output>(2),
-            round3: getRound<Round3Output>(3),
-          }),
-          makeOnRetry(4),
-        ),
+      const step = createRound4Step(
+        provider,
+        deferredAnalysis,
+        deferredContext,
+        config,
+        tracker,
+        estimateTokensFn,
+        () => ({
+          round1: getRound<Round1Output>(1),
+          round2: getRound<Round2Output>(2),
+          round3: getRound<Round3Output>(3),
+        }),
+        makeOnRetry(4),
       );
+      steps.push(wrapWithCache(4, step));
     }
 
     if (requiredRounds.has(5)) {
-      steps.push(
-        createRound5Step(
-          provider,
-          deferredAnalysis,
-          deferredContext,
-          config,
-          tracker,
-          estimateTokensFn,
-          () => ({
-            round1: getRound<Round1Output>(1),
-            round2: getRound<Round2Output>(2),
-          }),
-          makeOnRetry(5),
-        ),
+      const step = createRound5Step(
+        provider,
+        deferredAnalysis,
+        deferredContext,
+        config,
+        tracker,
+        estimateTokensFn,
+        () => ({
+          round1: getRound<Round1Output>(1),
+          round2: getRound<Round2Output>(2),
+        }),
+        makeOnRetry(5),
       );
+      steps.push(wrapWithCache(5, step));
     }
 
     if (requiredRounds.has(6)) {
-      steps.push(
-        createRound6Step(
-          provider,
-          deferredAnalysis,
-          deferredContext,
-          config,
-          tracker,
-          estimateTokensFn,
-          () => ({
-            round1: getRound<Round1Output>(1),
-            round2: getRound<Round2Output>(2),
-          }),
-          makeOnRetry(6),
-        ),
+      const step = createRound6Step(
+        provider,
+        deferredAnalysis,
+        deferredContext,
+        config,
+        tracker,
+        estimateTokensFn,
+        () => ({
+          round1: getRound<Round1Output>(1),
+          round2: getRound<Round2Output>(2),
+        }),
+        makeOnRetry(6),
       );
+      steps.push(wrapWithCache(6, step));
     }
 
     // Compute render step dependencies dynamically from registered rounds.
