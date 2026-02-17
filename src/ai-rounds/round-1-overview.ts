@@ -30,6 +30,7 @@ export function createRound1Step(
   config: HandoverConfig,
   tracker: TokenUsageTracker,
   estimateTokensFn: (text: string) => number,
+  onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): StepDefinition {
   return createStep({
     id: 'ai-round-1',
@@ -69,6 +70,7 @@ export function createRound1Step(
         buildFallback: () => buildRound1Fallback(staticAnalysis),
         tracker,
         estimateTokensFn,
+        onRetry,
       });
     },
     onSkip: () => buildRound1Fallback(staticAnalysis),

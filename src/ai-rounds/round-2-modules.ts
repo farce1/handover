@@ -34,6 +34,7 @@ export function createRound2Step(
   tracker: TokenUsageTracker,
   estimateTokensFn: (text: string) => number,
   getRound1Result: () => RoundExecutionResult<Round1Output> | undefined,
+  onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): StepDefinition {
   return createStep({
     id: 'ai-round-2',
@@ -77,6 +78,7 @@ export function createRound2Step(
         buildFallback: () => buildRound2Fallback(staticAnalysis),
         tracker,
         estimateTokensFn,
+        onRetry,
       });
     },
     onSkip: () => buildRound2Fallback(staticAnalysis),

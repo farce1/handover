@@ -59,6 +59,7 @@ export function createRound5Step(
     round1?: RoundExecutionResult<Round1Output>;
     round2?: RoundExecutionResult<Round2Output>;
   },
+  onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): StepDefinition {
   return createStep({
     id: 'ai-round-5',
@@ -73,6 +74,7 @@ export function createRound5Step(
           tracker,
           estimateTokensFn,
           getPriorResults,
+          onRetry,
         );
       } catch (error) {
         // Failed round: degrade gracefully with static fallback data
@@ -124,6 +126,7 @@ async function executeRound5(
     round1?: RoundExecutionResult<Round1Output>;
     round2?: RoundExecutionResult<Round2Output>;
   },
+  onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): Promise<RoundExecutionResult<Round5Output>> {
   const priorResults = getPriorResults();
   const r2Context = priorResults.round2?.context;
@@ -155,6 +158,8 @@ async function executeRound5(
         priorRounds,
         tracker,
         estimateTokensFn,
+        false,
+        onRetry,
       );
       return { moduleName: mod.name, result: moduleResult };
     });
@@ -238,6 +243,7 @@ async function executeRound5(
         priorRounds,
         tracker,
         estimateTokensFn,
+        onRetry,
       );
 
       // Merge retry results
@@ -335,6 +341,7 @@ async function analyzeModule(
   tracker: TokenUsageTracker,
   estimateTokensFn: (text: string) => number,
   isRetry = false,
+  onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): Promise<Round5Module | null> {
   try {
     // Filter packed context files to this module's path prefix
@@ -382,6 +389,7 @@ async function analyzeModule(
     const result = await provider.complete<Round5Module>(
       finalRequest,
       Round5ModuleSchema as z.ZodType<Round5Module>,
+      { onRetry },
     );
 
     // Track token usage
@@ -575,6 +583,7 @@ async function retryFailedModules(
   priorRounds: RoundContext[],
   tracker: TokenUsageTracker,
   estimateTokensFn: (text: string) => number,
+  onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): Promise<Array<{ moduleName: string; result: Round5Module | null }>> {
   const results: Array<{ moduleName: string; result: Round5Module | null }> =
     [];
@@ -593,6 +602,7 @@ async function retryFailedModules(
         tracker,
         estimateTokensFn,
         true, // isRetry
+        onRetry,
       );
       return { moduleName: mod.name, result: moduleResult };
     });

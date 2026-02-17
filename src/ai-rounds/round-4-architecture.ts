@@ -47,6 +47,7 @@ export function createRound4Step(
     round2?: RoundExecutionResult<Round2Output>;
     round3?: RoundExecutionResult<Round3Output>;
   },
+  onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): StepDefinition {
   return createStep({
     id: 'ai-round-4',
@@ -100,6 +101,7 @@ export function createRound4Step(
         buildFallback: () => buildRound4Fallback(staticAnalysis),
         tracker,
         estimateTokensFn,
+        onRetry,
       });
     },
     onSkip: () => buildRound4Fallback(staticAnalysis),
