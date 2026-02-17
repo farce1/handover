@@ -102,12 +102,13 @@ Plans:
   3. Round 5 fans out per-module for parallel per-module analysis
   4. All AI responses are validated against Zod schemas, and AI-generated claims about dependencies/imports are cross-checked against AST-derived facts
   5. A failed AI round does not block independent documents -- missing sections are clearly marked rather than crashing the pipeline
-**Plans**: TBD
+**Plans**: 4 plans in 4 waves
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
-- [ ] 05-03: TBD
+- [ ] 05-01-PLAN.md — Types, Zod schemas for all 6 rounds, prompt templates, validator, quality checker (Wave 1)
+- [ ] 05-02-PLAN.md — Round execution engine, Rounds 1-2 (overview + modules), fallback builders (Wave 2)
+- [ ] 05-03-PLAN.md — Rounds 3-6 (features, architecture, edge cases, deployment) with parallel DAG deps (Wave 3)
+- [ ] 05-04-PLAN.md — DAG wiring in generate.ts, validation summary, pipeline integration (Wave 4)
 
 ### Phase 6: Document Synthesis
 **Goal**: Fourteen cross-referenced markdown documents are rendered from AI-populated domain entities, with YAML front-matter, mermaid diagrams, validated cross-references, and LLM-optimized structure
