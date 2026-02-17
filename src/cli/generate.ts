@@ -7,6 +7,7 @@ import { DAGOrchestrator } from '../orchestrator/dag.js';
 import { createStep } from '../orchestrator/step.js';
 import { runStaticAnalysis } from '../analyzers/coordinator.js';
 import { formatMarkdownReport } from '../analyzers/report.js';
+import { detectMonorepo } from './monorepo.js';
 import { createRound1Step } from '../ai-rounds/round-1-overview.js';
 import { createRound2Step } from '../ai-rounds/round-2-modules.js';
 import { createRound3Step } from '../ai-rounds/round-3-features.js';
@@ -109,6 +110,17 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     // Determine if provider is local (drives LOCAL badge and cost omission)
     const preset = PROVIDER_PRESETS[config.provider];
     const isLocal = preset?.isLocal ?? false;
+
+    // Monorepo detection -- non-blocking warning before pipeline starts
+    const projectRoot = resolve(process.cwd());
+    const monorepo = detectMonorepo(projectRoot);
+    if (monorepo.isMonorepo) {
+      const toolLabel = monorepo.tool ?? 'unknown';
+      logger.warn(
+        `Monorepo detected (${toolLabel} workspaces). ` +
+        `Run \`handover generate\` from a specific package directory for best results.`,
+      );
+    }
 
     // Mutable display state -- updated throughout the pipeline, renderer reads it
     const displayState: DisplayState = {
