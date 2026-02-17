@@ -15,8 +15,9 @@ type StepStatus = 'start' | 'done' | 'fail';
  *
  * Respects NO_COLOR env var automatically (picocolors handles this).
  */
-class Logger {
+export class Logger {
   private verbose = false;
+  private suppressed = false;
 
   /**
    * Enable or disable verbose output.
@@ -27,10 +28,21 @@ class Logger {
   }
 
   /**
+   * Enable or disable suppress mode.
+   * When suppressed, all stdout-based methods (info, log, warn, success,
+   * step, ai, blank) are no-ops to prevent corrupting the renderer's
+   * multi-line display. Error output (stderr) is never suppressed.
+   */
+  setSuppressed(enabled: boolean): void {
+    this.suppressed = enabled;
+  }
+
+  /**
    * Informational message — always shown.
    * Cyan colored for headers and paths.
    */
   info(msg: string): void {
+    if (this.suppressed) return;
     console.log(pc.cyan('ℹ') + ' ' + msg);
   }
 
@@ -38,6 +50,7 @@ class Logger {
    * Verbose message — only shown when -v flag is active.
    */
   log(msg: string): void {
+    if (this.suppressed) return;
     if (this.verbose) {
       console.log(pc.dim('  ' + msg));
     }
@@ -48,6 +61,7 @@ class Logger {
    * Yellow colored.
    */
   warn(msg: string): void {
+    if (this.suppressed) return;
     console.log(pc.yellow('⚠') + ' ' + msg);
   }
 
@@ -68,6 +82,7 @@ class Logger {
    * Green colored.
    */
   success(msg: string): void {
+    if (this.suppressed) return;
     console.log(pc.green('✓') + ' ' + msg);
   }
 
@@ -76,6 +91,7 @@ class Logger {
    * Shows spinner-like start, checkmark done, or X fail.
    */
   step(name: string, status: StepStatus): void {
+    if (this.suppressed) return;
     switch (status) {
       case 'start':
         console.log(pc.magenta('◆') + ' ' + name + pc.dim('...'));
@@ -93,6 +109,7 @@ class Logger {
    * AI activity indicator — magenta colored.
    */
   ai(msg: string): void {
+    if (this.suppressed) return;
     console.log(pc.magenta('⚡') + ' ' + msg);
   }
 
@@ -100,6 +117,7 @@ class Logger {
    * Blank line for visual separation.
    */
   blank(): void {
+    if (this.suppressed) return;
     console.log();
   }
 }
