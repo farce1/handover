@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Current Position
 
 Phase: 6 of 9 (Document Synthesis)
-Plan: 1 of 4 in current phase (06-01 complete)
-Status: Rendering infrastructure complete -- types, registry, utilities, mermaid, audience helpers
-Last activity: 2026-02-17 -- Completed 06-01-PLAN.md (rendering infrastructure)
+Plan: 4 of 4 in current phase (06-01, 06-02, 06-03 complete)
+Status: All 14 document renderers complete -- batch 1 (INDEX, overview, getting-started, file-structure, deps, tech-debt, testing) + batch 2 (architecture, features, modules, environment, edge-cases, conventions, deployment)
+Last activity: 2026-02-17 -- Completed 06-02-PLAN.md (batch 1 document renderers)
 
 Progress: [██████████████░] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18
-- Average duration: 5min
-- Total execution time: 81min
+- Total plans completed: 19
+- Average duration: 4min
+- Total execution time: 85min
 
 **By Phase:**
 
@@ -45,10 +45,11 @@ Progress: [██████████████░] 96%
 | 05-03 | 2 tasks | 4min | 4min |
 | 05-04 | 2 tasks | 4min | 4min |
 | 06-01 | 2 tasks | 4min | 4min |
+| 06-03 | 2 tasks | 4min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 5min, 4min, 4min, 4min, 4min
-- Trend: consistent fast execution; Phase 6 started
+- Last 5 plans: 4min, 4min, 4min, 4min, 4min
+- Trend: consistent fast execution; Phase 6 AI-heavy renderers complete
 
 *Updated after each plan completion*
 
@@ -115,6 +116,11 @@ Recent decisions affecting current work:
 - [Phase 06]: crossRef always generates links even to non-generated docs (resolve when user generates all)
 - [Phase 06]: structuredBlock uses HTML comment wrappers for RAG-parseable but visually invisible AI blocks
 - [Phase 06]: Mermaid builders cap nodes at 10-20 per diagram to prevent visual overload
+- [Phase 06]: Architecture/Features/Conventions return empty string when primary AI round unavailable (no meaningful static fallback)
+- [Phase 06]: Modules/Environment/EdgeCases/Deployment have static fallback with warning banner
+- [Phase 06]: Edge cases sorted by severity (critical first) within each module
+- [Phase 06]: Deployment renderer detects CI provider from file tree patterns as static fallback
+- [Phase 06]: Environment variable references capped at 50 rows (consistent with report.ts pattern)
 
 ### Pending Todos
 
@@ -127,5 +133,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 06-01-PLAN.md (rendering infrastructure)
+Stopped at: Completed 06-03-PLAN.md (AI-heavy document renderers)
 Resume file: .planning/phases/06-document-synthesis/06-02-PLAN.md
