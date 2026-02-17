@@ -61,6 +61,7 @@ export async function retryWithBackoff<T>(
     maxRetries?: number;
     baseDelayMs?: number;
     isRetryable?: (error: unknown) => boolean;
+    onRetry?: (attempt: number, delayMs: number, reason: string) => void;
   } = {},
 ): Promise<T> {
   const maxRetries = options.maxRetries ?? 3;
@@ -90,6 +91,9 @@ export async function retryWithBackoff<T>(
       // Exponential backoff: 30s, 60s, 120s with jitter
       const delay = baseDelayMs * Math.pow(2, attempt);
       const jitter = delay * (0.5 + Math.random());
+
+      const reason = err instanceof Error ? err.message : 'rate limited';
+      options.onRetry?.(attempt + 1, Math.ceil(jitter), reason);
 
       logger.warn(
         `Rate limited. Retrying in ${Math.ceil(jitter / 1000)}s (attempt ${attempt + 1}/${maxRetries})...`,

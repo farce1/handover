@@ -19,6 +19,7 @@ export interface ExecuteRoundOptions<T> {
   buildFallback: () => T;
   tracker: TokenUsageTracker;
   estimateTokensFn: (text: string) => number;
+  onRetry?: (attempt: number, delayMs: number, reason: string) => void;
 }
 
 // ─── Round Execution Engine ────────────────────────────────────────────────
@@ -53,7 +54,7 @@ export async function executeRound<T>(
     const request = buildPrompt(isRetry);
 
     // 2. Call LLM with Zod schema validation
-    const result = await provider.complete<T>(request, schema);
+    const result = await provider.complete<T>(request, schema, { onRetry: options.onRetry });
 
     // 3. Record token usage
     const promptText = request.systemPrompt + request.userPrompt;
@@ -87,7 +88,11 @@ export async function executeRound<T>(
       return attempt(true);
     }
 
-    // 8. Compress output for next round (2000 tokens per prior round)
+    // 8. Compute tokens and cost for this round
+    const totalTokens = result.usage.inputTokens + result.usage.outputTokens;
+    const roundCost = tracker.getRoundCost(roundNumber);
+
+    // 9. Compress output for next round (2000 tokens per prior round)
     const context = compressRoundOutput(
       roundNumber,
       result.data as Record<string, unknown>,
@@ -95,13 +100,15 @@ export async function executeRound<T>(
       estimateTokensFn,
     );
 
-    // 9. Return result
+    // 10. Return result
     return {
       data: result.data,
       validation,
       quality,
       context,
       status: hasRetried ? 'retried' : 'success',
+      tokens: totalTokens,
+      cost: roundCost,
     };
   }
 
@@ -125,6 +132,13 @@ export async function executeRound<T>(
       estimateTokensFn,
     );
 
+    // Use tracker data if available (partial round may have recorded usage), otherwise 0
+    const roundUsage = tracker.getRoundUsage(roundNumber);
+    const fallbackTokens = roundUsage
+      ? roundUsage.inputTokens + roundUsage.outputTokens
+      : 0;
+    const fallbackCost = tracker.getRoundCost(roundNumber);
+
     return {
       data: fallbackData,
       validation: { validated: 0, corrected: 0, total: 0, dropRate: 0 },
@@ -136,6 +150,8 @@ export async function executeRound<T>(
       },
       context,
       status: 'degraded',
+      tokens: fallbackTokens,
+      cost: fallbackCost,
     };
   }
 }

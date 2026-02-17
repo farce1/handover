@@ -71,4 +71,5 @@ export interface DAGEvents {
   onStepStart?: (stepId: string, name: string) => void;
   onStepComplete?: (result: StepResult) => void;
   onStepFail?: (result: StepResult) => void;
+  onStepRetry?: (stepId: string, attempt: number, delayMs: number, reason: string) => void;
 }

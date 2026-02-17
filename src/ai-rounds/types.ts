@@ -32,6 +32,10 @@ export interface RoundExecutionResult<T> {
   quality: QualityMetrics;
   context: RoundContext;
   status: 'success' | 'degraded' | 'retried';
+  /** Total tokens (input + output) for this round. */
+  tokens?: number;
+  /** Estimated dollar cost for this round. */
+  cost?: number;
 }
 
 // ─── ValidationResult ───────────────────────────────────────────────────────

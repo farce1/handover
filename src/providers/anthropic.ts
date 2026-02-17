@@ -34,6 +34,7 @@ export class AnthropicProvider implements LLMProvider {
   async complete<T>(
     request: CompletionRequest,
     schema: z.ZodType<T>,
+    options?: { onRetry?: (attempt: number, delayMs: number, reason: string) => void },
   ): Promise<CompletionResult & { data: T }> {
     return this.rateLimiter.withLimit(async () => {
       return retryWithBackoff(
@@ -109,6 +110,7 @@ export class AnthropicProvider implements LLMProvider {
             }
             return false;
           },
+          onRetry: options?.onRetry,
         },
       );
     });

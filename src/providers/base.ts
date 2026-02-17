@@ -14,6 +14,7 @@ export interface LLMProvider {
   complete<T>(
     request: CompletionRequest,
     schema: z.ZodType<T>,
+    options?: { onRetry?: (attempt: number, delayMs: number, reason: string) => void },
   ): Promise<CompletionResult & { data: T }>;
 
   /**
