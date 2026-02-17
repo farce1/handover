@@ -12,12 +12,23 @@ export class TokenUsageTracker {
   private readonly warnThreshold: number;
 
   private static readonly MODEL_COSTS: Record<string, { inputPerMillion: number; outputPerMillion: number }> = {
+    // Anthropic
     'claude-opus-4-6': { inputPerMillion: 15, outputPerMillion: 75 },
     'claude-opus-4-5': { inputPerMillion: 5, outputPerMillion: 25 },
     'claude-sonnet-4-5': { inputPerMillion: 3, outputPerMillion: 15 },
     'claude-haiku-4-5': { inputPerMillion: 1, outputPerMillion: 5 },
+    // OpenAI
     'gpt-4o': { inputPerMillion: 2.5, outputPerMillion: 10 },
     'gpt-4o-mini': { inputPerMillion: 0.15, outputPerMillion: 0.6 },
+    'gpt-4.1': { inputPerMillion: 2, outputPerMillion: 8 },
+    'o3-mini': { inputPerMillion: 1.10, outputPerMillion: 4.40 },
+    // Groq
+    'llama-3.3-70b-versatile': { inputPerMillion: 0.59, outputPerMillion: 0.79 },
+    // Together
+    'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo': { inputPerMillion: 0.88, outputPerMillion: 0.88 },
+    // DeepSeek
+    'deepseek-chat': { inputPerMillion: 0.28, outputPerMillion: 0.42 },
+    // Default fallback (most expensive = safe for cost estimates)
     'default': { inputPerMillion: 15, outputPerMillion: 75 },
   };
 

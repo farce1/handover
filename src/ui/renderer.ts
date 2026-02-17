@@ -156,6 +156,7 @@ export class TerminalRenderer implements Renderer {
       state.totalCost,
       state.costWarningThreshold,
       this.spinnerFrame,
+      state.isLocal,
     );
   }
 

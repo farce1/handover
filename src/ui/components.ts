@@ -31,8 +31,9 @@ export function renderBanner(state: DisplayState): string[] {
   const providerModel = `${state.provider}/${state.model}`;
   const files = `${state.fileCount} files`;
   const lang = state.language;
+  const localBadge = state.isLocal ? `${sep}${pc.green(pc.bold('LOCAL'))}` : '';
 
-  return [`${arrow} ${name}${sep}${providerModel}${sep}${files}${sep}${lang}`];
+  return [`${arrow} ${name}${sep}${providerModel}${sep}${files}${sep}${lang}${localBadge}`];
 }
 
 /**
@@ -93,6 +94,7 @@ export function renderRoundBlock(
   totalCost: number,
   costWarningThreshold: number,
   spinnerFrame?: number,
+  isLocal?: boolean,
 ): string[] {
   const lines: string[] = [];
   const sep = pc.dim(' \u00B7 ');
@@ -101,9 +103,15 @@ export function renderRoundBlock(
     const roundLabel = `R${rd.roundNumber}`;
 
     switch (rd.status) {
+      case 'cached': {
+        // Cached round: show green check with "cached" label (no tokens/cost -- no API call)
+        lines.push(`  ${pc.green(SYMBOLS.done)} ${roundLabel} ${rd.name}${sep}${pc.dim('cached')}`);
+        break;
+      }
+
       case 'done': {
-        const tokenStr = rd.tokens !== undefined ? formatTokens(rd.tokens) : '';
-        const costStr = rd.cost !== undefined ? pc.yellow(formatCost(rd.cost)) : '';
+        const tokenStr = (!isLocal && rd.tokens !== undefined) ? formatTokens(rd.tokens) : '';
+        const costStr = (!isLocal && rd.cost !== undefined) ? pc.yellow(formatCost(rd.cost)) : '';
         const parts = [
           `${pc.green(SYMBOLS.done)} ${roundLabel} ${rd.name}`,
           tokenStr,
@@ -149,13 +157,13 @@ export function renderRoundBlock(
     }
   }
 
-  // Running total line
-  if (totalCost > 0) {
+  // Running total line -- omit for local providers (no $0.00 shown)
+  if (!isLocal && totalCost > 0) {
     lines.push(`  ${pc.yellow(formatCost(totalCost))} total`);
   }
 
-  // Cost warning
-  if (totalCost > costWarningThreshold && costWarningThreshold > 0) {
+  // Cost warning -- only for cloud providers
+  if (!isLocal && totalCost > costWarningThreshold && costWarningThreshold > 0) {
     lines.push(`  ${renderCostWarning(totalCost, costWarningThreshold)}`);
   }
 
@@ -182,9 +190,12 @@ export function renderCompletionSummary(state: DisplayState): string[] {
   const parts = [
     `${pc.green(SYMBOLS.done)} ${state.completionDocs} documents`,
     formatTokens(state.totalTokens),
-    pc.yellow(formatCost(state.totalCost)),
-    formatDuration(state.elapsedMs),
   ];
+  // Only show cost for cloud providers (no $0.00 for local)
+  if (!state.isLocal) {
+    parts.push(pc.yellow(formatCost(state.totalCost)));
+  }
+  parts.push(formatDuration(state.elapsedMs));
   return [parts.join(sep)];
 }
 
