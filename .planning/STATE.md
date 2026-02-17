@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** A single `handover generate` command produces a complete, cross-referenced knowledge base that eliminates the 2-4 week onboarding gap when codebases change hands.
-**Current focus:** Phase 8 complete -- Multi-provider ecosystem with crash recovery and local-provider UX. Ready for Phase 9.
+**Current focus:** Phase 9 in progress -- Integration hardening for npm publish readiness.
 
 ## Current Position
 
-Phase: 8 of 9 (Provider Ecosystem and Reliability) -- COMPLETE
-Plan: 3 of 3 in current phase (08-03 complete)
-Status: Phase 8 complete -- round cache integrated into pipeline, LOCAL badge, cost omission for local providers
-Last activity: 2026-02-17 -- Completed 08-03-PLAN.md (generate pipeline integration)
+Phase: 9 of 9 (Integration Hardening)
+Plan: 2 of 4 in current phase (09-01 and 09-02 complete)
+Status: Edge case hardening and npm publish prep complete
+Last activity: 2026-02-17 -- Completed 09-01-PLAN.md (edge case hardening and monorepo detection)
 
-Progress: [███████████████] 100%
+Progress: [██████████████▒] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 27
+- Total plans completed: 29
 - Average duration: 5min
-- Total execution time: 124min
+- Total execution time: 131min
 
 **By Phase:**
 
@@ -56,9 +56,12 @@ Progress: [███████████████] 100%
 | 08-02 | 2 tasks | 4min | 4min |
 | 08-03 | 2 tasks | 6min | 6min |
 
+| 09-01 | 2 tasks | 4min | 4min |
+| 09-02 | 2 tasks | 3min | 3min |
+
 **Recent Trend:**
-- Last 5 plans: 5min, 5min, 6min, 4min, 6min
-- Trend: consistent fast execution; Phase 8 complete (provider ecosystem and reliability)
+- Last 5 plans: 4min, 6min, 3min, 4min
+- Trend: consistent fast execution; Phase 9 in progress (integration hardening)
 
 *Updated after each plan completion*
 
@@ -166,6 +169,15 @@ Recent decisions affecting current work:
 - [Phase 08]: Cached rounds set display status directly in wrapper; onStepComplete guards against overwriting
 - [Phase 08]: isLocal threaded to CIRenderer for consistent cost omission across TTY and CI output modes
 - [Phase 08]: MODEL_COSTS expanded to 11 entries covering all PROVIDER_PRESETS pricing data
+- [Phase 09]: Binary files excluded entirely from discoverFiles() results (invisible in file tree, not just content-skipping)
+- [Phase 09]: Monorepo warning via logger.warn() before logger suppression (visible in normal terminal output)
+- [Phase 09]: Empty repo skips AI rounds via isEmptyRepo guard in wrapWithCache wrapper
+- [Phase 09]: Render step produces minimal INDEX + overview for empty repos with clear explanation
+- [Phase 09]: bin path ./dist/index.js (tsup flattens single entry to root of outDir)
+- [Phase 09]: No tsup banner -- shebang preserved from source src/cli/index.ts
+- [Phase 09]: unpkg CDN for grammar downloads (stable, no auth, version-pinned 0.1.13)
+- [Phase 09]: HANDOVER_GRAMMAR_DIR env var for offline/corporate pre-populated grammars
+- [Phase 09]: Size-based integrity check warns but does not reject (version tolerance)
 
 ### Pending Todos
 
@@ -178,5 +190,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 08-03-PLAN.md (generate pipeline integration -- Phase 8 complete)
-Resume file: .planning/phases/09-*/09-01-PLAN.md (Phase 9 when ready)
+Stopped at: Completed 09-01-PLAN.md (edge case hardening and monorepo detection)
+Resume file: .planning/phases/09-integration-hardening/09-03-PLAN.md
