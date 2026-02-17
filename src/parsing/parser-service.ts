@@ -2,6 +2,7 @@ import { Parser, Language, type Tree } from 'web-tree-sitter';
 import { createRequire } from 'node:module';
 
 import { getLanguageInfo } from './language-map.js';
+import { downloadGrammarIfNeeded } from '../grammars/downloader.js';
 import type { LanguageExtractor } from './extractors/base.js';
 import type { ParsedFile } from './types.js';
 
@@ -165,15 +166,26 @@ export class ParserService {
   /**
    * Lazily load a grammar WASM file.
    * Only loads each grammar once, caching the Language object.
+   *
+   * Two-step resolution:
+   * 1. Try node_modules (dev mode -- tree-sitter-wasms installed as devDep)
+   * 2. Download to user cache (production/npx mode -- CDN fallback)
    */
   private async loadLanguage(grammarName: string): Promise<Language> {
     const cached = this.languages.get(grammarName);
     if (cached) return cached;
 
-    // Resolve WASM path from tree-sitter-wasms package
-    const wasmPath = require.resolve(
-      `tree-sitter-wasms/out/tree-sitter-${grammarName}.wasm`,
-    );
+    let wasmPath: string;
+
+    // Try 1: Resolve from node_modules (dev mode)
+    try {
+      wasmPath = require.resolve(
+        `tree-sitter-wasms/out/tree-sitter-${grammarName}.wasm`,
+      );
+    } catch {
+      // Try 2: Download to user cache if not in node_modules (production/npx mode)
+      wasmPath = await downloadGrammarIfNeeded(grammarName);
+    }
 
     const language = await Language.load(wasmPath);
     this.languages.set(grammarName, language);
