@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** A single `handover generate` command produces a complete, cross-referenced knowledge base that eliminates the 2-4 week onboarding gap when codebases change hands.
-**Current focus:** Phase 6 in progress -- Document Synthesis
+**Current focus:** Phase 6 complete -- Document Synthesis done. Ready for Phase 7 or 8.
 
 ## Current Position
 
-Phase: 6 of 9 (Document Synthesis)
-Plan: 4 of 4 in current phase (06-01, 06-02, 06-03 complete)
-Status: All 14 document renderers complete -- batch 1 (INDEX, overview, getting-started, file-structure, deps, tech-debt, testing) + batch 2 (architecture, features, modules, environment, edge-cases, conventions, deployment)
-Last activity: 2026-02-17 -- Completed 06-02-PLAN.md (batch 1 document renderers)
+Phase: 6 of 9 (Document Synthesis) -- COMPLETE
+Plan: 4 of 4 in current phase (06-01, 06-02, 06-03, 06-04 complete)
+Status: Phase 6 complete -- all 14 renderers wired into pipeline, generate produces real markdown files, --only and --audience flags operational
+Last activity: 2026-02-17 -- Completed 06-04-PLAN.md (rendering pipeline integration)
 
-Progress: [██████████████░] 96%
+Progress: [███████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 20
+- Total plans completed: 21
 - Average duration: 4min
-- Total execution time: 89min
+- Total execution time: 93min
 
 **By Phase:**
 
@@ -47,10 +47,11 @@ Progress: [██████████████░] 96%
 | 06-01 | 2 tasks | 4min | 4min |
 | 06-02 | 2 tasks | 4min | 4min |
 | 06-03 | 2 tasks | 4min | 4min |
+| 06-04 | 3 tasks | 4min | 4min |
 
 **Recent Trend:**
 - Last 5 plans: 4min, 4min, 4min, 4min, 4min
-- Trend: consistent fast execution; all 14 document renderers complete
+- Trend: consistent fast execution; Phase 6 Document Synthesis complete
 
 *Updated after each plan completion*
 
@@ -126,6 +127,10 @@ Recent decisions affecting current work:
 - [Phase 06]: Package manager detection chain: manifest packageManager field -> lock file presence -> fallback null
 - [Phase 06]: Tech Debt renderer omits warning banner when static data is sufficient (unlike other renderers)
 - [Phase 06]: Testing renderer categorizes test files by path patterns (unit/integration/e2e) with /unit/, __tests__, .test. conventions
+- [Phase 06]: renderIndex shim in registry uses empty statuses; actual statuses passed at render-time in generate.ts
+- [Phase 06]: Conditional AI round registration using requiredRounds.has(N) for --only cost optimization
+- [Phase 06]: Terminal round detection for render step deps: rounds not depended upon by other registered rounds
+- [Phase 06]: Render deps fallback to static-analysis when no AI rounds required
 
 ### Pending Todos
 
@@ -138,6 +143,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 06-02-PLAN.md (batch 1 document renderers)
-Resume file: .planning/phases/06-document-synthesis/06-04-PLAN.md
-Resume file: .planning/phases/06-document-synthesis/06-02-PLAN.md
+Stopped at: Completed 06-04-PLAN.md (rendering pipeline integration) -- Phase 6 COMPLETE
+Resume file: Phase 7 or Phase 8 (next phase)
