@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** A single `handover generate` command produces a complete, cross-referenced knowledge base that eliminates the 2-4 week onboarding gap when codebases change hands.
-**Current focus:** Phase 9 in progress -- Integration hardening for npm publish readiness.
+**Current focus:** All 9 phases complete -- Ready for npm publish.
 
 ## Current Position
 
 Phase: 9 of 9 (Integration Hardening)
-Plan: 3 of 4 in current phase (09-01, 09-02, 09-03 complete)
-Status: Integration test suite complete with 19 passing tests
-Last activity: 2026-02-17 -- Completed 09-03-PLAN.md (integration tests)
+Plan: 4 of 4 in current phase (09-01, 09-02, 09-03, 09-04 complete)
+Status: All plans complete. Package publish-ready with validation suite and README.
+Last activity: 2026-02-17 -- Completed 09-04-PLAN.md (validation tests + README)
 
-Progress: [██████████████▓] 97%
+Progress: [████████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 30
+- Total plans completed: 31
 - Average duration: 5min
-- Total execution time: 139min
+- Total execution time: 142min
 
 **By Phase:**
 
@@ -59,10 +59,11 @@ Progress: [██████████████▓] 97%
 | 09-01 | 2 tasks | 4min | 4min |
 | 09-02 | 2 tasks | 3min | 3min |
 | 09-03 | 2 tasks | 8min | 8min |
+| 09-04 | 2 tasks | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 6min, 4min, 3min, 8min
-- Trend: consistent execution; 09-03 longer due to parallel test debugging
+- Last 5 plans: 4min, 3min, 8min, 3min
+- Trend: consistent execution; all Phase 09 plans complete
 
 *Updated after each plan completion*
 
@@ -179,6 +180,10 @@ Recent decisions affecting current work:
 - [Phase 09]: unpkg CDN for grammar downloads (stable, no auth, version-pinned 0.1.13)
 - [Phase 09]: HANDOVER_GRAMMAR_DIR env var for offline/corporate pre-populated grammars
 - [Phase 09]: Size-based integrity check warns but does not reject (version tolerance)
+- [Phase 09]: 5 validation targets cover all category types: ts-spa, python-api, go-microservice, rust-cli, mixed
+- [Phase 09]: Tests run full pipeline (no --static-only) per user decision: success = all 14 docs without crashes
+- [Phase 09]: HANDOVER_INTEGRATION env var gate prevents accidental CI cost and network dependency
+- [Phase 09]: README documents actual config schema fields, not aspirational ones
 
 ### Pending Todos
 
@@ -191,5 +196,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 09-03-PLAN.md (integration test suite)
-Resume file: .planning/phases/09-integration-hardening/09-04-PLAN.md
+Stopped at: Completed 09-04-PLAN.md (validation tests + README) -- ALL PHASES COMPLETE
+Resume file: None -- project complete
