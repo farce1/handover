@@ -53,7 +53,7 @@ export interface GenerateOptions {
   audience?: string;
   staticOnly?: boolean;
   verbose?: boolean;
-  noCache?: boolean;
+  cache?: boolean;
 }
 
 /**
@@ -209,7 +209,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
     // Initialize round cache for crash recovery
     const roundCache = new RoundCache();
-    if (options.noCache) {
+    if (options.cache === false) {
       await roundCache.clear();
     }
 
