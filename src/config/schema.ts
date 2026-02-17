@@ -11,6 +11,7 @@ export const HandoverConfigSchema = z.object({
   model: z.string().optional(),
   apiKeyEnv: z.string().optional(),
   output: z.string().default('./handover'),
+  audience: z.enum(['human', 'ai']).default('human'),
   include: z.array(z.string()).default(['**/*']),
   exclude: z.array(z.string()).default([]),
   context: z.string().optional(),
