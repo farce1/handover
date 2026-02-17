@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** A single `handover generate` command produces a complete, cross-referenced knowledge base that eliminates the 2-4 week onboarding gap when codebases change hands.
-**Current focus:** Phase 7 complete -- Terminal UX fully integrated. All 3 plans delivered (renderer, events, generate.ts integration).
+**Current focus:** Phase 8 in progress -- Multi-provider ecosystem. Plan 1 (provider foundation) complete.
 
 ## Current Position
 
-Phase: 7 of 9 (Terminal UX) -- COMPLETE
-Plan: 3 of 3 in current phase (07-01, 07-02, 07-03 complete)
-Status: Terminal UX fully integrated -- generate.ts uses renderer for all progress output
-Last activity: 2026-02-17 -- Completed 07-03-PLAN.md (generate.ts renderer integration)
+Phase: 8 of 9 (Provider Ecosystem and Reliability)
+Plan: 1 of 3 in current phase (08-01 complete)
+Status: Multi-provider foundation built -- 7 named providers with OpenAICompatibleProvider and fail-fast validation
+Last activity: 2026-02-17 -- Completed 08-01-PLAN.md (multi-provider foundation)
 
-Progress: [██████████████░] 90%
+Progress: [██████████████░] 93%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 24
-- Average duration: 4min
-- Total execution time: 108min
+- Total plans completed: 25
+- Average duration: 5min
+- Total execution time: 114min
 
 **By Phase:**
 
@@ -52,9 +52,11 @@ Progress: [██████████████░] 90%
 | 07-02 | 3 tasks | 5min | 5min |
 | 07-03 | 2 tasks | 5min | 5min |
 
+| 08-01 | 2 tasks | 6min | 6min |
+
 **Recent Trend:**
-- Last 5 plans: 4min, 4min, 5min, 5min, 5min
-- Trend: consistent fast execution; Phase 7 Terminal UX complete
+- Last 5 plans: 4min, 5min, 5min, 5min, 6min
+- Trend: consistent fast execution; Phase 8 provider foundation complete
 
 *Updated after each plan completion*
 
@@ -148,6 +150,11 @@ Recent decisions affecting current work:
 - [Phase 07]: Static-only mode uses same renderer system for consistent UX (banner + analyzers + completion)
 - [Phase 07]: Removed monkey-patched onStepComplete; all DAG events in orchestratorEvents object
 - [Phase 07]: costWarningThreshold defaults to 1.0 in generate.ts when not set in config
+- [Phase 08]: Single OpenAICompatibleProvider class for all 6 non-Anthropic providers via configurable baseURL
+- [Phase 08]: Azure OpenAI uses AzureOpenAI client class with apiVersion '2024-10-21'
+- [Phase 08]: Validation order: provider-specific checks before generic API key check for most specific error first
+- [Phase 08]: Tool call type narrowing via toolCall.type !== 'function' for openai v5 union type
+- [Phase 08]: Ollama gets dummy apiKey 'ollama' (required by SDK, ignored by server)
 
 ### Pending Todos
 
@@ -160,5 +167,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 07-03-PLAN.md (generate.ts renderer integration) -- Phase 7 complete
-Resume file: Phase 8 (Providers/Reliability)
+Stopped at: Completed 08-01-PLAN.md (multi-provider foundation)
+Resume file: .planning/phases/08-provider-ecosystem-and-reliability/08-02-PLAN.md
