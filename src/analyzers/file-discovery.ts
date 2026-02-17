@@ -2,6 +2,7 @@ import fg from 'fast-glob';
 import ignore from 'ignore';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
+import { logger } from '../utils/logger.js';
 import type { FileEntry } from './types.js';
 
 /**
@@ -21,9 +22,24 @@ const ALWAYS_IGNORE = [
   '**/.handover/**',
 ];
 
+/** Maximum file size in bytes -- files larger than this are skipped (2MB). */
+const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
+
+/** Maximum line heuristic -- informational only, size-based filter is primary. */
+const MAX_LINE_HEURISTIC = 50_000;
+
 /**
- * Known binary file extensions that should be counted in stats
- * but never content-scanned (TODO, env, AST analysis).
+ * Format a byte count as a human-readable string (KB, MB).
+ */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+/**
+ * Known binary file extensions -- these files are excluded entirely
+ * from discovery results (invisible in file tree output).
  */
 const BINARY_EXTENSIONS = new Set([
   '.png',
@@ -94,15 +110,35 @@ export async function discoverFiles(rootDir: string): Promise<FileEntry[]> {
     ignore: ALWAYS_IGNORE,
   });
 
-  // Apply .gitignore as secondary filter, then map to FileEntry
-  const files: FileEntry[] = entries
-    .filter((entry) => !ig.ignores(entry.path))
-    .map((entry) => ({
+  // Apply .gitignore as secondary filter, exclude binary files entirely,
+  // and skip enormous files (>2MB) with a log warning.
+  const files: FileEntry[] = [];
+
+  for (const entry of entries) {
+    // Secondary .gitignore filter
+    if (ig.ignores(entry.path)) continue;
+
+    const ext = extname(entry.path);
+    const size = entry.stats?.size ?? 0;
+
+    // Binary files are entirely invisible -- filtered out before file tree
+    if (isBinaryFile(ext)) continue;
+
+    // Enormous file filter -- skip files exceeding 2MB threshold
+    if (size > MAX_FILE_SIZE_BYTES) {
+      logger.warn(
+        `Skipping enormous file: ${entry.path} (${formatBytes(size)}) -- exceeds ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB threshold`,
+      );
+      continue;
+    }
+
+    files.push({
       path: entry.path,
       absolutePath: join(rootDir, entry.path),
-      size: entry.stats?.size ?? 0,
-      extension: extname(entry.path),
-    }));
+      size,
+      extension: ext,
+    });
+  }
 
   // Sort by path for deterministic output
   files.sort((a, b) => a.path.localeCompare(b.path));

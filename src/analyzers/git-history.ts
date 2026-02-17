@@ -1,4 +1,5 @@
 import { simpleGit } from 'simple-git';
+import { logger } from '../utils/logger.js';
 import type {
   AnalysisContext,
   AnalyzerResult,
@@ -328,9 +329,21 @@ export async function analyzeGitHistory(
       elapsed: performance.now() - start,
     };
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+
+    // Gracefully handle non-git repos even if checkIsRepo() itself throws
+    if (msg.includes('not a git repository') || msg.includes('Not a git repository')) {
+      logger.info('No git history available -- skipping git analysis');
+      return {
+        success: true,
+        data: emptyGitResult('Not a git repository'),
+        elapsed: performance.now() - start,
+      };
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: msg,
       elapsed: performance.now() - start,
     };
   }

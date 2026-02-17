@@ -235,6 +235,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     let staticAnalysisResult: StaticAnalysisResult | undefined;
     let packedContext: PackedContext | undefined;
     let analysisFingerprint = '';
+    let isEmptyRepo = false;
 
     const deferredAnalysis = new Proxy({} as StaticAnalysisResult, {
       get: (_target, prop) => (staticAnalysisResult as Record<string | symbol, unknown>)?.[prop],
@@ -381,6 +382,11 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           });
           staticAnalysisResult = result;
 
+          // Check for empty repo (no source files after filtering)
+          if (result.metadata.fileCount === 0) {
+            isEmptyRepo = true;
+          }
+
           // Compute fingerprint for round cache invalidation
           // Use directoryTree file entries (path + size) for deterministic hashing
           const fileEntries = result.fileTree.directoryTree
@@ -427,6 +433,11 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         name: step.name,
         deps: [...step.deps],
         execute: async (context) => {
+          // Skip AI rounds entirely for empty repos (no source files)
+          if (isEmptyRepo) {
+            return null;
+          }
+
           const modelName = config.model ?? preset?.defaultModel ?? 'default';
           const hash = roundCache.computeHash(roundNum, modelName, analysisFingerprint);
           const cached = await roundCache.get(roundNum, hash);
@@ -577,6 +588,52 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           // Signal rounds done before transitioning to rendering
           renderer.onRoundsDone(displayState);
 
+          // Empty repo short-circuit: produce minimal INDEX + overview
+          if (isEmptyRepo) {
+            const outputDir = resolve(config.output);
+            await mkdir(outputDir, { recursive: true });
+
+            const overviewContent = renderEmptyRepoOverview();
+            await writeFile(join(outputDir, '01-PROJECT-OVERVIEW.md'), overviewContent, 'utf-8');
+            displayState.renderedDocs.push('01-PROJECT-OVERVIEW.md');
+            renderer.onDocRendered(displayState);
+
+            const emptyStatuses: DocumentStatus[] = [{
+              id: '01-project-overview',
+              filename: '01-PROJECT-OVERVIEW.md',
+              title: 'Project Overview',
+              status: 'static-only',
+              reason: 'Empty repository -- no source files found',
+            }];
+
+            // Add not-generated statuses for all other documents
+            for (const doc of DOCUMENT_REGISTRY) {
+              if (doc.id === '00-index' || doc.id === '01-project-overview') continue;
+              emptyStatuses.push({
+                id: doc.id,
+                filename: doc.filename,
+                title: doc.title,
+                status: 'not-generated',
+                reason: 'Empty repository -- no source files to analyze',
+              });
+            }
+
+            const emptyCtx: RenderContext = {
+              rounds: {},
+              staticAnalysis: staticAnalysisResult!,
+              config,
+              audience,
+              generatedAt: new Date().toISOString(),
+              projectName: config.project.name ?? 'Unknown Project',
+            };
+            const indexContent = renderIndex(emptyCtx, emptyStatuses);
+            await writeFile(join(outputDir, '00-INDEX.md'), indexContent, 'utf-8');
+            displayState.renderedDocs.push('00-INDEX.md');
+            renderer.onDocRendered(displayState);
+
+            return { generatedDocs: emptyStatuses, outputDir };
+          }
+
           // Build the RenderContext from pipeline results
           const ctx: RenderContext = {
             rounds: {
@@ -707,4 +764,31 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     renderer.destroy();
     logger.setSuppressed(false);
   }
+}
+
+/**
+ * Render a minimal overview document for empty repositories.
+ * Produces a clear explanation of why no analysis was generated.
+ */
+function renderEmptyRepoOverview(): string {
+  const now = new Date().toISOString();
+  return `---
+title: Project Overview
+generated: ${now}
+---
+
+# Project Overview
+
+This repository contains no source files that could be analyzed. The handover documentation generator found no recognizable source code files after applying file filters.
+
+## Possible Reasons
+
+- The repository is newly initialized and has no code yet
+- All source files are in directories excluded by \`.gitignore\` or handover configuration
+- The repository contains only binary files, configuration, or documentation
+
+## Next Steps
+
+Add source code to the repository and run \`handover generate\` again.
+`;
 }
