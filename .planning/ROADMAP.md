@@ -138,11 +138,12 @@ Plans:
   3. Running totals of tokens, cost, and elapsed time update in real-time, and completion summary shows all generated files, total tokens, total cost, and duration in a framed box
   4. Colors follow semantic palette (cyan headers, green success, yellow warnings/cost, red errors, magenta AI activity) and NO_COLOR environment variable disables all color
   5. Non-TTY environments (CI/CD) disable animations and output structured log lines instead
-**Plans**: TBD
+**Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [ ] 07-01-PLAN.md — UI types, formatters, display components, multi-line TTY renderer, CI fallback renderer (Wave 1)
+- [ ] 07-02-PLAN.md — Event pipeline: cost calculation, progress callbacks for runner/rate-limiter, config extension (Wave 1)
+- [ ] 07-03-PLAN.md — Integration: wire renderer into generate.ts, logger suppress mode, full pipeline UX (Wave 2)
 
 ### Phase 8: Provider Ecosystem and Reliability
 **Goal**: Users can switch between Anthropic, OpenAI, Ollama, or any OpenAI-compatible endpoint via config alone, see cost estimates before running, and recover from crashes without re-running completed work
