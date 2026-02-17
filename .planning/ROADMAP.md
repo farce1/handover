@@ -120,12 +120,13 @@ Plans:
   3. Every document includes YAML front-matter, a 2-sentence self-contained summary, and cross-references with relative paths that resolve to valid targets
   4. Architecture and dependency documents include mermaid diagram suggestions where visualization adds value
   5. Code references use full paths (e.g., `src/auth/middleware.ts:L42`) throughout all documents
-**Plans**: TBD
+**Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
-- [ ] 06-03: TBD
+- [ ] 06-01-PLAN.md — Rendering infrastructure: types, document registry, shared utilities, mermaid builders, audience helpers, config extension (Wave 1)
+- [ ] 06-02-PLAN.md — Document renderers batch 1: INDEX, Overview, Getting Started, File Structure, Dependencies, Tech Debt, Testing (Wave 2)
+- [ ] 06-03-PLAN.md — Document renderers batch 2: Architecture, Features, Modules, Environment, Edge Cases, Conventions, Deployment (Wave 2)
+- [ ] 06-04-PLAN.md — DAG integration: replace render placeholder, --only round skipping, --audience flag, document generation (Wave 3)
 
 ### Phase 7: Terminal UX
 **Goal**: Users see rich, informative progress throughout the entire pipeline -- startup banner, per-analyzer spinners, per-round progress bars with token/cost tracking, document render progress, and a completion summary -- with graceful degradation in CI/CD environments
