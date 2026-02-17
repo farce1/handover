@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** A single `handover generate` command produces a complete, cross-referenced knowledge base that eliminates the 2-4 week onboarding gap when codebases change hands.
-**Current focus:** Phase 3 complete -- ready for Phase 4: Document Templates
+**Current focus:** Phase 4 in progress -- Context Window Management
 
 ## Current Position
 
-Phase: 3 of 9 (Static Analysis Pipeline) -- COMPLETE
-Plan: 4 of 4 in current phase (03-01, 03-02, 03-03, 03-04 complete)
-Status: Phase 3 complete -- all 8 analyzers, coordinator, report formatters, and CLI wiring delivered
-Last activity: 2026-02-16 -- Completed 03-04-PLAN.md (coordinator, reports, CLI)
+Phase: 4 of 9 (Context Window Management)
+Plan: 1 of 3 in current phase (04-01 complete)
+Status: Plan 04-01 complete -- Zod schemas, token counter, and file priority scorer delivered
+Last activity: 2026-02-17 -- Completed 04-01-PLAN.md (context schemas and scorer)
 
-Progress: [██████████] 75%
+Progress: [███████████] 79%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 11
 - Average duration: 5min
-- Total execution time: 54min
+- Total execution time: 56min
 
 **By Phase:**
 
@@ -37,10 +37,11 @@ Progress: [██████████] 75%
 | 03-02 | 2 tasks | 3min | 3min |
 | 03-03 | 2 tasks | 3min | 3min |
 | 03-04 | 3 tasks | 5min | 5min |
+| 04-01 | 2 tasks | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 9min, 4min, 3min, 3min, 5min
-- Trend: consistent fast execution; Phase 3 complete in 15min total (4 plans)
+- Last 5 plans: 4min, 3min, 3min, 5min, 2min
+- Trend: consistent fast execution; Phase 4 started with 2min plan
 
 *Updated after each plan completion*
 
@@ -76,6 +77,10 @@ Recent decisions affecting current work:
 - [Phase 03]: Empty typed fallback objects for failed analyzer results -- enables partial results via Promise.allSettled
 - [Phase 03]: Lazy import for CLI analyze command action handler (fast startup pattern)
 - [Phase 03]: Static-only early return in generate.ts bypasses API key validation
+- [Phase 04]: chars/4 heuristic as standalone token estimator with optional LLMProvider delegation
+- [Phase 04]: Test file penalty of -15 from score to deprioritize test files in context packing
+- [Phase 04]: Lock files excluded entirely from scoring (zero handover value)
+- [Phase 04]: Safety margin 0.9 default for token budget to avoid context window overflow
 
 ### Pending Todos
 
@@ -87,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-16
-Stopped at: Completed 03-04-PLAN.md (Phase 3 complete)
-Resume file: .planning/phases/04-document-templates/ (Phase 4 next)
+Last session: 2026-02-17
+Stopped at: Completed 04-01-PLAN.md (context schemas and scorer)
+Resume file: .planning/phases/04-context-window-management/04-02-PLAN.md
