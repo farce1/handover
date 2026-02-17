@@ -29,6 +29,13 @@ export const HandoverConfigSchema = z.object({
       deployTarget: z.string().optional(),
     })
     .default({}),
+  contextWindow: z
+    .object({
+      maxTokens: z.number().int().positive().optional(),
+      pin: z.array(z.string()).default([]),
+      boost: z.array(z.string()).default([]),
+    })
+    .default({}),
 });
 
 export type HandoverConfig = z.infer<typeof HandoverConfigSchema>;
