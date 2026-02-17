@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Current Position
 
 Phase: 7 of 9 (Terminal UX)
-Plan: 1 of 3 in current phase (07-01 complete)
-Status: UI rendering layer built -- types, formatters, 8 display components, TTY renderer with sisteransi, CI fallback renderer
-Last activity: 2026-02-17 -- Completed 07-01-PLAN.md (terminal UI rendering layer)
+Plan: 2 of 3 in current phase (07-01, 07-02 complete)
+Status: Event pipeline extended with cost estimation, retry callbacks, and onRetry threading through all round step creators
+Last activity: 2026-02-17 -- Completed 07-02-PLAN.md (event pipeline extension)
 
-Progress: [████████████░░░] 80%
+Progress: [█████████████░░] 85%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 22
+- Total plans completed: 23
 - Average duration: 4min
-- Total execution time: 98min
+- Total execution time: 103min
 
 **By Phase:**
 
@@ -49,10 +49,11 @@ Progress: [████████████░░░] 80%
 | 06-03 | 2 tasks | 4min | 4min |
 | 06-04 | 3 tasks | 4min | 4min |
 | 07-01 | 2 tasks | 5min | 5min |
+| 07-02 | 3 tasks | 5min | 5min |
 
 **Recent Trend:**
-- Last 5 plans: 4min, 4min, 4min, 4min, 5min
-- Trend: consistent fast execution; Phase 7 Terminal UX started
+- Last 5 plans: 4min, 4min, 4min, 5min, 5min
+- Trend: consistent fast execution; Phase 7 event pipeline extended
 
 *Updated after each plan completion*
 
@@ -136,6 +137,11 @@ Recent decisions affecting current work:
 - [Phase 07]: Static import of CIRenderer in renderer.ts (ESM-compatible, no dynamic require)
 - [Phase 07]: Components accept spinnerFrame parameter for animation state (pure function pattern)
 - [Phase 07]: computeSecondsLeft helper encapsulated in components.ts (not exposed to renderer)
+- [Phase 07]: MODEL_COSTS static table with default fallback to claude-opus-4-6 pricing (most expensive, safe default)
+- [Phase 07]: onRetry callback threaded end-to-end: DAG -> round step -> executeRound -> provider.complete -> retryWithBackoff
+- [Phase 07]: costWarningThreshold in config schema with no default (renderer handles default 1.00)
+- [Phase 07]: Degraded round fallback path checks tracker for partial usage data before returning zero values
+- [Phase 07]: Round 5 per-module fan-out receives onRetry through analyzeModule and retryFailedModules
 
 ### Pending Todos
 
@@ -148,5 +154,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 07-01-PLAN.md (terminal UI rendering layer)
-Resume file: 07-02-PLAN.md (next plan in Phase 7)
+Stopped at: Completed 07-02-PLAN.md (event pipeline extension)
+Resume file: 07-03-PLAN.md (next plan in Phase 7)
