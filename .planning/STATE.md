@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** A single `handover generate` command produces a complete, cross-referenced knowledge base that eliminates the 2-4 week onboarding gap when codebases change hands.
-**Current focus:** Phase 8 in progress -- Multi-provider ecosystem. Plans 1-2 complete (foundation + cache/estimate).
+**Current focus:** Phase 8 complete -- Multi-provider ecosystem with crash recovery and local-provider UX. Ready for Phase 9.
 
 ## Current Position
 
-Phase: 8 of 9 (Provider Ecosystem and Reliability)
-Plan: 2 of 3 in current phase (08-02 complete)
-Status: Round cache and estimate command built -- content-hash cache for crash recovery, styled cost comparison CLI
-Last activity: 2026-02-17 -- Completed 08-02-PLAN.md (round cache and estimate command)
+Phase: 8 of 9 (Provider Ecosystem and Reliability) -- COMPLETE
+Plan: 3 of 3 in current phase (08-03 complete)
+Status: Phase 8 complete -- round cache integrated into pipeline, LOCAL badge, cost omission for local providers
+Last activity: 2026-02-17 -- Completed 08-03-PLAN.md (generate pipeline integration)
 
-Progress: [██████████████░] 96%
+Progress: [███████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 26
+- Total plans completed: 27
 - Average duration: 5min
-- Total execution time: 118min
+- Total execution time: 124min
 
 **By Phase:**
 
@@ -54,10 +54,11 @@ Progress: [██████████████░] 96%
 
 | 08-01 | 2 tasks | 6min | 6min |
 | 08-02 | 2 tasks | 4min | 4min |
+| 08-03 | 2 tasks | 6min | 6min |
 
 **Recent Trend:**
-- Last 5 plans: 5min, 5min, 5min, 6min, 4min
-- Trend: consistent fast execution; Phase 8 cache and estimate complete
+- Last 5 plans: 5min, 5min, 6min, 4min, 6min
+- Trend: consistent fast execution; Phase 8 complete (provider ecosystem and reliability)
 
 *Updated after each plan completion*
 
@@ -160,6 +161,11 @@ Recent decisions affecting current work:
 - [Phase 08]: Estimate command uses console.log directly, not terminal renderer (simple command, not pipeline)
 - [Phase 08]: Cost entries sorted: current provider first, then ascending cost, local providers last
 - [Phase 08]: Ollama label uses provider name as model since defaultModel is empty string
+- [Phase 08]: wrapWithCache helper wraps each round step's execute function for transparent cache integration
+- [Phase 08]: Analysis fingerprint from directoryTree file entries (not raw AnalysisContext files)
+- [Phase 08]: Cached rounds set display status directly in wrapper; onStepComplete guards against overwriting
+- [Phase 08]: isLocal threaded to CIRenderer for consistent cost omission across TTY and CI output modes
+- [Phase 08]: MODEL_COSTS expanded to 11 entries covering all PROVIDER_PRESETS pricing data
 
 ### Pending Todos
 
@@ -172,5 +178,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 08-02-PLAN.md (round cache and estimate command)
-Resume file: .planning/phases/08-provider-ecosystem-and-reliability/08-03-PLAN.md
+Stopped at: Completed 08-03-PLAN.md (generate pipeline integration -- Phase 8 complete)
+Resume file: .planning/phases/09-*/09-01-PLAN.md (Phase 9 when ready)
