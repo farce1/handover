@@ -27,14 +27,32 @@ import { scoreFiles } from '../context/scorer.js';
 import { packFiles } from '../context/packer.js';
 import { computeTokenBudget } from '../context/token-counter.js';
 import { createProvider } from '../providers/factory.js';
+import {
+  DOCUMENT_REGISTRY,
+  ROUND_DEPS,
+  resolveSelectedDocs,
+  computeRequiredRounds,
+} from '../renderers/registry.js';
+import type { RenderContext, DocumentStatus } from '../renderers/types.js';
+import { renderIndex } from '../renderers/render-00-index.js';
+import { determineDocStatus } from '../renderers/utils.js';
 import type { RoundExecutionResult } from '../ai-rounds/types.js';
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 import type { PackedContext } from '../context/types.js';
+import type {
+  Round1Output,
+  Round2Output,
+  Round3Output,
+  Round4Output,
+  Round5Output,
+  Round6Output,
+} from '../ai-rounds/schemas.js';
 
 export interface GenerateOptions {
   provider?: string;
   model?: string;
   only?: string;
+  audience?: string;
   staticOnly?: boolean;
   verbose?: boolean;
 }
@@ -111,6 +129,14 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     }
     logger.blank();
 
+    // Resolve audience mode: CLI --audience overrides config
+    const audience: 'human' | 'ai' =
+      options.audience === 'ai' ? 'ai' : (config.audience ?? 'human');
+
+    // Resolve selected documents and required AI rounds
+    const selectedDocs = resolveSelectedDocs(options.only, DOCUMENT_REGISTRY);
+    const requiredRounds = computeRequiredRounds(selectedDocs);
+
     // Build the DAG pipeline
     const startTime = Date.now();
     const rootDir = resolve(process.cwd());
@@ -165,7 +191,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       roundResults.get(n) as RoundResultOf<T>;
 
     const steps = [
-      // Step 1: Static Analysis + Context Packing
+      // Step 1: Static Analysis + Context Packing (always runs)
       createStep({
         id: 'static-analysis',
         name: 'Static Analysis',
@@ -198,96 +224,131 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           return result;
         },
       }),
+    ];
 
-      // Step 2: AI Round 1 -- Project Overview (sequential after static-analysis)
-      createRound1Step(
-        provider,
-        deferredAnalysis,
-        deferredContext,
-        config,
-        tracker,
-        estimateTokensFn,
-      ),
+    // Conditionally register AI round steps based on requiredRounds (--only optimization)
+    if (requiredRounds.has(1)) {
+      steps.push(
+        createRound1Step(
+          provider,
+          deferredAnalysis,
+          deferredContext,
+          config,
+          tracker,
+          estimateTokensFn,
+        ),
+      );
+    }
 
-      // Step 3: AI Round 2 -- Module Detection (sequential after Round 1)
-      createRound2Step(
-        provider,
-        deferredAnalysis,
-        deferredContext,
-        config,
-        tracker,
-        estimateTokensFn,
-        () => getRound<import('../ai-rounds/schemas.js').Round1Output>(1),
-      ),
+    if (requiredRounds.has(2)) {
+      steps.push(
+        createRound2Step(
+          provider,
+          deferredAnalysis,
+          deferredContext,
+          config,
+          tracker,
+          estimateTokensFn,
+          () => getRound<Round1Output>(1),
+        ),
+      );
+    }
 
-      // Step 4: AI Round 3 -- Feature Extraction (parallel with R5, R6 after R2)
-      createRound3Step(
-        provider,
-        deferredAnalysis,
-        deferredContext,
-        config,
-        tracker,
-        estimateTokensFn,
-        () => ({
-          round1: getRound<import('../ai-rounds/schemas.js').Round1Output>(1),
-          round2: getRound<import('../ai-rounds/schemas.js').Round2Output>(2),
-        }),
-      ),
+    if (requiredRounds.has(3)) {
+      steps.push(
+        createRound3Step(
+          provider,
+          deferredAnalysis,
+          deferredContext,
+          config,
+          tracker,
+          estimateTokensFn,
+          () => ({
+            round1: getRound<Round1Output>(1),
+            round2: getRound<Round2Output>(2),
+          }),
+        ),
+      );
+    }
 
-      // Step 5: AI Round 4 -- Architecture Detection (sequential after R3)
-      createRound4Step(
-        provider,
-        deferredAnalysis,
-        deferredContext,
-        config,
-        tracker,
-        estimateTokensFn,
-        () => ({
-          round1: getRound<import('../ai-rounds/schemas.js').Round1Output>(1),
-          round2: getRound<import('../ai-rounds/schemas.js').Round2Output>(2),
-          round3: getRound<import('../ai-rounds/schemas.js').Round3Output>(3),
-        }),
-      ),
+    if (requiredRounds.has(4)) {
+      steps.push(
+        createRound4Step(
+          provider,
+          deferredAnalysis,
+          deferredContext,
+          config,
+          tracker,
+          estimateTokensFn,
+          () => ({
+            round1: getRound<Round1Output>(1),
+            round2: getRound<Round2Output>(2),
+            round3: getRound<Round3Output>(3),
+          }),
+        ),
+      );
+    }
 
-      // Step 6: AI Round 5 -- Edge Cases & Conventions (parallel with R3, R6 after R2)
-      createRound5Step(
-        provider,
-        deferredAnalysis,
-        deferredContext,
-        config,
-        tracker,
-        estimateTokensFn,
-        () => ({
-          round1: getRound<import('../ai-rounds/schemas.js').Round1Output>(1),
-          round2: getRound<import('../ai-rounds/schemas.js').Round2Output>(2),
-        }),
-      ),
+    if (requiredRounds.has(5)) {
+      steps.push(
+        createRound5Step(
+          provider,
+          deferredAnalysis,
+          deferredContext,
+          config,
+          tracker,
+          estimateTokensFn,
+          () => ({
+            round1: getRound<Round1Output>(1),
+            round2: getRound<Round2Output>(2),
+          }),
+        ),
+      );
+    }
 
-      // Step 7: AI Round 6 -- Deployment Inference (parallel with R3, R5 after R2)
-      createRound6Step(
-        provider,
-        deferredAnalysis,
-        deferredContext,
-        config,
-        tracker,
-        estimateTokensFn,
-        () => ({
-          round1: getRound<import('../ai-rounds/schemas.js').Round1Output>(1),
-          round2: getRound<import('../ai-rounds/schemas.js').Round2Output>(2),
-        }),
-      ),
+    if (requiredRounds.has(6)) {
+      steps.push(
+        createRound6Step(
+          provider,
+          deferredAnalysis,
+          deferredContext,
+          config,
+          tracker,
+          estimateTokensFn,
+          () => ({
+            round1: getRound<Round1Output>(1),
+            round2: getRound<Round2Output>(2),
+          }),
+        ),
+      );
+    }
 
-      // Step 8: Document Rendering (placeholder for Phase 6)
+    // Compute render step dependencies dynamically from registered rounds.
+    // Terminal rounds = those not depended upon by any other registered round.
+    const registeredRoundIds = [...requiredRounds].map((n) => `ai-round-${n}`);
+    const terminalRounds = registeredRoundIds.filter((id) => {
+      const roundNum = parseInt(id.split('-')[2], 10);
+      return !registeredRoundIds.some((otherId) => {
+        const otherNum = parseInt(otherId.split('-')[2], 10);
+        return otherNum !== roundNum && ROUND_DEPS[otherNum]?.includes(roundNum);
+      });
+    });
+    const renderDeps =
+      terminalRounds.length > 0 ? terminalRounds : ['static-analysis'];
+
+    // Render step (always runs -- produces documents on disk)
+    steps.push(
       createStep({
         id: 'render',
         name: 'Document Rendering',
-        deps: ['ai-round-4', 'ai-round-5', 'ai-round-6'],
+        deps: renderDeps,
         execute: async () => {
-          logger.log('Document rendering will run here (Phase 6)');
+          // Placeholder: Task 3 replaces this with real document generation
+          logger.log('Document rendering will run here (Task 3)');
           return {};
         },
       }),
-    ];
+    );
 
     for (const step of steps) {
       stepNames.set(step.id, step.name);
