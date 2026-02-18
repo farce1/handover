@@ -71,13 +71,13 @@ Plans:
 3. An AI assistant reading llms.txt at the repo root gets a curated index of 8-12 files covering what handover does, how to use it, and how to extend it
 4. AGENTS.md contains only AI-operational rules (build commands, test commands, conventions, where things live) — all human narrative has moved to docs/contributor/
 5. CONTRIBUTING.md links to real docs/ paths and a first-time contributor can clone, install, run tests, and find a good-first-issue within 15 minutes
-   **Plans**: TBD
+   **Plans:** 3 plans
 
 Plans:
 
-- [ ] 03-01: docs/user/ — getting-started.md, configuration.md, providers.md, output-documents.md
-- [ ] 03-02: docs/contributor/ — architecture.md, development.md, adding-providers.md, adding-analyzers.md
-- [ ] 03-03: AGENTS.md restructure; PRD.md retirement; CONTRIBUTING.md finalization; llms.txt; package.json metadata
+- [ ] 03-01-PLAN.md — docs/user/ — getting-started.md, configuration.md, providers.md, output-documents.md
+- [ ] 03-02-PLAN.md — docs/contributor/ — architecture.md, development.md, adding-providers.md, adding-analyzers.md
+- [ ] 03-03-PLAN.md — AGENTS.md restructure, PRD.md retirement, CONTRIBUTING.md finalization, llms.txt, package.json metadata
 
 ## Progress
 
