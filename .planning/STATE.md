@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** Phase 3 — Documentation
+**Current focus:** Phase 3 — Documentation (COMPLETE)
 
 ## Current Position
 
 Phase: 3 of 3 (Documentation)
-Plan: 3 of N in current phase
-Status: In progress
-Last activity: 2026-02-18 — Completed 03-02 (contributor docs: architecture, development, adding-providers, adding-analyzers)
+Plan: 3 of 3 in current phase — COMPLETE
+Status: All phases complete
+Last activity: 2026-02-18 — Completed 03-03 (AGENTS.md, CONTRIBUTING.md, llms.txt, package.json metadata, PRD.md retired)
 
-Progress: [########░░] 80%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 7
-- Average duration: 4 min
-- Total execution time: 0.52 hours
+- Total plans completed: 8
+- Average duration: 5 min
+- Total execution time: 0.58 hours
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: [########░░] 80%
 | ----------------------------- | ----- | ------ | -------- |
 | 01-community-health           | 1     | 1 min  | 1 min    |
 | 02-ci-cd-automation           | 4     | 14 min | 4 min    |
-| 03-docs-and-llm-accessibility | 2     | 18 min | 9 min    |
+| 03-docs-and-llm-accessibility | 3     | 26 min | 9 min    |
 
 **Recent Trend:**
 
-- Last 5 plans: 02-03 (6 min), 02-04 (2 min), 03-01 (3 min), 03-02 (15 min)
+- Last 5 plans: 02-04 (2 min), 03-01 (3 min), 03-02 (15 min), 03-03 (8 min)
 - Trend: stable
 
 _Updated after each plan completion_
@@ -75,20 +75,22 @@ Recent decisions affecting current work:
 - [Phase 03-docs-and-llm-accessibility]: Provider table sources env vars/models from src/providers/presets.ts (not README) as authoritative source
 - [Phase 03-docs-and-llm-accessibility]: Architecture doc uses narrative walkthrough style; extension docs use step-by-step tutorial with skeletons
 - [Phase 03-docs-and-llm-accessibility]: All file path references in contributor docs verified against actual codebase; no line numbers for durability
+- [Phase 03-docs-and-llm-accessibility]: AGENTS.md zero narrative — 60 lines of pure AI-ops rules (commands, conventions, file map, commit format, prohibitions)
+- [Phase 03-docs-and-llm-accessibility]: llms.txt follows llmstxt.org spec — 11 entries, Optional H2 for content LLMs may skip; no llms-full.txt
+- [Phase 03-docs-and-llm-accessibility]: PRD.md was .gitignored (never committed) — physical file deleted to clean working tree
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
 - GitHub Sponsors account status unknown — FUNDING.yml requires Sponsors to be enabled on the account; verify before Phase 1 plan 03 executes, or mark as conditional
-- AGENTS.md and PRD.md distillation scope unknown — read both files at Phase 3 plan start to scope the restructuring effort; PRD.md is ~90KB
 - npm trusted publishing not yet configured — user must add handover-cli trusted publisher on npmjs.com before release workflow can publish
 - RELEASE_PLEASE_TOKEN not yet created — user must create GitHub fine-grained PAT and add as repo secret
 
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 03-02-PLAN.md (contributor docs: architecture, development, adding-providers, adding-analyzers)
-Resume file: .planning/phases/03-docs-and-llm-accessibility/03-03-PLAN.md
+Stopped at: Completed 03-03-PLAN.md (AGENTS.md restructure, CONTRIBUTING.md, llms.txt, package.json metadata, PRD.md retired — Phase 3 complete)
+Resume file: None — all phases complete
