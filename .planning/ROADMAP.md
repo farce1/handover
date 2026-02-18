@@ -44,13 +44,13 @@ Plans:
   3. The README displays four working badges: CI status (green), npm version, npm downloads, and license
   4. Dependabot opens weekly PRs for outdated npm dependencies
   5. CodeQL and OpenSSF Scorecard workflows run on schedule and the Scorecard badge appears in the README
-**Plans**: TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] 02-01: CI workflow (ci.yml) with Node matrix, lint/typecheck/build/test, integration gate
-- [ ] 02-02: Release workflow (release.yml) with release-please and OIDC npm publish; CHANGELOG.md seed
-- [ ] 02-03: Commitlint + husky + lint-staged + prettier setup; Dependabot config
-- [ ] 02-04: CodeQL workflow, OpenSSF Scorecard workflow, README badges
+- [ ] 02-01-PLAN.md — CI quality gate workflow (ci.yml) with Node 20+22 matrix, vitest coverage config with 80% thresholds, Codecov upload
+- [ ] 02-02-PLAN.md — Release workflow (release-please.yml) with manifest config, OIDC npm publish, CHANGELOG.md seed
+- [ ] 02-03-PLAN.md — ESLint flat config, Prettier, commitlint, husky + lint-staged hooks, Dependabot config
+- [ ] 02-04-PLAN.md — Commitlint CI step, CodeQL workflow, OpenSSF Scorecard workflow, README trust signal badges
 
 ### Phase 3: Docs and LLM Accessibility
 **Goal**: Users find clear how-to guides; contributors find architecture and extension docs; AI assistants find a curated llms.txt index — all content sourced from distilled AGENTS.md and PRD.md
