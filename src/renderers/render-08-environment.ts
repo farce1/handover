@@ -1,5 +1,5 @@
 import type { RenderContext } from './types.js';
-import { buildTable, codeRef, crossRef, sectionIntro } from './utils.js';
+import { buildTable, codeRef, sectionIntro } from './utils.js';
 import { renderDocument, collectRoundsUsed } from './render-template.js';
 
 // ─── renderEnvironment ─────────────────────────────────────────────────────
@@ -35,7 +35,9 @@ export function renderEnvironment(ctx: RenderContext): string {
     renderBody: (lines) => {
       // Warning banner if static-only
       if (!hasR6) {
-        lines.push('> **Note:** AI analysis for this section was unavailable. Content is based on static analysis only and may be incomplete.');
+        lines.push(
+          '> **Note:** AI analysis for this section was unavailable. Content is based on static analysis only and may be incomplete.',
+        );
         lines.push('');
       }
 
@@ -62,15 +64,17 @@ export function renderEnvironment(ctx: RenderContext): string {
       lines.push('');
 
       if (hasR6 && r6.envVars.length > 0) {
-        lines.push(buildTable(
-          ['Name', 'Purpose', 'Required', 'Source'],
-          r6.envVars.map((v) => [
-            `\`${v.name}\``,
-            v.purpose,
-            v.required ? 'Yes' : 'No',
-            v.source,
-          ]),
-        ));
+        lines.push(
+          buildTable(
+            ['Name', 'Purpose', 'Required', 'Source'],
+            r6.envVars.map((v) => [
+              `\`${v.name}\``,
+              v.purpose,
+              v.required ? 'Yes' : 'No',
+              v.source,
+            ]),
+          ),
+        );
         lines.push('');
       } else {
         const uniqueVars = new Map<string, string[]>();
@@ -82,14 +86,18 @@ export function renderEnvironment(ctx: RenderContext): string {
         }
 
         if (uniqueVars.size > 0) {
-          lines.push(buildTable(
-            ['Name', 'Referenced In'],
-            Array.from(uniqueVars.entries()).map(([name, files]) => [
-              `\`${name}\``,
-              files.slice(0, 3).map((f) => codeRef(f)).join(', ') +
-                (files.length > 3 ? ` (+${files.length - 3} more)` : ''),
-            ]),
-          ));
+          lines.push(
+            buildTable(
+              ['Name', 'Referenced In'],
+              Array.from(uniqueVars.entries()).map(([name, files]) => [
+                `\`${name}\``,
+                files
+                  .slice(0, 3)
+                  .map((f) => codeRef(f))
+                  .join(', ') + (files.length > 3 ? ` (+${files.length - 3} more)` : ''),
+              ]),
+            ),
+          );
           lines.push('');
         }
       }
@@ -99,14 +107,12 @@ export function renderEnvironment(ctx: RenderContext): string {
         lines.push('## Variable References');
         lines.push('');
         const refs = staticEnv.envReferences.slice(0, 50);
-        lines.push(buildTable(
-          ['File', 'Line', 'Variable'],
-          refs.map((ref) => [
-            codeRef(ref.file),
-            String(ref.line),
-            `\`${ref.variable}\``,
-          ]),
-        ));
+        lines.push(
+          buildTable(
+            ['File', 'Line', 'Variable'],
+            refs.map((ref) => [codeRef(ref.file), String(ref.line), `\`${ref.variable}\``]),
+          ),
+        );
 
         if (staticEnv.envReferences.length > 50) {
           lines.push('');

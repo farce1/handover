@@ -76,15 +76,7 @@ export const TradeoffsSchema = z.object({
 
 export const ArchPatternSchema = z.object({
   name: z.string(),
-  type: z.enum([
-    'mvc',
-    'event-driven',
-    'cqrs',
-    'layered',
-    'microservice',
-    'monolith',
-    'other',
-  ]),
+  type: z.enum(['mvc', 'event-driven', 'cqrs', 'layered', 'microservice', 'monolith', 'other']),
   description: z.string(),
   tradeoffs: TradeoffsSchema,
   evidence: z.array(EvidenceSchema).default([]),
@@ -162,13 +154,7 @@ export const CompletionResultSchema = z.object({
 
 // ─── Orchestrator types ──────────────────────────────────────────────────────
 
-export const StepStatusSchema = z.enum([
-  'pending',
-  'running',
-  'completed',
-  'failed',
-  'skipped',
-]);
+export const StepStatusSchema = z.enum(['pending', 'running', 'completed', 'failed', 'skipped']);
 
 export const StepResultSchema = z.object({
   stepId: z.string(),

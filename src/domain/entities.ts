@@ -6,14 +6,7 @@ import {
   DependencySchema,
   EnvConfigSchema,
 } from './schemas.js';
-import type {
-  Project,
-  Module,
-  SourceFile,
-  Feature,
-  Dependency,
-  EnvConfig,
-} from './types.js';
+import type { Project, Module, SourceFile, Feature, Dependency, EnvConfig } from './types.js';
 
 /**
  * Create a new Project with sensible defaults.
@@ -40,11 +33,7 @@ export function createProject(
 /**
  * Create an empty Module shell.
  */
-export function createModule(
-  name: string,
-  path: string,
-  purpose: string = '',
-): Module {
+export function createModule(name: string, path: string, purpose: string = ''): Module {
   return ModuleSchema.parse({
     name,
     path,
@@ -77,10 +66,7 @@ export function createSourceFile(
 /**
  * Create a Feature entry.
  */
-export function createFeature(
-  name: string,
-  description: string,
-): Feature {
+export function createFeature(name: string, description: string): Feature {
   return FeatureSchema.parse({
     name,
     description,

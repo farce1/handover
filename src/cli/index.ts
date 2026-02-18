@@ -10,10 +10,7 @@ program
   .description('Generate comprehensive codebase documentation for handover')
   .version('0.1.0');
 
-program
-  .command('init')
-  .description('Create .handover.yml configuration file')
-  .action(runInit);
+program.command('init').description('Create .handover.yml configuration file').action(runInit);
 
 program
   .command('generate')

@@ -44,15 +44,13 @@ export async function runAnalyze(options: AnalyzeOptions): Promise<void> {
 
     // Display header
     logger.blank();
-    logger.info(
-      `${pc.bold('handover')} v0.1.0 — static analysis`,
-    );
+    logger.info(`${pc.bold('handover')} v0.1.0 — static analysis`);
     logger.blank();
     logger.info(`Analyzing ${pc.cyan(rootDir)}...`);
     logger.blank();
 
     // Run static analysis
-    const gitDepth = options.gitDepth === 'full' ? 'full' as const : 'default' as const;
+    const gitDepth = options.gitDepth === 'full' ? ('full' as const) : ('default' as const);
     const result = await runStaticAnalysis(rootDir, config, {
       gitDepth,
       onProgress: (analyzer, status) => {

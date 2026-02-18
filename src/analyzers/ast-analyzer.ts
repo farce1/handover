@@ -12,9 +12,7 @@ import type { AnalysisContext, AnalyzerResult, ASTResult } from './types.js';
  * Processes files in batches of 30 to avoid overwhelming WASM memory.
  * Handles individual file parse failures gracefully (logs warning, continues).
  */
-export async function analyzeAST(
-  ctx: AnalysisContext,
-): Promise<AnalyzerResult<ASTResult>> {
+export async function analyzeAST(ctx: AnalysisContext): Promise<AnalyzerResult<ASTResult>> {
   const start = performance.now();
 
   try {
@@ -25,8 +23,7 @@ export async function analyzeAST(
     try {
       // Filter to supported, non-binary files
       const supportedFiles = ctx.files.filter(
-        (file) =>
-          isSupportedFile(file.path) && !isBinaryFile(file.extension),
+        (file) => isSupportedFile(file.path) && !isBinaryFile(file.extension),
       );
 
       const parsedFiles: ParsedFile[] = [];
@@ -45,8 +42,7 @@ export async function analyzeAST(
             parsedFiles.push({ ...parsed, path: file.path });
           } catch (error) {
             // Individual file parse failure: log warning and continue
-            const msg =
-              error instanceof Error ? error.message : String(error);
+            const msg = error instanceof Error ? error.message : String(error);
             warnings.push(`Failed to parse ${file.path}: ${msg}`);
           }
         }
@@ -64,8 +60,7 @@ export async function analyzeAST(
         totalClasses += pf.classes.length;
         totalExports += pf.exports.length;
         totalImports += pf.imports.length;
-        languageBreakdown[pf.language] =
-          (languageBreakdown[pf.language] ?? 0) + 1;
+        languageBreakdown[pf.language] = (languageBreakdown[pf.language] ?? 0) + 1;
       }
 
       return {

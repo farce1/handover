@@ -63,7 +63,8 @@ export function createStandardRoundStep<T>(
   roundGetter: <U>(n: number) => RoundExecutionResult<U> | undefined,
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): StepDefinition {
-  const { roundNumber, name, deps, maxTokens, schema, buildData, buildFallback, getPriorContexts } = roundConfig;
+  const { roundNumber, name, deps, maxTokens, schema, buildData, buildFallback, getPriorContexts } =
+    roundConfig;
 
   return createStep({
     id: `ai-round-${roundNumber}`,
@@ -100,7 +101,11 @@ export function createStandardRoundStep<T>(
           };
         },
         validate: (data: T) =>
-          validateRoundClaims(roundNumber, data as unknown as Record<string, unknown>, staticAnalysis),
+          validateRoundClaims(
+            roundNumber,
+            data as unknown as Record<string, unknown>,
+            staticAnalysis,
+          ),
         buildFallback: () => buildFallback(staticAnalysis),
         tracker,
         estimateTokensFn,

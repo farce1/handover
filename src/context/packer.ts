@@ -1,11 +1,6 @@
 import type { ParsedFile } from '../parsing/types.js';
 import type { ASTResult } from '../analyzers/types.js';
-import type {
-  FilePriority,
-  PackedContext,
-  PackedFile,
-  TokenBudget,
-} from './types.js';
+import type { FilePriority, PackedContext, PackedFile, TokenBudget } from './types.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -47,22 +42,16 @@ export function generateSignatureSummary(parsed: ParsedFile): string {
     if (!exportedNames.has(fn.name)) continue;
 
     const asyncPrefix = fn.isAsync ? 'async ' : '';
-    const params = fn.parameters
-      .map((p) => (p.type ? `${p.name}: ${p.type}` : p.name))
-      .join(', ');
+    const params = fn.parameters.map((p) => (p.type ? `${p.name}: ${p.type}` : p.name)).join(', ');
     const returnSuffix = fn.returnType ? `: ${fn.returnType}` : '';
-    lines.push(
-      `export ${asyncPrefix}function ${fn.name}(${params})${returnSuffix}`,
-    );
+    lines.push(`export ${asyncPrefix}function ${fn.name}(${params})${returnSuffix}`);
   }
 
   // Exported classes
   for (const cls of parsed.classes) {
     if (!exportedNames.has(cls.name)) continue;
 
-    const publicMethods = cls.methods.filter(
-      (m) => m.visibility === 'public',
-    );
+    const publicMethods = cls.methods.filter((m) => m.visibility === 'public');
     const methodSigs = publicMethods
       .map((m) => {
         const params = m.parameters
@@ -73,9 +62,7 @@ export function generateSignatureSummary(parsed: ParsedFile): string {
       })
       .join('; ');
 
-    lines.push(
-      `export class ${cls.name} { ${methodSigs ? methodSigs : ''} }`,
-    );
+    lines.push(`export class ${cls.name} { ${methodSigs ? methodSigs : ''} }`);
   }
 
   // Exported constants
@@ -88,9 +75,7 @@ export function generateSignatureSummary(parsed: ParsedFile): string {
   // Import summary
   if (parsed.imports.length > 0) {
     const sources = parsed.imports.map((i) => i.source);
-    lines.push(
-      `// ${parsed.imports.length} imports from: ${sources.join(', ')}`,
-    );
+    lines.push(`// ${parsed.imports.length} imports from: ${sources.join(', ')}`);
   }
 
   return lines.join('\n');
@@ -149,21 +134,15 @@ function extractOversizedSections(
   const addedRanges = new Set<string>();
 
   // Priority 1: Exported function/class bodies
-  const exportedFunctions = parsed.functions.filter((f) =>
-    exportedNames.has(f.name),
-  );
-  const exportedClasses = parsed.classes.filter((c) =>
-    exportedNames.has(c.name),
-  );
+  const exportedFunctions = parsed.functions.filter((f) => exportedNames.has(f.name));
+  const exportedClasses = parsed.classes.filter((c) => exportedNames.has(c.name));
 
   for (const fn of exportedFunctions) {
     const rangeKey = `${fn.line}-${fn.endLine}`;
     if (addedRanges.has(rangeKey)) continue;
     addedRanges.add(rangeKey);
 
-    const sectionContent = contentLines
-      .slice(fn.line - 1, fn.endLine)
-      .join('\n');
+    const sectionContent = contentLines.slice(fn.line - 1, fn.endLine).join('\n');
     sections.push({
       label: `Export: ${fn.name}`,
       content: sectionContent,
@@ -176,9 +155,7 @@ function extractOversizedSections(
     if (addedRanges.has(rangeKey)) continue;
     addedRanges.add(rangeKey);
 
-    const sectionContent = contentLines
-      .slice(cls.line - 1, cls.endLine)
-      .join('\n');
+    const sectionContent = contentLines.slice(cls.line - 1, cls.endLine).join('\n');
     sections.push({
       label: `Export: ${cls.name}`,
       content: sectionContent,
@@ -336,22 +313,11 @@ export async function packFiles(
     const parsed = astMap.get(entry.path);
 
     // ── Oversized check (CTX-03) ──────────────────────────────────────
-    if (
-      fullTokens > OVERSIZED_THRESHOLD_TOKENS &&
-      entry.score >= 30 &&
-      parsed
-    ) {
-      const { signatures, sections } = extractOversizedSections(
-        parsed,
-        content,
-        estimateTokensFn,
-      );
+    if (fullTokens > OVERSIZED_THRESHOLD_TOKENS && entry.score >= 30 && parsed) {
+      const { signatures, sections } = extractOversizedSections(parsed, content, estimateTokensFn);
 
       const sigTokens = estimateTokensFn(signatures);
-      const totalSectionTokens = sections.reduce(
-        (sum, s) => sum + s.tokens,
-        0,
-      );
+      const totalSectionTokens = sections.reduce((sum, s) => sum + s.tokens, 0);
 
       // Try signatures + all sections
       if (sigTokens + totalSectionTokens <= remaining) {
@@ -388,9 +354,7 @@ export async function packFiles(
           includedSections.length > 0
             ? signatures +
               '\n\n' +
-              includedSections
-                .map((s) => `// --- ${s.label} ---\n${s.content}`)
-                .join('\n\n')
+              includedSections.map((s) => `// --- ${s.label} ---\n${s.content}`).join('\n\n')
             : signatures;
         const combinedTokens = estimateTokensFn(combinedContent);
 
@@ -478,9 +442,7 @@ export async function packFiles(
   // ── Build PackedContext ─────────────────────────────────────────────────
   const usedTokens = budget.fileContentBudget - remaining;
   const fullFiles = packedFiles.filter((f) => f.tier === 'full').length;
-  const signatureFiles = packedFiles.filter(
-    (f) => f.tier === 'signatures',
-  ).length;
+  const signatureFiles = packedFiles.filter((f) => f.tier === 'signatures').length;
   const skippedFiles = packedFiles.filter((f) => f.tier === 'skip').length;
 
   return {
@@ -493,9 +455,7 @@ export async function packFiles(
       skippedFiles,
       usedTokens,
       budgetTokens: budget.fileContentBudget,
-      utilizationPercent: Math.round(
-        (usedTokens / budget.fileContentBudget) * 100,
-      ),
+      utilizationPercent: Math.round((usedTokens / budget.fileContentBudget) * 100),
     },
   };
 }

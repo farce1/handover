@@ -10,10 +10,7 @@ import { stringify } from 'yaml';
  *
  * In human mode: returns empty string (no visible output).
  */
-export function structuredBlock(
-  audience: 'human' | 'ai',
-  data: Record<string, unknown>,
-): string {
+export function structuredBlock(audience: 'human' | 'ai', data: Record<string, unknown>): string {
   if (audience !== 'ai') return '';
 
   const yamlContent = stringify(data).trimEnd();

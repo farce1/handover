@@ -25,17 +25,12 @@ const CATEGORY_MAP: Record<string, TodoItem['category']> = {
 
 // Build marker regex from CATEGORY_MAP keys
 const ALL_MARKERS = Object.keys(CATEGORY_MAP);
-const MARKER_REGEX = new RegExp(
-  `\\b(${ALL_MARKERS.join('|')})\\b[:\\s]\\s*(.*)`,
-  'i',
-);
+const MARKER_REGEX = new RegExp(`\\b(${ALL_MARKERS.join('|')})\\b[:\\s]\\s*(.*)`, 'i');
 
 // Issue reference regex: #123 and JIRA-456 / GH-789 patterns
 const ISSUE_REF_REGEX = /(?:#(\d+)|([A-Z]{2,}-\d+))/g;
 
-export async function scanTodos(
-  ctx: AnalysisContext,
-): Promise<AnalyzerResult<TodoResult>> {
+export async function scanTodos(ctx: AnalysisContext): Promise<AnalyzerResult<TodoResult>> {
   const start = Date.now();
 
   try {

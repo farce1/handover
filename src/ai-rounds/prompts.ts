@@ -97,7 +97,7 @@ export function buildRoundPrompt(
   packedContext: PackedContext,
   priorRounds: RoundContext[],
   roundSpecificData: string,
-  estimateTokensFn: (text: string) => number,
+  _estimateTokensFn: (text: string) => number,
 ): CompletionRequest {
   // Assemble prior context from compressed round outputs
   const priorContextText =

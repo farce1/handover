@@ -76,8 +76,7 @@ function extractModules(output: Record<string, unknown>): string[] {
 }
 
 function extractFindings(output: Record<string, unknown>): string[] {
-  const raw =
-    output.findings ?? output.keyFindings ?? output.key_findings;
+  const raw = output.findings ?? output.keyFindings ?? output.key_findings;
   if (!Array.isArray(raw)) return [];
 
   return raw.filter((s): s is string => typeof s === 'string');
@@ -89,16 +88,9 @@ function extractRelationships(output: Record<string, unknown>): string[] {
 
   return raw
     .map((item: unknown) => {
-      if (
-        item &&
-        typeof item === 'object' &&
-        'from' in item &&
-        'to' in item
-      ) {
+      if (item && typeof item === 'object' && 'from' in item && 'to' in item) {
         const rel = item as { from: string; to: string; type?: string };
-        return rel.type
-          ? `${rel.from} -> ${rel.to} (${rel.type})`
-          : `${rel.from} -> ${rel.to}`;
+        return rel.type ? `${rel.from} -> ${rel.to} (${rel.type})` : `${rel.from} -> ${rel.to}`;
       }
       return null;
     })
@@ -163,10 +155,10 @@ function enforceTokenBudget(
   maxTokens: number,
   estimateTokensFn: (text: string) => number,
 ): TruncatedFields {
-  let currentModules = [...modules];
-  let currentFindings = [...findings];
-  let currentRelationships = [...relationships];
-  let currentOpenQuestions = [...openQuestions];
+  const currentModules = [...modules];
+  const currentFindings = [...findings];
+  const currentRelationships = [...relationships];
+  const currentOpenQuestions = [...openQuestions];
 
   const fits = (): boolean => {
     const text = buildCompactText(

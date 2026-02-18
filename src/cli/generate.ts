@@ -118,7 +118,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       const toolLabel = monorepo.tool ?? 'unknown';
       logger.warn(
         `Monorepo detected (${toolLabel} workspaces). ` +
-        `Run \`handover generate\` from a specific package directory for best results.`,
+          `Run \`handover generate\` from a specific package directory for best results.`,
       );
     }
 
@@ -151,7 +151,16 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       const rootDir = resolve(process.cwd());
 
       // Initialize analyzers for progress display
-      const ANALYZER_NAMES = ['file-tree', 'dependencies', 'git-history', 'todos', 'env', 'ast', 'tests', 'docs'];
+      const ANALYZER_NAMES = [
+        'file-tree',
+        'dependencies',
+        'git-history',
+        'todos',
+        'env',
+        'ast',
+        'tests',
+        'docs',
+      ];
       for (const name of ANALYZER_NAMES) {
         displayState.analyzers.set(name, 'pending');
       }
@@ -163,9 +172,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       const analyzerStart = Date.now();
       const result = await runStaticAnalysis(rootDir, config, {
         onProgress: (analyzer, status) => {
-          const mapped: AnalyzerStatus = status === 'start' ? 'running'
-            : status === 'fail' ? 'failed'
-            : 'done';
+          const mapped: AnalyzerStatus =
+            status === 'start' ? 'running' : status === 'fail' ? 'failed' : 'done';
           displayState.analyzers.set(analyzer, mapped);
           displayState.analyzerElapsedMs = Date.now() - analyzerStart;
           if (status === 'fail') {
@@ -254,18 +262,19 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     });
 
     const deferredContext = new Proxy({} as PackedContext, {
-      get: (_target, prop) => (packedContext as unknown as Record<string | symbol, unknown>)?.[prop],
+      get: (_target, prop) =>
+        (packedContext as unknown as Record<string | symbol, unknown>)?.[prop],
     });
 
     // Helper to get typed round results from the shared Map
     type RoundResultOf<T> = RoundExecutionResult<T> | undefined;
-    const getRound = <T>(n: number): RoundResultOf<T> =>
-      roundResults.get(n) as RoundResultOf<T>;
+    const getRound = <T>(n: number): RoundResultOf<T> => roundResults.get(n) as RoundResultOf<T>;
 
     // Create per-round onRetry callbacks that delegate to the orchestrator's onStepRetry event
-    const makeOnRetry = (roundNum: number) => (attempt: number, delayMs: number, reason: string) => {
-      orchestratorEvents.onStepRetry?.(`ai-round-${roundNum}`, attempt, delayMs, reason);
-    };
+    const makeOnRetry =
+      (roundNum: number) => (attempt: number, delayMs: number, reason: string) => {
+        orchestratorEvents.onStepRetry?.(`ai-round-${roundNum}`, attempt, delayMs, reason);
+      };
 
     // DAG orchestrator events -- update display state and call renderer
     const orchestratorEvents: DAGEvents = {
@@ -308,9 +317,9 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
           // If degraded, also record an error and affected docs
           if (roundData.status === 'degraded') {
-            const affectedDocs = DOCUMENT_REGISTRY
-              .filter(d => d.requiredRounds.includes(roundNum))
-              .map(d => d.filename);
+            const affectedDocs = DOCUMENT_REGISTRY.filter((d) =>
+              d.requiredRounds.includes(roundNum),
+            ).map((d) => d.filename);
             displayState.errors.push({
               source: `Round ${roundNum}`,
               message: 'Degraded: round completed but failed quality checks',
@@ -332,9 +341,9 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             rd.status = 'failed';
           }
           // Determine affected documents
-          const affectedDocs = DOCUMENT_REGISTRY
-            .filter(d => d.requiredRounds.includes(roundNum))
-            .map(d => d.filename);
+          const affectedDocs = DOCUMENT_REGISTRY.filter((d) =>
+            d.requiredRounds.includes(roundNum),
+          ).map((d) => d.filename);
           displayState.errors.push({
             source: `Round ${roundNum}`,
             message: result.error instanceof Error ? result.error.message : String(result.error),
@@ -362,7 +371,16 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     const orchestrator = new DAGOrchestrator(orchestratorEvents);
 
     // Initialize analyzer map and run static analysis with progress
-    const ANALYZER_NAMES = ['file-tree', 'dependencies', 'git-history', 'todos', 'env', 'ast', 'tests', 'docs'];
+    const ANALYZER_NAMES = [
+      'file-tree',
+      'dependencies',
+      'git-history',
+      'todos',
+      'env',
+      'ast',
+      'tests',
+      'docs',
+    ];
     for (const name of ANALYZER_NAMES) {
       displayState.analyzers.set(name, 'pending');
     }
@@ -378,9 +396,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           const analyzerStart = Date.now();
           const result = await runStaticAnalysis(rootDir, config, {
             onProgress: (analyzer, status) => {
-              const mapped: AnalyzerStatus = status === 'start' ? 'running'
-                : status === 'fail' ? 'failed'
-                : 'done';
+              const mapped: AnalyzerStatus =
+                status === 'start' ? 'running' : status === 'fail' ? 'failed' : 'done';
               displayState.analyzers.set(analyzer, mapped);
               displayState.analyzerElapsedMs = Date.now() - analyzerStart;
               if (status === 'fail') {
@@ -402,8 +419,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           // Compute fingerprint for round cache invalidation
           // Use directoryTree file entries (path + size) for deterministic hashing
           const fileEntries = result.fileTree.directoryTree
-            .filter(e => e.type === 'file')
-            .map(f => ({ path: f.path, size: f.size ?? 0 }));
+            .filter((e) => e.type === 'file')
+            .map((f) => ({ path: f.path, size: f.size ?? 0 }));
           analysisFingerprint = RoundCache.computeAnalysisFingerprint(fileEntries);
 
           // Detect language from file extensions
@@ -417,8 +434,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           // Context packing: score files and pack into token budget
           const scored = scoreFiles(result);
           const budget = computeTokenBudget(provider.maxContextTokens());
-          const getFileContent = async (path: string) =>
-            readFile(join(rootDir, path), 'utf-8');
+          const getFileContent = async (path: string) => readFile(join(rootDir, path), 'utf-8');
 
           packedContext = await packFiles(
             scored,
@@ -585,8 +601,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         return otherNum !== roundNum && ROUND_DEPS[otherNum]?.includes(roundNum);
       });
     });
-    const renderDeps =
-      terminalRounds.length > 0 ? terminalRounds : ['static-analysis'];
+    const renderDeps = terminalRounds.length > 0 ? terminalRounds : ['static-analysis'];
 
     // Render step (always runs -- produces documents on disk)
     steps.push(
@@ -610,13 +625,15 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             displayState.renderedDocs.push('01-PROJECT-OVERVIEW.md');
             renderer.onDocRendered(displayState);
 
-            const emptyStatuses: DocumentStatus[] = [{
-              id: '01-project-overview',
-              filename: '01-PROJECT-OVERVIEW.md',
-              title: 'Project Overview',
-              status: 'static-only',
-              reason: 'Empty repository -- no source files found',
-            }];
+            const emptyStatuses: DocumentStatus[] = [
+              {
+                id: '01-project-overview',
+                filename: '01-PROJECT-OVERVIEW.md',
+                title: 'Project Overview',
+                status: 'static-only',
+                reason: 'Empty repository -- no source files found',
+              },
+            ];
 
             // Add not-generated statuses for all other documents
             for (const doc of DOCUMENT_REGISTRY) {
@@ -661,9 +678,9 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             audience,
             generatedAt: new Date().toISOString(),
             projectName:
-              getRound<Round1Output>(1)?.data?.projectName
-              ?? config.project.name
-              ?? 'Unknown Project',
+              getRound<Round1Output>(1)?.data?.projectName ??
+              config.project.name ??
+              'Unknown Project',
           };
 
           // Create output directory
@@ -698,11 +715,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             renderer.onDocRendered(displayState);
 
             // Determine status based on round availability
-            const roundStatus = determineDocStatus(
-              doc.requiredRounds,
-              roundResults,
-              true,
-            );
+            const roundStatus = determineDocStatus(doc.requiredRounds, roundResults, true);
             statuses.push({
               id: doc.id,
               filename: doc.filename,
@@ -750,7 +763,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       );
     }
 
-    const dagResults = await orchestrator.execute(config);
+    const _dagResults = await orchestrator.execute(config);
 
     // Completion summary
     displayState.phase = 'complete';

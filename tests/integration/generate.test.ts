@@ -66,10 +66,10 @@ function cloneTarget(target: ValidationTarget): void {
       stdio: 'pipe',
     });
   } else {
-    execSync(
-      `git clone --depth=1 --branch ${target.ref} ${target.repo} "${dir}"`,
-      { timeout: 120_000, stdio: 'pipe' },
-    );
+    execSync(`git clone --depth=1 --branch ${target.ref} ${target.repo} "${dir}"`, {
+      timeout: 120_000,
+      stdio: 'pipe',
+    });
   }
 }
 
@@ -81,10 +81,7 @@ describe.skipIf(SKIP_REAL_REPOS)('real-world codebase validation', () => {
       try {
         cloneTarget(target);
       } catch (error) {
-        console.error(
-          `Failed to clone ${target.name} (${target.repo}@${target.ref}):`,
-          error,
-        );
+        console.error(`Failed to clone ${target.name} (${target.repo}@${target.ref}):`, error);
         throw error;
       }
     }
@@ -115,9 +112,7 @@ describe.skipIf(SKIP_REAL_REPOS)('real-world codebase validation', () => {
         const outputDir = join(repoDir, 'handover');
         const files = existsSync(outputDir) ? readdirSync(outputDir) : [];
         for (const expectedDoc of EXPECTED_DOCS) {
-          expect(files, `Missing document: ${expectedDoc}`).toContain(
-            expectedDoc,
-          );
+          expect(files, `Missing document: ${expectedDoc}`).toContain(expectedDoc);
         }
       });
 
@@ -143,9 +138,7 @@ describe.skipIf(SKIP_REAL_REPOS)('real-world codebase validation', () => {
           }
           const content = readFileSync(docPath, 'utf-8');
           expect(content, `${doc} missing front-matter`).toMatch(/^---\n/);
-          expect(content, `${doc} missing closing front-matter`).toMatch(
-            /\n---\n/,
-          );
+          expect(content, `${doc} missing closing front-matter`).toMatch(/\n---\n/);
         }
       });
 

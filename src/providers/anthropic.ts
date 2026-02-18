@@ -14,11 +14,7 @@ export class AnthropicProvider extends BaseProvider {
   readonly name = 'anthropic';
   private client: Anthropic;
 
-  constructor(
-    apiKey: string,
-    model: string = 'claude-opus-4-6',
-    concurrency: number = 4,
-  ) {
+  constructor(apiKey: string, model: string = 'claude-opus-4-6', concurrency: number = 4) {
     super(model, concurrency);
     this.client = new Anthropic({ apiKey });
     this.logInit('Anthropic', concurrency);
@@ -36,9 +32,7 @@ export class AnthropicProvider extends BaseProvider {
       model: this.model,
       max_tokens: request.maxTokens ?? 4096,
       system: request.systemPrompt,
-      messages: [
-        { role: 'user', content: request.userPrompt },
-      ],
+      messages: [{ role: 'user', content: request.userPrompt }],
       tools: [
         {
           name: 'structured_response',
@@ -55,8 +49,7 @@ export class AnthropicProvider extends BaseProvider {
 
     // Extract tool_use block
     const toolBlock = response.content.find(
-      (block): block is Anthropic.ToolUseBlock =>
-        block.type === 'tool_use',
+      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
     );
 
     if (!toolBlock) {

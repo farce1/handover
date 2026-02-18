@@ -66,12 +66,8 @@ export async function analyzeGitHistory(
 
     // Detect branching strategy from naming patterns
     const hasReleaseBranches = branchNames.some((b) => /release[/-]/.test(b));
-    const hasDevelop = branchNames.some((b) =>
-      /(?:^|\/)(?:develop|dev)$/.test(b),
-    );
-    const hasFeatureBranches = branchNames.some((b) =>
-      /feature[/-]/.test(b),
-    );
+    const hasDevelop = branchNames.some((b) => /(?:^|\/)(?:develop|dev)$/.test(b));
+    const hasFeatureBranches = branchNames.some((b) => /feature[/-]/.test(b));
     const hasHotfix = branchNames.some((b) => /hotfix[/-]/.test(b));
 
     let strategy: BranchPattern['strategy'] = 'unknown';
@@ -86,17 +82,12 @@ export async function analyzeGitHistory(
     } else if (hasFeatureBranches && !hasDevelop) {
       strategy = 'feature-branch';
       evidence.push('feature branches without develop');
-      if (hasReleaseBranches)
-        evidence.push('release branches found');
+      if (hasReleaseBranches) evidence.push('release branches found');
     } else if (branchNames.length <= 3) {
       strategy = 'trunk-based';
-      evidence.push(
-        `${branchNames.length} total branches (<=3 suggests trunk-based)`,
-      );
+      evidence.push(`${branchNames.length} total branches (<=3 suggests trunk-based)`);
     } else {
-      evidence.push(
-        `${branchNames.length} branches, no clear naming convention`,
-      );
+      evidence.push(`${branchNames.length} branches, no clear naming convention`);
     }
 
     // Identify active (within 30 days) and stale (90+ days) branches
@@ -135,7 +126,7 @@ export async function analyzeGitHistory(
     const localCount = Object.keys(branches.branches).filter(
       (b) => !b.startsWith('remotes/'),
     ).length;
-    const remoteCount = branchNames.length - localCount;
+    const _remoteCount = branchNames.length - localCount;
 
     const branchPattern: BranchPattern = {
       strategy,
@@ -164,12 +155,7 @@ export async function analyzeGitHistory(
     }> = [];
 
     try {
-      const rawLog = await git.raw([
-        'log',
-        '--all',
-        '--format=%H|%an|%ae|%aI|%s',
-        ...sinceArg,
-      ]);
+      const rawLog = await git.raw(['log', '--all', '--format=%H|%an|%ae|%aI|%s', ...sinceArg]);
 
       parsedCommits = rawLog
         .trim()
@@ -190,34 +176,23 @@ export async function analyzeGitHistory(
     }
 
     // Take most recent 100 commits for recentCommits array
-    const recentCommits: GitCommit[] = parsedCommits
-      .slice(0, 100)
-      .map((c) => ({
-        hash: c.hash,
-        author: c.author,
-        date: c.date,
-        message: c.message,
-      }));
+    const recentCommits: GitCommit[] = parsedCommits.slice(0, 100).map((c) => ({
+      hash: c.hash,
+      author: c.author,
+      date: c.date,
+      message: c.message,
+    }));
 
     // ── Most-changed files (churn) ────────────────────────────────────────
 
     const fileChangeCounts = new Map<string, number>();
     try {
-      const nameOnlyLog = await git.raw([
-        'log',
-        '--all',
-        '--name-only',
-        '--format=',
-        ...sinceArg,
-      ]);
+      const nameOnlyLog = await git.raw(['log', '--all', '--name-only', '--format=', ...sinceArg]);
 
       for (const line of nameOnlyLog.split('\n')) {
         const trimmed = line.trim();
         if (trimmed) {
-          fileChangeCounts.set(
-            trimmed,
-            (fileChangeCounts.get(trimmed) ?? 0) + 1,
-          );
+          fileChangeCounts.set(trimmed, (fileChangeCounts.get(trimmed) ?? 0) + 1);
         }
       }
     } catch {
@@ -241,10 +216,7 @@ export async function analyzeGitHistory(
 
     // ── Contributors ──────────────────────────────────────────────────────
 
-    const contributorMap = new Map<
-      string,
-      { name: string; email: string; count: number }
-    >();
+    const contributorMap = new Map<string, { name: string; email: string; count: number }>();
     for (const commit of parsedCommits) {
       const key = `${commit.author}|${commit.email}`;
       const existing = contributorMap.get(key);
@@ -286,10 +258,7 @@ export async function analyzeGitHistory(
         for (const line of authorLog.trim().split('\n')) {
           const trimmed = line.trim();
           if (trimmed) {
-            authorCounts.set(
-              trimmed,
-              (authorCounts.get(trimmed) ?? 0) + 1,
-            );
+            authorCounts.set(trimmed, (authorCounts.get(trimmed) ?? 0) + 1);
           }
         }
 

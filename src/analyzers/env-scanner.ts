@@ -40,9 +40,7 @@ const ENV_REFERENCE_REGEX = new RegExp(
 // Regex for variable definitions in .env files
 const ENV_VAR_DEFINITION = /^([A-Z_][A-Z0-9_]*)=/;
 
-export async function scanEnvVars(
-  ctx: AnalysisContext,
-): Promise<AnalyzerResult<EnvResult>> {
+export async function scanEnvVars(ctx: AnalysisContext): Promise<AnalyzerResult<EnvResult>> {
   const start = Date.now();
 
   try {
@@ -78,7 +76,11 @@ export async function scanEnvVars(
     }
 
     // Check for .env without .env.example (potential secret exposure)
-    if (envFileNames.has('.env') && !envFileNames.has('.env.example') && !envFileNames.has('.env.sample')) {
+    if (
+      envFileNames.has('.env') &&
+      !envFileNames.has('.env.example') &&
+      !envFileNames.has('.env.sample')
+    ) {
       warnings.push(
         '.env file found without .env.example -- potential secret exposure risk. Consider adding a .env.example template.',
       );
@@ -86,9 +88,7 @@ export async function scanEnvVars(
 
     // Scan source files for env var references in batches of 50
     const sourceFiles = ctx.files.filter(
-      (f) =>
-        !isBinaryFile(f.extension) &&
-        !basename(f.path).startsWith('.env'),
+      (f) => !isBinaryFile(f.extension) && !basename(f.path).startsWith('.env'),
     );
 
     for (let i = 0; i < sourceFiles.length; i += 50) {
@@ -127,10 +127,7 @@ export async function scanEnvVars(
 /**
  * Scan a single file's content for environment variable references.
  */
-function scanFileForEnvRefs(
-  content: string,
-  filePath: string,
-): EnvResult['envReferences'] {
+function scanFileForEnvRefs(content: string, filePath: string): EnvResult['envReferences'] {
   const refs: EnvResult['envReferences'] = [];
   const lines = content.split('\n');
 
@@ -140,8 +137,7 @@ function scanFileForEnvRefs(
 
     while ((match = ENV_REFERENCE_REGEX.exec(lines[i])) !== null) {
       // Find which capture group matched (groups 1-5 correspond to the 5 patterns)
-      const variable =
-        match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5];
+      const variable = match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5];
       if (variable) {
         refs.push({
           file: filePath,

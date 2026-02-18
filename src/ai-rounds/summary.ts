@@ -148,9 +148,7 @@ export function buildFailureReport(
           : 'DEGRADED';
 
     const validationInfo = `${result.validation.validated} validated, ${result.validation.corrected} corrected`;
-    lines.push(
-      `- **Round ${round} (${name}):** ${statusIndicator} -- ${validationInfo}`,
-    );
+    lines.push(`- **Round ${round} (${name}):** ${statusIndicator} -- ${validationInfo}`);
   }
 
   // Affected documents
@@ -160,9 +158,7 @@ export function buildFailureReport(
 
   for (const problem of problemRounds) {
     const doc = ROUND_DOCUMENT_MAP[problem.round] ?? `Round ${problem.round} output`;
-    lines.push(
-      `- **${doc}:** ${problem.status} -- ${problem.reason ?? 'unknown reason'}`,
-    );
+    lines.push(`- **${doc}:** ${problem.status} -- ${problem.reason ?? 'unknown reason'}`);
   }
 
   // Consolidated summary
@@ -193,16 +189,12 @@ export function buildFailureReport(
  *   "AI analysis: 6/6 rounds complete, 42 claims validated, 3 corrected"
  *   "AI analysis: 4/6 rounds complete (2 degraded), 28 claims validated, 1 corrected"
  */
-export function formatValidationLine(
-  summary: PipelineValidationSummary,
-): string {
+export function formatValidationLine(summary: PipelineValidationSummary): string {
   const successCount = summary.roundSummaries.filter(
     (r) => r.status === 'success' || r.status === 'retried',
   ).length;
 
-  const degradedCount = summary.roundSummaries.filter(
-    (r) => r.status === 'degraded',
-  ).length;
+  const degradedCount = summary.roundSummaries.filter((r) => r.status === 'degraded').length;
 
   const totalRounds = summary.roundSummaries.length;
 

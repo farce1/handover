@@ -16,8 +16,7 @@ export function renderFileStructure(ctx: RenderContext): string {
   const fileTree = ctx.staticAnalysis.fileTree;
 
   const roundsUsed = collectRoundsUsed(ctx, 1, 2);
-  const status =
-    r1 && r2 ? 'complete' : roundsUsed.length > 0 ? 'partial' : 'static-only';
+  const status = r1 && r2 ? 'complete' : roundsUsed.length > 0 ? 'partial' : 'static-only';
 
   return renderDocument(ctx, {
     title: 'File Structure',
@@ -65,15 +64,11 @@ export function renderFileStructure(ctx: RenderContext): string {
       }
 
       lines.push(
-        sectionIntro(
-          'The project directory structure with annotations for key directories.',
-        ),
+        sectionIntro('The project directory structure with annotations for key directories.'),
       );
       lines.push('');
 
-      const directories = fileTree.directoryTree.filter(
-        (e) => e.type === 'directory',
-      );
+      const directories = fileTree.directoryTree.filter((e) => e.type === 'directory');
       lines.push('```');
       for (const dir of directories) {
         const depth = dir.path.split('/').length - 1;
@@ -81,8 +76,7 @@ export function renderFileStructure(ctx: RenderContext): string {
         const name = dir.path.split('/').pop() ?? dir.path;
         const annotation = moduleAnnotations.get(dir.path);
         const annotationSuffix = annotation ? `  # ${annotation}` : '';
-        const childCount =
-          dir.children !== undefined ? ` (${dir.children} items)` : '';
+        const childCount = dir.children !== undefined ? ` (${dir.children} items)` : '';
         lines.push(`${indent}${name}/${childCount}${annotationSuffix}`);
       }
       lines.push('```');
@@ -94,8 +88,9 @@ export function renderFileStructure(ctx: RenderContext): string {
       lines.push(sectionIntro('Breakdown of files by extension.'));
       lines.push('');
 
-      const extensionEntries = Object.entries(fileTree.filesByExtension)
-        .sort(([, a], [, b]) => b - a);
+      const extensionEntries = Object.entries(fileTree.filesByExtension).sort(
+        ([, a], [, b]) => b - a,
+      );
 
       if (extensionEntries.length > 0) {
         const extRows = extensionEntries.map(([ext, count]) => {
@@ -153,10 +148,7 @@ export function renderFileStructure(ctx: RenderContext): string {
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(1024)),
-    units.length - 1,
-  );
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const value = bytes / Math.pow(1024, i);
   return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }

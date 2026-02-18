@@ -49,8 +49,7 @@ export function renderTechDebt(ctx: RenderContext): string {
         const summaryRows = Object.entries(todos.summary.byCategory)
           .sort(([, a], [, b]) => b - a)
           .map(([category, count]) => {
-            const pct =
-              totalTodos > 0 ? ((count / totalTodos) * 100).toFixed(1) : '0.0';
+            const pct = totalTodos > 0 ? ((count / totalTodos) * 100).toFixed(1) : '0.0';
             return [capitalize(category), String(count), `${pct}%`];
           });
 
@@ -107,7 +106,11 @@ export function renderTechDebt(ctx: RenderContext): string {
         if (debtInsights.length > 0) {
           lines.push('## AI Insights');
           lines.push('');
-          lines.push(sectionIntro('Additional technical debt and quality concerns identified by AI analysis.'));
+          lines.push(
+            sectionIntro(
+              'Additional technical debt and quality concerns identified by AI analysis.',
+            ),
+          );
           lines.push('');
 
           for (const insight of debtInsights) {
@@ -126,9 +129,8 @@ export function renderTechDebt(ctx: RenderContext): string {
               warning: r5.modules.flatMap((m) =>
                 m.edgeCases.filter((e) => e.severity === 'warning'),
               ).length,
-              info: r5.modules.flatMap((m) =>
-                m.edgeCases.filter((e) => e.severity === 'info'),
-              ).length,
+              info: r5.modules.flatMap((m) => m.edgeCases.filter((e) => e.severity === 'info'))
+                .length,
             },
           });
         }

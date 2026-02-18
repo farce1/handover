@@ -42,9 +42,7 @@ export function renderDependencies(ctx: RenderContext): string {
 
       // ── Warning banner ──────────────────────────────────────────────
       if (!r1) {
-        lines.push(
-          '> **Note:** AI analysis was unavailable. Dependency roles are not enriched.',
-        );
+        lines.push('> **Note:** AI analysis was unavailable. Dependency roles are not enriched.');
         lines.push('');
       }
 
@@ -58,20 +56,14 @@ export function renderDependencies(ctx: RenderContext): string {
 
       const prodDeps = allStaticDeps.filter((d) => d.type === 'production');
       const devDeps = allStaticDeps.filter((d) => d.type === 'development');
-      const peerDeps = allStaticDeps.filter(
-        (d) => d.type === 'peer' || d.type === 'optional',
-      );
+      const peerDeps = allStaticDeps.filter((d) => d.type === 'peer' || d.type === 'optional');
 
       // ── Production Dependencies ─────────────────────────────────────
       lines.push('## Production Dependencies');
       lines.push('');
 
       if (prodDeps.length > 0) {
-        lines.push(
-          sectionIntro(
-            'Runtime dependencies required for the application to function.',
-          ),
-        );
+        lines.push(sectionIntro('Runtime dependencies required for the application to function.'));
         lines.push('');
         const prodRows = prodDeps.map((d) => [d.name, d.version, r1DepMap.get(d.name) ?? '-']);
         lines.push(buildTable(['Name', 'Version', 'Role'], prodRows));
@@ -96,9 +88,7 @@ export function renderDependencies(ctx: RenderContext): string {
 
       if (devDeps.length > 0) {
         lines.push(
-          sectionIntro(
-            'Development-time dependencies for building, testing, and tooling.',
-          ),
+          sectionIntro('Development-time dependencies for building, testing, and tooling.'),
         );
         lines.push('');
         const devRows = devDeps.map((d) => [d.name, d.version, r1DepMap.get(d.name) ?? '-']);
@@ -138,9 +128,7 @@ export function renderDependencies(ctx: RenderContext): string {
       lines.push('');
 
       if (staticDeps.manifests.length > 0) {
-        lines.push(
-          sectionIntro('Manifest files declaring project dependencies.'),
-        );
+        lines.push(sectionIntro('Manifest files declaring project dependencies.'));
         lines.push('');
         for (const manifest of staticDeps.manifests) {
           lines.push(

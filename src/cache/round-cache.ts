@@ -29,17 +29,13 @@ interface RoundCacheEntry {
  * if the analysis input changed, the cache is treated as stale.
  */
 export class RoundCache {
-  constructor(
-    private readonly cacheDir: string = '.handover/cache/rounds',
-  ) {}
+  constructor(private readonly cacheDir: string = '.handover/cache/rounds') {}
 
   /**
    * Compute a fingerprint from discovered files (paths + sizes).
    * Sorted by path for determinism. Fast — no file content reading.
    */
-  static computeAnalysisFingerprint(
-    files: Array<{ path: string; size: number }>,
-  ): string {
+  static computeAnalysisFingerprint(files: Array<{ path: string; size: number }>): string {
     const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path));
     const data = sorted.map((f) => `${f.path}:${f.size}`).join('\n');
     return createHash('sha256').update(data).digest('hex');
@@ -49,11 +45,7 @@ export class RoundCache {
    * Compute a content hash for a specific round.
    * Combines round number, model, and analysis fingerprint.
    */
-  computeHash(
-    roundNumber: number,
-    model: string,
-    analysisFingerprint: string,
-  ): string {
+  computeHash(roundNumber: number, model: string, analysisFingerprint: string): string {
     return createHash('sha256')
       .update(JSON.stringify({ roundNumber, model, analysisFingerprint }))
       .digest('hex');
@@ -64,10 +56,7 @@ export class RoundCache {
    *
    * @returns The cached result, or null if missing/stale/corrupted.
    */
-  async get(
-    roundNumber: number,
-    expectedHash: string,
-  ): Promise<unknown | null> {
+  async get(roundNumber: number, expectedHash: string): Promise<unknown | null> {
     const filePath = join(this.cacheDir, `round-${roundNumber}.json`);
 
     if (!existsSync(filePath)) {
@@ -94,12 +83,7 @@ export class RoundCache {
    * Store a round result to disk.
    * Creates the cache directory if it does not exist.
    */
-  async set(
-    roundNumber: number,
-    hash: string,
-    result: unknown,
-    model: string,
-  ): Promise<void> {
+  async set(roundNumber: number, hash: string, result: unknown, model: string): Promise<void> {
     await mkdir(this.cacheDir, { recursive: true });
 
     const filePath = join(this.cacheDir, `round-${roundNumber}.json`);

@@ -17,7 +17,7 @@ We will review your report and respond on a best-effort basis. There is no forma
 Security fixes are applied to the latest published version only.
 
 | Version | Supported |
-|---------|-----------|
+| ------- | --------- |
 | Latest  | Yes       |
 | Older   | No        |
 

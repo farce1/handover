@@ -41,7 +41,9 @@ export function renderConventions(ctx: RenderContext): string {
       if (r5.crossCuttingConventions.length > 0) {
         lines.push('## Cross-Cutting Conventions');
         lines.push('');
-        lines.push(sectionIntro('Patterns that span multiple modules and represent team-wide standards.'));
+        lines.push(
+          sectionIntro('Patterns that span multiple modules and represent team-wide standards.'),
+        );
         lines.push('');
 
         for (const convention of r5.crossCuttingConventions) {
@@ -62,9 +64,7 @@ export function renderConventions(ctx: RenderContext): string {
       }
 
       // ── Per-Module Conventions ──────────────────────────────────────
-      const modulesWithConventions = r5.modules.filter(
-        (m) => m.conventions.length > 0,
-      );
+      const modulesWithConventions = r5.modules.filter((m) => m.conventions.length > 0);
 
       if (modulesWithConventions.length > 0) {
         lines.push('## Per-Module Conventions');

@@ -5,24 +5,11 @@ import type { PackedContext, RoundContext } from '../context/types.js';
 import type { HandoverConfig } from '../config/schema.js';
 import type { TokenUsageTracker } from '../context/tracker.js';
 import type { StepDefinition } from '../orchestrator/types.js';
-import type {
-  RoundExecutionResult,
-  ValidationResult,
-  QualityMetrics,
-} from './types.js';
-import type {
-  Round1Output,
-  Round2Output,
-  Round5Module,
-  Round5Output,
-} from './schemas.js';
-import { Round5ModuleSchema, Round5OutputSchema } from './schemas.js';
+import type { RoundExecutionResult } from './types.js';
+import type { Round1Output, Round2Output, Round5Module, Round5Output } from './schemas.js';
+import { Round5ModuleSchema } from './schemas.js';
 import { createStep } from '../orchestrator/step.js';
-import {
-  buildRoundPrompt,
-  buildRetrySystemPrompt,
-  ROUND_SYSTEM_PROMPTS,
-} from './prompts.js';
+import { buildRoundPrompt, buildRetrySystemPrompt, ROUND_SYSTEM_PROMPTS } from './prompts.js';
 import { validateRoundClaims } from './validator.js';
 import { checkRoundQuality } from './quality.js';
 import { compressRoundOutput } from '../context/compressor.js';
@@ -78,11 +65,8 @@ export function createRound5Step(
         );
       } catch (error) {
         // Failed round: degrade gracefully with static fallback data
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        logger.warn(
-          `Round 5 failed: ${errorMessage} -- falling back to static data`,
-        );
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.warn(`Round 5 failed: ${errorMessage} -- falling back to static data`);
 
         const fallbackData = buildRound5Fallback(staticAnalysis);
         const context: RoundContext = compressRoundOutput(
@@ -180,18 +164,12 @@ async function executeRound5(
   }
 
   // 3. Aggregate results
-  const succeededModules = allModuleResults
-    .filter((r) => r.result !== null)
-    .map((r) => r.result!);
+  const succeededModules = allModuleResults.filter((r) => r.result !== null).map((r) => r.result!);
 
-  const failedCount = allModuleResults.filter(
-    (r) => r.result === null,
-  ).length;
+  const failedCount = allModuleResults.filter((r) => r.result === null).length;
 
   if (failedCount > 0) {
-    logger.warn(
-      `Round 5: ${failedCount}/${modules.length} module analyses failed`,
-    );
+    logger.warn(`Round 5: ${failedCount}/${modules.length} module analyses failed`);
   }
 
   // 4. Build cross-cutting conventions (patterns appearing in 2+ modules)
@@ -212,27 +190,19 @@ async function executeRound5(
   );
 
   // 7. Quality check
-  const quality = checkRoundQuality(
-    aggregatedOutput as unknown as Record<string, unknown>,
-    5,
-  );
+  const quality = checkRoundQuality(aggregatedOutput as unknown as Record<string, unknown>, 5);
 
   // 8. Retry failed modules if drop rate too high or quality fails
   let status: 'success' | 'degraded' | 'retried' = 'success';
 
   const dropRate = failedCount / Math.max(modules.length, 1);
-  if (
-    (dropRate > 0.3 || validation.dropRate > 0.3 || !quality.isAcceptable) &&
-    failedCount > 0
-  ) {
+  if ((dropRate > 0.3 || validation.dropRate > 0.3 || !quality.isAcceptable) && failedCount > 0) {
     // Retry failed modules only with stricter prompting
     const failedModuleNames = allModuleResults
       .filter((r) => r.result === null)
       .map((r) => r.moduleName);
 
-    const failedModules = modules.filter((m) =>
-      failedModuleNames.includes(m.name),
-    );
+    const failedModules = modules.filter((m) => failedModuleNames.includes(m.name));
 
     if (failedModules.length > 0) {
       const retryResults = await retryFailedModules(
@@ -255,8 +225,7 @@ async function executeRound5(
 
       // Rebuild aggregated output
       aggregatedOutput.modules = succeededModules;
-      aggregatedOutput.crossCuttingConventions =
-        findCrossCuttingConventions(succeededModules);
+      aggregatedOutput.crossCuttingConventions = findCrossCuttingConventions(succeededModules);
 
       status = 'retried';
     }
@@ -307,17 +276,12 @@ function getModulesForAnalysis(
   // Fallback: top-level directories as module approximation
   const topLevelDirs = analysis.fileTree.directoryTree.filter(
     (entry) =>
-      entry.type === 'directory' &&
-      !entry.path.includes('/') &&
-      !entry.path.startsWith('.'),
+      entry.type === 'directory' && !entry.path.includes('/') && !entry.path.startsWith('.'),
   );
 
   return topLevelDirs.map((dir) => {
     const files = analysis.fileTree.directoryTree
-      .filter(
-        (entry) =>
-          entry.type === 'file' && entry.path.startsWith(dir.path + '/'),
-      )
+      .filter((entry) => entry.type === 'file' && entry.path.startsWith(dir.path + '/'))
       .map((entry) => entry.path);
 
     return {
@@ -348,17 +312,14 @@ async function analyzeModule(
     const modulePackedContext: PackedContext = {
       ...packedContext,
       files: packedContext.files.filter(
-        (f) =>
-          f.path.startsWith(mod.path + '/') || f.path === mod.path,
+        (f) => f.path.startsWith(mod.path + '/') || f.path === mod.path,
       ),
     };
 
     // If no files match the module path, include all files (fallback for flat structures)
     if (modulePackedContext.files.length === 0) {
       modulePackedContext.files = packedContext.files.filter((f) =>
-        mod.files.some(
-          (mf) => f.path === mf || f.path.startsWith(mf),
-        ),
+        mod.files.some((mf) => f.path === mf || f.path.startsWith(mf)),
       );
     }
 
@@ -405,11 +366,8 @@ async function analyzeModule(
 
     return result.data;
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
-    logger.warn(
-      `Module ${mod.name} analysis failed: ${errorMessage}`,
-    );
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.warn(`Module ${mod.name} analysis failed: ${errorMessage}`);
     return null;
   }
 }
@@ -417,10 +375,7 @@ async function analyzeModule(
 /**
  * Build module-specific data string for Round 5 analysis.
  */
-function buildModuleData(
-  mod: ModuleInfo,
-  analysis: StaticAnalysisResult,
-): string {
+function buildModuleData(mod: ModuleInfo, analysis: StaticAnalysisResult): string {
   const sections: string[] = [];
 
   sections.push(`## Module: ${mod.name}`);
@@ -429,9 +384,7 @@ function buildModuleData(
   sections.push('');
 
   // Filter AST files to this module
-  const moduleAstFiles = analysis.ast.files.filter((f) =>
-    mod.files.includes(f.path),
-  );
+  const moduleAstFiles = analysis.ast.files.filter((f) => mod.files.includes(f.path));
 
   if (moduleAstFiles.length > 0) {
     sections.push('## Module Source Files');
@@ -439,12 +392,18 @@ function buildModuleData(
       sections.push(`  ${file.path}:`);
       if (file.functions.length > 0) {
         sections.push(
-          `    Functions: ${file.functions.map((f) => f.name).slice(0, 10).join(', ')}`,
+          `    Functions: ${file.functions
+            .map((f) => f.name)
+            .slice(0, 10)
+            .join(', ')}`,
         );
       }
       if (file.exports.length > 0) {
         sections.push(
-          `    Exports: ${file.exports.map((e) => e.name).slice(0, 10).join(', ')}`,
+          `    Exports: ${file.exports
+            .map((e) => e.name)
+            .slice(0, 10)
+            .join(', ')}`,
         );
       }
     }
@@ -452,9 +411,7 @@ function buildModuleData(
   }
 
   // Module-specific TODO items
-  const moduleTodos = analysis.todos.items.filter((item) =>
-    mod.files.includes(item.file),
-  );
+  const moduleTodos = analysis.todos.items.filter((item) => mod.files.includes(item.file));
 
   if (moduleTodos.length > 0) {
     sections.push('## TODO/FIXME Items in Module');
@@ -466,19 +423,13 @@ function buildModuleData(
 
   // Module-specific test files
   const moduleTestFiles = analysis.tests.testFiles.filter((tf) =>
-    mod.files.some(
-      (mf) =>
-        tf.path.startsWith(mod.path + '/') ||
-        tf.path.includes(mod.name),
-    ),
+    mod.files.some((_mf) => tf.path.startsWith(mod.path + '/') || tf.path.includes(mod.name)),
   );
 
   if (moduleTestFiles.length > 0) {
     sections.push('## Test Files for Module');
     for (const tf of moduleTestFiles.slice(0, 10)) {
-      sections.push(
-        `  ${tf.path} (${tf.framework}, ${tf.testCount} tests)`,
-      );
+      sections.push(`  ${tf.path} (${tf.framework}, ${tf.testCount} tests)`);
     }
     sections.push('');
   }
@@ -503,10 +454,7 @@ function findCrossCuttingConventions(
   modules: Round5Module[],
 ): Round5Output['crossCuttingConventions'] {
   // Count how many modules share each convention pattern
-  const patternCounts = new Map<
-    string,
-    { description: string; count: number }
-  >();
+  const patternCounts = new Map<string, { description: string; count: number }>();
 
   for (const mod of modules) {
     for (const conv of mod.conventions) {
@@ -554,20 +502,14 @@ function buildAggregatedFindings(
     }
   }
 
-  findings.push(
-    `Analyzed ${modules.length}/${totalModules} modules successfully`,
-  );
+  findings.push(`Analyzed ${modules.length}/${totalModules} modules successfully`);
 
   if (critical + warning + info > 0) {
-    findings.push(
-      `Edge cases found: ${critical} critical, ${warning} warning, ${info} info`,
-    );
+    findings.push(`Edge cases found: ${critical} critical, ${warning} warning, ${info} info`);
   }
 
   if (failedCount > 0) {
-    findings.push(
-      `${failedCount} module analyses failed and were excluded`,
-    );
+    findings.push(`${failedCount} module analyses failed and were excluded`);
   }
 
   return findings;
@@ -585,8 +527,7 @@ async function retryFailedModules(
   estimateTokensFn: (text: string) => number,
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): Promise<Array<{ moduleName: string; result: Round5Module | null }>> {
-  const results: Array<{ moduleName: string; result: Round5Module | null }> =
-    [];
+  const results: Array<{ moduleName: string; result: Round5Module | null }> = [];
 
   // Retry in batches
   for (let i = 0; i < failedModules.length; i += MODULE_BATCH_SIZE) {

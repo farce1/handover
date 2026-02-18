@@ -4,14 +4,23 @@ import type {
   FunctionSymbol,
   ClassSymbol,
   ImportInfo,
-  ExportInfo,
   ConstantSymbol,
   Field,
   Parameter,
 } from '../types.js';
 import { LanguageExtractor, type ExtractorResult } from './base.js';
-import { walkChildren, findChildByType, findChildrenByType, getFieldNode, getNamedChildren } from '../utils/node-helpers.js';
-import { getText, getTextTrimmed, getDocstringAbove, getDecoratorTexts } from '../utils/text-extract.js';
+import {
+  walkChildren,
+  findChildByType,
+  getFieldNode,
+  getNamedChildren,
+} from '../utils/node-helpers.js';
+import {
+  getText,
+  getTextTrimmed,
+  getDocstringAbove,
+  getDecoratorTexts,
+} from '../utils/text-extract.js';
 
 // ─── Rust Extractor ──────────────────────────────────────────────────────────
 
@@ -77,21 +86,14 @@ export class RustExtractor extends LanguageExtractor {
 
   // ─── Function extraction ─────────────────────────────────────────────────
 
-  private extractFunction(
-    node: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private extractFunction(node: SyntaxNode, source: string, result: ExtractorResult): void {
     const fn = this.buildFunctionSymbol(node, source);
     if (fn) {
       result.functions.push(fn);
     }
   }
 
-  private buildFunctionSymbol(
-    node: SyntaxNode,
-    source: string,
-  ): FunctionSymbol | null {
+  private buildFunctionSymbol(node: SyntaxNode, source: string): FunctionSymbol | null {
     const nameNode = getFieldNode(node, 'name');
     if (!nameNode) return null;
 
@@ -125,10 +127,7 @@ export class RustExtractor extends LanguageExtractor {
     };
   }
 
-  private extractParameters(
-    node: SyntaxNode,
-    source: string,
-  ): Parameter[] {
+  private extractParameters(node: SyntaxNode, source: string): Parameter[] {
     const paramsNode = getFieldNode(node, 'parameters');
     if (!paramsNode) return [];
 
@@ -155,10 +154,7 @@ export class RustExtractor extends LanguageExtractor {
     return params;
   }
 
-  private extractReturnType(
-    node: SyntaxNode,
-    source: string,
-  ): string | undefined {
+  private extractReturnType(node: SyntaxNode, source: string): string | undefined {
     const returnTypeNode = getFieldNode(node, 'return_type');
     if (!returnTypeNode) return undefined;
 
@@ -167,10 +163,7 @@ export class RustExtractor extends LanguageExtractor {
     return text.replace(/^->\s*/, '');
   }
 
-  private extractTypeParameters(
-    node: SyntaxNode,
-    source: string,
-  ): string[] {
+  private extractTypeParameters(node: SyntaxNode, source: string): string[] {
     const typeParamsNode = getFieldNode(node, 'type_parameters');
     if (!typeParamsNode) return [];
 
@@ -240,10 +233,7 @@ export class RustExtractor extends LanguageExtractor {
     classMap.set(name, classSymbol);
   }
 
-  private extractStructFields(
-    node: SyntaxNode,
-    source: string,
-  ): Field[] {
+  private extractStructFields(node: SyntaxNode, source: string): Field[] {
     const fields: Field[] = [];
     const bodyNode = findChildByType(node, 'field_declaration_list');
     if (!bodyNode) return fields;
@@ -319,10 +309,7 @@ export class RustExtractor extends LanguageExtractor {
     }
   }
 
-  private extractEnumVariants(
-    node: SyntaxNode,
-    source: string,
-  ): Field[] {
+  private extractEnumVariants(node: SyntaxNode, source: string): Field[] {
     const fields: Field[] = [];
     const bodyNode = findChildByType(node, 'enum_variant_list');
     if (!bodyNode) return fields;
@@ -333,7 +320,8 @@ export class RustExtractor extends LanguageExtractor {
         const nameNode = getFieldNode(child, 'name');
         if (nameNode) {
           // Capture the full variant text for type info (tuple variants, struct variants)
-          const bodyChild = findChildByType(child, 'field_declaration_list') ||
+          const bodyChild =
+            findChildByType(child, 'field_declaration_list') ||
             findChildByType(child, 'ordered_field_declaration_list');
           fields.push({
             name: getText(nameNode, source),
@@ -458,11 +446,7 @@ export class RustExtractor extends LanguageExtractor {
 
   // ─── Use declaration extraction ─────────────────────────────────────────
 
-  private extractUseDeclaration(
-    node: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private extractUseDeclaration(node: SyntaxNode, source: string, result: ExtractorResult): void {
     const visibility = this.extractVisibility(node);
     const isReExport = visibility === 'public';
 
@@ -505,7 +489,10 @@ export class RustExtractor extends LanguageExtractor {
     source: string,
     prefix: string,
   ): Array<{ path: string; names: Array<{ name: string; alias?: string; isWildcard?: boolean }> }> {
-    const results: Array<{ path: string; names: Array<{ name: string; alias?: string; isWildcard?: boolean }> }> = [];
+    const results: Array<{
+      path: string;
+      names: Array<{ name: string; alias?: string; isWildcard?: boolean }>;
+    }> = [];
 
     switch (node.type) {
       case 'scoped_identifier':
@@ -513,7 +500,9 @@ export class RustExtractor extends LanguageExtractor {
         const fullPath = getTextTrimmed(node, source);
         const parts = fullPath.split('::');
         const name = parts[parts.length - 1]!;
-        const path = prefix ? `${prefix}::${parts.slice(0, -1).join('::')}` : parts.slice(0, -1).join('::');
+        const path = prefix
+          ? `${prefix}::${parts.slice(0, -1).join('::')}`
+          : parts.slice(0, -1).join('::');
         results.push({
           path: path || fullPath,
           names: [{ name }],
@@ -564,13 +553,17 @@ export class RustExtractor extends LanguageExtractor {
           const fullPath = getTextTrimmed(pathChild, source);
           const parts = fullPath.split('::');
           const name = parts[parts.length - 1]!;
-          const path = prefix ? `${prefix}::${parts.slice(0, -1).join('::')}` : parts.slice(0, -1).join('::');
+          const path = prefix
+            ? `${prefix}::${parts.slice(0, -1).join('::')}`
+            : parts.slice(0, -1).join('::');
           results.push({
             path: path || fullPath,
-            names: [{
-              name,
-              alias: aliasChild ? getTextTrimmed(aliasChild, source) : undefined,
-            }],
+            names: [
+              {
+                name,
+                alias: aliasChild ? getTextTrimmed(aliasChild, source) : undefined,
+              },
+            ],
           });
         }
         break;
@@ -594,11 +587,7 @@ export class RustExtractor extends LanguageExtractor {
 
   // ─── Constant extraction ─────────────────────────────────────────────────
 
-  private extractConstant(
-    node: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private extractConstant(node: SyntaxNode, source: string, result: ExtractorResult): void {
     const nameNode = getFieldNode(node, 'name');
     if (!nameNode) return;
 
@@ -624,19 +613,13 @@ export class RustExtractor extends LanguageExtractor {
 
   // ─── Rust attributes (decorators) ────────────────────────────────────────
 
-  private extractRustAttributes(
-    node: SyntaxNode,
-    source: string,
-  ): string[] {
+  private extractRustAttributes(node: SyntaxNode, source: string): string[] {
     return getDecoratorTexts(node, source);
   }
 
   // ─── Rustdoc extraction ──────────────────────────────────────────────────
 
-  private extractRustdoc(
-    node: SyntaxNode,
-    source: string,
-  ): string | undefined {
+  private extractRustdoc(node: SyntaxNode, source: string): string | undefined {
     // Collect consecutive /// or //! comments above the node
     const comments: string[] = [];
     let sibling = node.previousNamedSibling;
@@ -717,9 +700,7 @@ export class RustExtractor extends LanguageExtractor {
     for (const cls of result.classes) {
       if (cls.visibility === 'public') {
         // Check if already added (e.g., enums)
-        const existing = result.exports.find(
-          (e) => e.name === cls.name && e.line === cls.line,
-        );
+        const existing = result.exports.find((e) => e.name === cls.name && e.line === cls.line);
         if (!existing) {
           result.exports.push({
             name: cls.name,

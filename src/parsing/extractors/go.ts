@@ -1,16 +1,14 @@
 import type { Tree, Node as SyntaxNode } from 'web-tree-sitter';
 
-import type {
-  FunctionSymbol,
-  ClassSymbol,
-  ImportInfo,
-  ExportInfo,
-  ConstantSymbol,
-  Field,
-  Parameter,
-} from '../types.js';
+import type { FunctionSymbol, ClassSymbol, ConstantSymbol, Field, Parameter } from '../types.js';
 import { LanguageExtractor, type ExtractorResult } from './base.js';
-import { walkChildren, findChildByType, findChildrenByType, getFieldNode, getNamedChildren } from '../utils/node-helpers.js';
+import {
+  walkChildren,
+  findChildByType,
+  findChildrenByType,
+  getFieldNode,
+  getNamedChildren,
+} from '../utils/node-helpers.js';
 import { getText, getTextTrimmed, getDocstringAbove } from '../utils/text-extract.js';
 
 // ─── Go Extractor ────────────────────────────────────────────────────────────
@@ -71,21 +69,14 @@ export class GoExtractor extends LanguageExtractor {
 
   // ─── Function extraction ─────────────────────────────────────────────────
 
-  private extractFunction(
-    node: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private extractFunction(node: SyntaxNode, source: string, result: ExtractorResult): void {
     const fn = this.buildFunctionSymbol(node, source);
     if (fn) {
       result.functions.push(fn);
     }
   }
 
-  private buildFunctionSymbol(
-    node: SyntaxNode,
-    source: string,
-  ): FunctionSymbol | null {
+  private buildFunctionSymbol(node: SyntaxNode, source: string): FunctionSymbol | null {
     const nameNode = getFieldNode(node, 'name');
     if (!nameNode) return null;
 
@@ -112,10 +103,7 @@ export class GoExtractor extends LanguageExtractor {
     };
   }
 
-  private extractParameters(
-    node: SyntaxNode,
-    source: string,
-  ): Parameter[] {
+  private extractParameters(node: SyntaxNode, source: string): Parameter[] {
     const paramsNode = getFieldNode(node, 'parameters');
     if (!paramsNode) return [];
 
@@ -135,7 +123,8 @@ export class GoExtractor extends LanguageExtractor {
         }
 
         // Check for variadic parameter (... prefix on type)
-        const isVariadic = typeNode?.type === 'variadic_parameter_declaration' ||
+        const isVariadic =
+          typeNode?.type === 'variadic_parameter_declaration' ||
           (typeText && typeText.startsWith('...'));
 
         if (names.length > 0) {
@@ -168,20 +157,14 @@ export class GoExtractor extends LanguageExtractor {
     return params;
   }
 
-  private extractReturnType(
-    node: SyntaxNode,
-    source: string,
-  ): string | undefined {
+  private extractReturnType(node: SyntaxNode, source: string): string | undefined {
     const resultNode = getFieldNode(node, 'result');
     if (!resultNode) return undefined;
 
     return getTextTrimmed(resultNode, source);
   }
 
-  private extractTypeParameters(
-    node: SyntaxNode,
-    source: string,
-  ): string[] {
+  private extractTypeParameters(node: SyntaxNode, source: string): string[] {
     const typeParamsNode = getFieldNode(node, 'type_parameters');
     if (!typeParamsNode) return [];
 
@@ -224,10 +207,7 @@ export class GoExtractor extends LanguageExtractor {
     result.functions.push(fn);
   }
 
-  private extractReceiverType(
-    node: SyntaxNode,
-    source: string,
-  ): string | null {
+  private extractReceiverType(node: SyntaxNode, source: string): string | null {
     // receiver is a parameter_list with a single parameter_declaration
     for (const child of getNamedChildren(node)) {
       if (child.type === 'parameter_declaration') {
@@ -271,12 +251,33 @@ export class GoExtractor extends LanguageExtractor {
     const visibility: 'public' | 'private' | 'protected' = isExported(name) ? 'public' : 'private';
     const typeParameters = this.extractTypeParameters(node, source);
     // Doc comments may be above the type_declaration parent, not the type_spec
-    const docstring = this.extractGoDocComment(parentDecl, source) || this.extractGoDocComment(node, source);
+    const docstring =
+      this.extractGoDocComment(parentDecl, source) || this.extractGoDocComment(node, source);
 
     if (typeNode.type === 'struct_type') {
-      this.extractStruct(node, typeNode, name, visibility, typeParameters, docstring, source, result, classMap);
+      this.extractStruct(
+        node,
+        typeNode,
+        name,
+        visibility,
+        typeParameters,
+        docstring,
+        source,
+        result,
+        classMap,
+      );
     } else if (typeNode.type === 'interface_type') {
-      this.extractInterface(node, typeNode, name, visibility, typeParameters, docstring, source, result, classMap);
+      this.extractInterface(
+        node,
+        typeNode,
+        name,
+        visibility,
+        typeParameters,
+        docstring,
+        source,
+        result,
+        classMap,
+      );
     } else {
       // Type alias — record as ExportInfo
       if (visibility === 'public') {
@@ -323,7 +324,9 @@ export class GoExtractor extends LanguageExtractor {
           if (fieldNames.length > 0) {
             // Named fields
             for (const fn of fieldNames) {
-              const fieldVis: 'public' | 'private' | 'protected' = isExported(fn) ? 'public' : 'private';
+              const fieldVis: 'public' | 'private' | 'protected' = isExported(fn)
+                ? 'public'
+                : 'private';
               fields.push({
                 name: fn,
                 type: fieldType,
@@ -494,12 +497,14 @@ export class GoExtractor extends LanguageExtractor {
 
     result.imports.push({
       source: path,
-      specifiers: [{
-        name: isDotImport ? '.' : (isBlankImport ? '_' : pkgName),
-        alias,
-        isDefault: false,
-        isNamespace: isDotImport,
-      }],
+      specifiers: [
+        {
+          name: isDotImport ? '.' : isBlankImport ? '_' : pkgName,
+          alias,
+          isDefault: false,
+          isNamespace: isDotImport,
+        },
+      ],
       isTypeOnly: false,
       line,
     });
@@ -507,11 +512,7 @@ export class GoExtractor extends LanguageExtractor {
 
   // ─── Const/var extraction ────────────────────────────────────────────────
 
-  private extractConstDeclaration(
-    node: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private extractConstDeclaration(node: SyntaxNode, source: string, result: ExtractorResult): void {
     for (const child of getNamedChildren(node)) {
       if (child.type === 'const_spec') {
         this.extractConstSpec(child, source, result);
@@ -519,11 +520,7 @@ export class GoExtractor extends LanguageExtractor {
     }
   }
 
-  private extractConstSpec(
-    node: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private extractConstSpec(node: SyntaxNode, source: string, result: ExtractorResult): void {
     const names: string[] = [];
     const typeNode = getFieldNode(node, 'type');
 
@@ -559,11 +556,7 @@ export class GoExtractor extends LanguageExtractor {
     }
   }
 
-  private extractVarDeclaration(
-    node: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private extractVarDeclaration(node: SyntaxNode, source: string, result: ExtractorResult): void {
     for (const child of getNamedChildren(node)) {
       if (child.type === 'var_spec') {
         this.extractVarSpec(child, source, result);
@@ -571,11 +564,7 @@ export class GoExtractor extends LanguageExtractor {
     }
   }
 
-  private extractVarSpec(
-    node: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private extractVarSpec(node: SyntaxNode, source: string, result: ExtractorResult): void {
     const names: string[] = [];
     const typeNode = getFieldNode(node, 'type');
 
@@ -604,10 +593,7 @@ export class GoExtractor extends LanguageExtractor {
 
   // ─── Go doc comment extraction ───────────────────────────────────────────
 
-  private extractGoDocComment(
-    node: SyntaxNode,
-    source: string,
-  ): string | undefined {
+  private extractGoDocComment(node: SyntaxNode, source: string): string | undefined {
     // Go doc comments are regular // comments immediately above a declaration
     const comments: string[] = [];
     let sibling = node.previousNamedSibling;

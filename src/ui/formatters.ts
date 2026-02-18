@@ -75,14 +75,14 @@ export function formatBar(progress: number, width: number): string {
 
 /** TTY symbols for status display. */
 const ttySymbols = {
-  pending: '\u25CB',   // ○
-  running: '\u25C6',   // ◆
-  done: '\u2713',      // ✓
-  failed: '\u2717',    // ✗
-  arrow: '\u25B6',     // ▶
-  warning: '\u26A0',   // ⚠
+  pending: '\u25CB', // ○
+  running: '\u25C6', // ◆
+  done: '\u2713', // ✓
+  failed: '\u2717', // ✗
+  arrow: '\u25B6', // ▶
+  warning: '\u26A0', // ⚠
   cost: '$',
-  retry: '\u21BB',     // ↻
+  retry: '\u21BB', // ↻
 } as const;
 
 /** ASCII fallback symbols for NO_COLOR environments. */

@@ -78,18 +78,13 @@ export function buildRound2Fallback(analysis: StaticAnalysisResult): Round2Outpu
   // Top-level directories as module approximations
   const topLevelDirs = analysis.fileTree.directoryTree.filter(
     (entry) =>
-      entry.type === 'directory' &&
-      !entry.path.includes('/') &&
-      !entry.path.startsWith('.'),
+      entry.type === 'directory' && !entry.path.includes('/') && !entry.path.startsWith('.'),
   );
 
   const modules = topLevelDirs.map((dir) => {
     // Find files that belong to this directory
     const files = analysis.fileTree.directoryTree
-      .filter(
-        (entry) =>
-          entry.type === 'file' && entry.path.startsWith(dir.path + '/'),
-      )
+      .filter((entry) => entry.type === 'file' && entry.path.startsWith(dir.path + '/'))
       .map((entry) => entry.path);
 
     return {
@@ -107,7 +102,9 @@ export function buildRound2Fallback(analysis: StaticAnalysisResult): Round2Outpu
     boundaryIssues: [
       'Module boundaries approximated from directory structure -- AI analysis unavailable',
     ],
-    findings: ['Module detection based on directory structure only; no semantic analysis performed'],
+    findings: [
+      'Module detection based on directory structure only; no semantic analysis performed',
+    ],
     openQuestions: [],
   };
 }
@@ -136,7 +133,9 @@ export function buildRound4Fallback(_analysis: StaticAnalysisResult): Round4Outp
   return {
     patterns: [],
     dataFlow: [],
-    findings: ['Architecture detection unavailable -- AI analysis required for pattern identification'],
+    findings: [
+      'Architecture detection unavailable -- AI analysis required for pattern identification',
+    ],
   };
 }
 
@@ -200,7 +199,11 @@ export function buildRound6Fallback(analysis: StaticAnalysisResult): Round6Outpu
   const scripts: Record<string, string> = {};
   const commands: string[] = [];
   for (const manifest of analysis.dependencies.manifests) {
-    if (manifest.packageManager === 'npm' || manifest.packageManager === 'yarn' || manifest.packageManager === 'pnpm') {
+    if (
+      manifest.packageManager === 'npm' ||
+      manifest.packageManager === 'yarn' ||
+      manifest.packageManager === 'pnpm'
+    ) {
       // We don't have the raw package.json scripts in the manifest type,
       // but we can indicate build-related dependencies
       commands.push(`See ${manifest.file} for build configuration`);
@@ -240,9 +243,7 @@ export function buildRound6Fallback(analysis: StaticAnalysisResult): Round6Outpu
     deployment: {
       containerized,
       ciProvider,
-      evidence: evidence.length > 0
-        ? evidence
-        : ['No CI/CD configuration files detected'],
+      evidence: evidence.length > 0 ? evidence : ['No CI/CD configuration files detected'],
     },
     envVars,
     buildProcess: {

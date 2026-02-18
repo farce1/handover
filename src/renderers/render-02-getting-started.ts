@@ -13,12 +13,11 @@ import { renderDocument, collectRoundsUsed, pushStructuredBlock } from './render
 export function renderGettingStarted(ctx: RenderContext): string {
   const r1 = ctx.rounds.r1?.data;
   const r6 = ctx.rounds.r6?.data;
-  const staticDeps = ctx.staticAnalysis.dependencies;
+  const _staticDeps = ctx.staticAnalysis.dependencies;
   const staticEnv = ctx.staticAnalysis.env;
 
   const roundsUsed = collectRoundsUsed(ctx, 1, 6);
-  const status =
-    r1 && r6 ? 'complete' : roundsUsed.length > 0 ? 'partial' : 'static-only';
+  const status = r1 && r6 ? 'complete' : roundsUsed.length > 0 ? 'partial' : 'static-only';
 
   return renderDocument(ctx, {
     title: 'Getting Started',
@@ -49,11 +48,7 @@ export function renderGettingStarted(ctx: RenderContext): string {
       // ── Prerequisites ───────────────────────────────────────────────
       lines.push('## Prerequisites');
       lines.push('');
-      lines.push(
-        sectionIntro(
-          'Ensure the following tools are installed before proceeding.',
-        ),
-      );
+      lines.push(sectionIntro('Ensure the following tools are installed before proceeding.'));
       lines.push('');
 
       const language = r1?.primaryLanguage ?? detectLanguage(ctx);
@@ -73,9 +68,7 @@ export function renderGettingStarted(ctx: RenderContext): string {
       // ── Installation ────────────────────────────────────────────────
       lines.push('## Installation');
       lines.push('');
-      lines.push(
-        sectionIntro('Clone the repository and install dependencies.'),
-      );
+      lines.push(sectionIntro('Clone the repository and install dependencies.'));
       lines.push('');
 
       const gitInfo = ctx.staticAnalysis.gitHistory;
@@ -100,9 +93,7 @@ export function renderGettingStarted(ctx: RenderContext): string {
       lines.push('');
 
       if (r6 && r6.buildProcess.commands.length > 0) {
-        lines.push(
-          sectionIntro('Build and run the project using the following commands.'),
-        );
+        lines.push(sectionIntro('Build and run the project using the following commands.'));
         lines.push('');
         lines.push('```bash');
         for (const cmd of r6.buildProcess.commands) {
@@ -121,20 +112,14 @@ export function renderGettingStarted(ctx: RenderContext): string {
           lines.push('');
         }
       } else if (r1 && r1.entryPoints.length > 0) {
-        lines.push(
-          sectionIntro('Start with one of the following entry points.'),
-        );
+        lines.push(sectionIntro('Start with one of the following entry points.'));
         lines.push('');
         for (const ep of r1.entryPoints) {
           lines.push(`- ${codeRef(ep.path)} (${ep.type}): ${ep.description}`);
         }
         lines.push('');
       } else {
-        lines.push(
-          sectionIntro(
-            'Refer to the project README or configuration for run commands.',
-          ),
-        );
+        lines.push(sectionIntro('Refer to the project README or configuration for run commands.'));
         lines.push('');
       }
 
@@ -220,19 +205,28 @@ export function renderGettingStarted(ctx: RenderContext): string {
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function detectLanguage(ctx: RenderContext): string | null {
-  const extensions = Object.entries(
-    ctx.staticAnalysis.fileTree.filesByExtension,
-  ).sort(([, a], [, b]) => b - a);
+  const extensions = Object.entries(ctx.staticAnalysis.fileTree.filesByExtension).sort(
+    ([, a], [, b]) => b - a,
+  );
 
   if (extensions.length === 0) return null;
 
   const extToLang: Record<string, string> = {
-    '.ts': 'TypeScript', '.tsx': 'TypeScript',
-    '.js': 'JavaScript', '.jsx': 'JavaScript',
-    '.py': 'Python', '.rb': 'Ruby', '.go': 'Go',
-    '.rs': 'Rust', '.java': 'Java', '.kt': 'Kotlin',
-    '.cs': 'C#', '.cpp': 'C++', '.c': 'C',
-    '.swift': 'Swift', '.php': 'PHP',
+    '.ts': 'TypeScript',
+    '.tsx': 'TypeScript',
+    '.js': 'JavaScript',
+    '.jsx': 'JavaScript',
+    '.py': 'Python',
+    '.rb': 'Ruby',
+    '.go': 'Go',
+    '.rs': 'Rust',
+    '.java': 'Java',
+    '.kt': 'Kotlin',
+    '.cs': 'C#',
+    '.cpp': 'C++',
+    '.c': 'C',
+    '.swift': 'Swift',
+    '.php': 'PHP',
   };
 
   for (const [ext] of extensions) {
@@ -264,13 +258,21 @@ function detectPackageManager(ctx: RenderContext): string | null {
 
 function deriveInstallCommand(pm: string | null): string | null {
   switch (pm) {
-    case 'npm': return 'npm install';
-    case 'yarn': return 'yarn install';
-    case 'pnpm': return 'pnpm install';
-    case 'pip': return 'pip install -r requirements.txt';
-    case 'bundler': return 'bundle install';
-    case 'go': return 'go mod download';
-    case 'cargo': return 'cargo build';
-    default: return null;
+    case 'npm':
+      return 'npm install';
+    case 'yarn':
+      return 'yarn install';
+    case 'pnpm':
+      return 'pnpm install';
+    case 'pip':
+      return 'pip install -r requirements.txt';
+    case 'bundler':
+      return 'bundle install';
+    case 'go':
+      return 'go mod download';
+    case 'cargo':
+      return 'cargo build';
+    default:
+      return null;
   }
 }

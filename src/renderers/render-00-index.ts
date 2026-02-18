@@ -11,16 +11,11 @@ import { structuredBlock } from './audience.js';
  * the generation status of every other document. It produces a table linking
  * to each document with its status indicator.
  */
-export function renderIndex(
-  ctx: RenderContext,
-  statuses: DocumentStatus[],
-): string {
+export function renderIndex(ctx: RenderContext, statuses: DocumentStatus[]): string {
   const lines: string[] = [];
 
   // ── YAML front-matter ──────────────────────────────────────────────────
-  const generatedCount = statuses.filter(
-    (s) => s.status !== 'not-generated',
-  ).length;
+  const generatedCount = statuses.filter((s) => s.status !== 'not-generated').length;
   const roundsUsed = new Set<number>();
   for (const [key, val] of Object.entries(ctx.rounds)) {
     if (val != null) {
@@ -73,10 +68,7 @@ export function renderIndex(
 
   const rows = statuses.map((s, i) => {
     const num = String(i).padStart(2, '0');
-    const docLink =
-      s.status !== 'not-generated'
-        ? `[${s.title}](${s.filename})`
-        : s.title;
+    const docLink = s.status !== 'not-generated' ? `[${s.title}](${s.filename})` : s.title;
     return [num, docLink, statusLabel(s.status)];
   });
 

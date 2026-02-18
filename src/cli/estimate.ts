@@ -10,7 +10,7 @@ import { resolve } from 'node:path';
 import pc from 'picocolors';
 import { loadConfig } from '../config/loader.js';
 import { discoverFiles } from '../analyzers/file-discovery.js';
-import { PROVIDER_PRESETS, type ProviderPreset } from '../providers/presets.js';
+import { PROVIDER_PRESETS } from '../providers/presets.js';
 import { formatTokens, formatCost, SYMBOLS } from '../ui/formatters.js';
 
 /** Options accepted by the estimate command. */
@@ -50,8 +50,7 @@ export async function runEstimate(options: EstimateOptions): Promise<void> {
 
   // Current provider/model
   const currentPreset = PROVIDER_PRESETS[config.provider];
-  const currentModel =
-    config.model ?? currentPreset?.defaultModel ?? 'unknown';
+  const currentModel = config.model ?? currentPreset?.defaultModel ?? 'unknown';
 
   // Build cost comparison across all provider presets
   const entries: CostEntry[] = [];
@@ -85,10 +84,8 @@ export async function runEstimate(options: EstimateOptions): Promise<void> {
     }
 
     // Input tokens dominate; output ~20% of input as heuristic
-    const inputCost =
-      (estimatedTokens / 1_000_000) * pricing.inputPerMillion;
-    const outputCost =
-      ((estimatedTokens * 0.2) / 1_000_000) * pricing.outputPerMillion;
+    const inputCost = (estimatedTokens / 1_000_000) * pricing.inputPerMillion;
+    const outputCost = ((estimatedTokens * 0.2) / 1_000_000) * pricing.outputPerMillion;
     const totalCost = inputCost + outputCost;
 
     entries.push({

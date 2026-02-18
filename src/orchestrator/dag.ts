@@ -1,10 +1,5 @@
 import { OrchestratorError } from '../utils/errors.js';
-import type {
-  StepDefinition,
-  StepResult,
-  StepContext,
-  DAGEvents,
-} from './types.js';
+import type { StepDefinition, StepResult, StepContext, DAGEvents } from './types.js';
 
 /**
  * DAG orchestrator with reactive execution using Kahn's algorithm.
@@ -49,9 +44,7 @@ export class DAGOrchestrator {
     for (const [id, step] of this.steps) {
       for (const dep of step.deps) {
         if (!this.steps.has(dep)) {
-          errors.push(
-            `Step "${id}" depends on unknown step "${dep}"`,
-          );
+          errors.push(`Step "${id}" depends on unknown step "${dep}"`);
         }
       }
     }
@@ -95,9 +88,7 @@ export class DAGOrchestrator {
       for (const [id, degree] of inDegree) {
         if (degree > 0) cycleNodes.push(id);
       }
-      errors.push(
-        `Cyclic dependency detected involving: ${cycleNodes.join(', ')}`,
-      );
+      errors.push(`Cyclic dependency detected involving: ${cycleNodes.join(', ')}`);
     }
 
     return { valid: errors.length === 0, errors };
@@ -111,24 +102,15 @@ export class DAGOrchestrator {
     // Validate first
     const validation = this.validate();
     if (!validation.valid) {
-      const cycleError = validation.errors.find((e) =>
-        e.includes('Cyclic'),
-      );
+      const cycleError = validation.errors.find((e) => e.includes('Cyclic'));
       if (cycleError) {
-        throw OrchestratorError.cyclicDependency(
-          validation.errors,
-        );
+        throw OrchestratorError.cyclicDependency(validation.errors);
       }
       for (const err of validation.errors) {
         if (err.includes('unknown step')) {
-          const match = err.match(
-            /Step "(.+)" depends on unknown step "(.+)"/,
-          );
+          const match = err.match(/Step "(.+)" depends on unknown step "(.+)"/);
           if (match) {
-            throw OrchestratorError.missingDependency(
-              match[1],
-              match[2],
-            );
+            throw OrchestratorError.missingDependency(match[1], match[2]);
           }
         }
       }

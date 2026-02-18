@@ -73,9 +73,7 @@ export function buildTable(headers: string[], rows: string[][]): string {
 
   const headerRow = `| ${headers.map(escape).join(' | ')} |`;
   const separatorRow = `| ${headers.map(() => '---').join(' | ')} |`;
-  const dataRows = rows.map(
-    (row) => `| ${row.map(escape).join(' | ')} |`,
-  );
+  const dataRows = rows.map((row) => `| ${row.map(escape).join(' | ')} |`);
 
   return [headerRow, separatorRow, ...dataRows].join('\n');
 }
@@ -92,28 +90,29 @@ export function buildSummaryLine(ctx: RenderContext, topic: string): string {
 
   switch (topic) {
     case 'architecture': {
-      const patterns = ctx.rounds.r4?.data.patterns
-        .map((p) => p.name)
-        .slice(0, 3)
-        .join(', ') ?? 'undetermined';
-      const topModules = ctx.rounds.r2?.data.modules
-        .slice(0, 3)
-        .map((m) => m.name)
-        .join(', ') ?? 'undetermined';
+      const patterns =
+        ctx.rounds.r4?.data.patterns
+          .map((p) => p.name)
+          .slice(0, 3)
+          .join(', ') ?? 'undetermined';
+      const topModules =
+        ctx.rounds.r2?.data.modules
+          .slice(0, 3)
+          .map((m) => m.name)
+          .join(', ') ?? 'undetermined';
       return `${projectName} uses ${patterns} architecture. Key modules include ${topModules}.`;
     }
     case 'overview': {
-      const lang = Object.entries(staticAnalysis.fileTree.filesByExtension)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 1)
-        .map(([ext]) => ext)
-        .join('') || 'multiple languages';
+      const lang =
+        Object.entries(staticAnalysis.fileTree.filesByExtension)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 1)
+          .map(([ext]) => ext)
+          .join('') || 'multiple languages';
       return `${projectName} is a ${lang} project with ${meta.fileCount} files. It was analyzed on ${meta.analyzedAt}.`;
     }
     case 'dependencies': {
-      const depCount = staticAnalysis.dependencies.manifests
-        .flatMap((m) => m.dependencies)
-        .length;
+      const depCount = staticAnalysis.dependencies.manifests.flatMap((m) => m.dependencies).length;
       return `${projectName} has ${depCount} dependencies across ${staticAnalysis.dependencies.manifests.length} manifest(s). Dependencies are categorized by type and role.`;
     }
     case 'testing': {

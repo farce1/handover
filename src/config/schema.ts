@@ -6,7 +6,16 @@ import { z } from 'zod';
  */
 export const HandoverConfigSchema = z.object({
   provider: z
-    .enum(['anthropic', 'openai', 'ollama', 'groq', 'together', 'deepseek', 'azure-openai', 'custom'])
+    .enum([
+      'anthropic',
+      'openai',
+      'ollama',
+      'groq',
+      'together',
+      'deepseek',
+      'azure-openai',
+      'custom',
+    ])
     .default('anthropic'),
   model: z.string().optional(),
   apiKeyEnv: z.string().optional(),

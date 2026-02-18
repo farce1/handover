@@ -26,7 +26,7 @@ const ALWAYS_IGNORE = [
 const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
 
 /** Maximum line heuristic -- informational only, size-based filter is primary. */
-const MAX_LINE_HEURISTIC = 50_000;
+const _MAX_LINE_HEURISTIC = 50_000;
 
 /**
  * Format a byte count as a human-readable string (KB, MB).

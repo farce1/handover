@@ -16,7 +16,7 @@
 import pc from 'picocolors';
 
 import type { AnalyzerStatus, DisplayState, ErrorInfo, RoundDisplayState } from './types.js';
-import { formatCost, formatDuration, formatTokens, isNoColor, SPINNER_FRAMES, SYMBOLS } from './formatters.js';
+import { formatCost, formatDuration, formatTokens, SPINNER_FRAMES, SYMBOLS } from './formatters.js';
 
 /**
  * Render the startup banner line.
@@ -110,8 +110,8 @@ export function renderRoundBlock(
       }
 
       case 'done': {
-        const tokenStr = (!isLocal && rd.tokens !== undefined) ? formatTokens(rd.tokens) : '';
-        const costStr = (!isLocal && rd.cost !== undefined) ? pc.yellow(formatCost(rd.cost)) : '';
+        const tokenStr = !isLocal && rd.tokens !== undefined ? formatTokens(rd.tokens) : '';
+        const costStr = !isLocal && rd.cost !== undefined ? pc.yellow(formatCost(rd.cost)) : '';
         const parts = [
           `${pc.green(SYMBOLS.done)} ${roundLabel} ${rd.name}`,
           tokenStr,
@@ -124,16 +124,19 @@ export function renderRoundBlock(
       case 'running': {
         if (rd.retrying) {
           // Show retry countdown inline
-          lines.push(`  ${renderRetryCountdown(
-            rd.roundNumber,
-            computeSecondsLeft(rd),
-            rd.retryReason ?? 'unknown',
-          )}`);
+          lines.push(
+            `  ${renderRetryCountdown(
+              rd.roundNumber,
+              computeSecondsLeft(rd),
+              rd.retryReason ?? 'unknown',
+            )}`,
+          );
         } else {
           // Show spinner + elapsed time
-          const frame = spinnerFrame !== undefined
-            ? SPINNER_FRAMES.frames[spinnerFrame % SPINNER_FRAMES.frames.length]
-            : SPINNER_FRAMES.frames[0];
+          const frame =
+            spinnerFrame !== undefined
+              ? SPINNER_FRAMES.frames[spinnerFrame % SPINNER_FRAMES.frames.length]
+              : SPINNER_FRAMES.frames[0];
           const elapsed = pc.dim(formatDuration(rd.elapsedMs));
           lines.push(`  ${pc.magenta(frame)} ${roundLabel} ${pc.bold(rd.name)}${sep}${elapsed}`);
         }
@@ -218,11 +221,7 @@ export function renderCostWarning(currentCost: number, threshold: number): strin
  * The caller computes secondsLeft from RoundDisplayState.retryStartMs
  * and retryDelayMs.
  */
-export function renderRetryCountdown(
-  round: number,
-  secondsLeft: number,
-  reason: string,
-): string {
+export function renderRetryCountdown(round: number, secondsLeft: number, reason: string): string {
   return `${pc.yellow(SYMBOLS.retry)} Round ${round} failed ${pc.dim(`(${reason})`)} ${pc.dim('\u00B7')} retrying in ${pc.yellow(`${secondsLeft}s`)}...`;
 }
 

@@ -27,10 +27,7 @@ export function getTextTrimmed(node: SyntaxNode, source: string): string {
  *
  * Returns undefined if no preceding comment is found.
  */
-export function getDocstringAbove(
-  node: SyntaxNode,
-  source: string,
-): string | undefined {
+export function getDocstringAbove(node: SyntaxNode, source: string): string | undefined {
   const prev = node.previousNamedSibling;
   if (!prev) return undefined;
 
@@ -54,10 +51,7 @@ export function getDocstringAbove(
  *
  * Returns full decorator text including arguments (e.g., "@app.route('/api')").
  */
-export function getDecoratorTexts(
-  node: SyntaxNode,
-  source: string,
-): string[] {
+export function getDecoratorTexts(node: SyntaxNode, source: string): string[] {
   const decorators: string[] = [];
 
   // Pattern 1: Parent is a decorated_definition (Python)

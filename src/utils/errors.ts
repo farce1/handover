@@ -141,13 +141,14 @@ export class ProviderError extends HandoverError {
  * Wraps unknown errors in HandoverError for consistent formatting.
  */
 export function handleCliError(err: unknown, context?: string): never {
-  const toLog = err instanceof HandoverError
-    ? err
-    : new HandoverError(
-        err instanceof Error ? err.message : String(err),
-        context ?? 'An unexpected error occurred',
-        'Check the error above and try again',
-      );
+  const toLog =
+    err instanceof HandoverError
+      ? err
+      : new HandoverError(
+          err instanceof Error ? err.message : String(err),
+          context ?? 'An unexpected error occurred',
+          'Check the error above and try again',
+        );
   logger.error(toLog);
   process.exit(1);
 }

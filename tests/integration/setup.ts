@@ -72,10 +72,7 @@ export function createFixtureScope(): {
  * WARNING: Use `createFixtureScope()` for parallel-safe test files.
  * This function is kept for simple single-file usage.
  */
-export function createFixture(
-  name: string,
-  files: Record<string, string>,
-): string {
+export function createFixture(name: string, files: Record<string, string>): string {
   mkdirSync(FIXTURES_DIR, { recursive: true });
   const fixtureDir = mkdtempSync(join(FIXTURES_DIR, `${name}-`));
 
@@ -91,11 +88,7 @@ export function createFixture(
 /**
  * Legacy API: Add binary file content to an existing fixture directory.
  */
-export function addBinaryFile(
-  fixtureDir: string,
-  relativePath: string,
-  content: Buffer,
-): void {
+export function addBinaryFile(fixtureDir: string, relativePath: string, content: Buffer): void {
   const fullPath = join(fixtureDir, relativePath);
   mkdirSync(dirname(fullPath), { recursive: true });
   writeFileSync(fullPath, content);

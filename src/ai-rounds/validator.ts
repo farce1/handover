@@ -12,9 +12,7 @@ export function validateFileClaims(
   analysis: StaticAnalysisResult,
 ): { valid: string[]; dropped: string[] } {
   const knownPaths = new Set(
-    analysis.fileTree.directoryTree
-      .filter((e) => e.type === 'file')
-      .map((e) => e.path),
+    analysis.fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path),
   );
 
   const valid: string[] = [];
@@ -118,9 +116,7 @@ function extractImportClaims(
 
   if (roundNumber === 3) {
     // Round 3: crossModuleFlows with path arrays
-    const flows = output['crossModuleFlows'] as
-      | Array<{ path: string[] }>
-      | undefined;
+    const flows = output['crossModuleFlows'] as Array<{ path: string[] }> | undefined;
     if (Array.isArray(flows)) {
       for (const flow of flows) {
         if (Array.isArray(flow.path)) {

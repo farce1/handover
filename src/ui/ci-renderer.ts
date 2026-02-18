@@ -61,21 +61,17 @@ export class CIRenderer implements Renderer {
     // Only log on round completion (status === 'done', 'cached', or 'failed')
     for (const [, rd] of state.rounds) {
       if (rd.status === 'cached') {
-        console.log(
-          `${this.timestamp()} [round-${rd.roundNumber}] ${rd.name} cached`,
-        );
+        console.log(`${this.timestamp()} [round-${rd.roundNumber}] ${rd.name} cached`);
       } else if (rd.status === 'done') {
         const tokenStr = rd.tokens !== undefined ? formatTokens(rd.tokens) : '';
-        const costStr = (!state.isLocal && rd.cost !== undefined) ? formatCost(rd.cost) : '';
+        const costStr = !state.isLocal && rd.cost !== undefined ? formatCost(rd.cost) : '';
         const details = [tokenStr, costStr].filter(Boolean).join(', ');
         console.log(
           `${this.timestamp()} [round-${rd.roundNumber}] ${rd.name} complete${details ? ` (${details})` : ''}`,
         );
       } else if (rd.status === 'failed') {
         const reason = rd.retryReason ? ` (${rd.retryReason})` : '';
-        console.log(
-          `${this.timestamp()} [round-${rd.roundNumber}] ${rd.name} FAILED${reason}`,
-        );
+        console.log(`${this.timestamp()} [round-${rd.roundNumber}] ${rd.name} FAILED${reason}`);
       }
     }
   }
@@ -93,18 +89,13 @@ export class CIRenderer implements Renderer {
   }
 
   onComplete(state: DisplayState): void {
-    const duration = `${((state.elapsedMs) / 1000).toFixed(0)}s`;
-    const parts = [
-      `${state.completionDocs} documents`,
-      formatTokens(state.totalTokens),
-    ];
+    const duration = `${(state.elapsedMs / 1000).toFixed(0)}s`;
+    const parts = [`${state.completionDocs} documents`, formatTokens(state.totalTokens)];
     if (!state.isLocal) {
       parts.push(formatCost(state.totalCost));
     }
     parts.push(duration);
-    console.log(
-      `${this.timestamp()} [done] ${parts.join(', ')}`,
-    );
+    console.log(`${this.timestamp()} [done] ${parts.join(', ')}`);
 
     // Print errors if any
     if (state.errors.length > 0) {

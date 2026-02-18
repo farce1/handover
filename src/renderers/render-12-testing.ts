@@ -72,7 +72,11 @@ export function renderTesting(ctx: RenderContext): string {
       lines.push('');
 
       if (tests.testFiles.length > 0) {
-        lines.push(sectionIntro(`${totalTestFiles} test files detected containing ${totalTests} total tests.`));
+        lines.push(
+          sectionIntro(
+            `${totalTestFiles} test files detected containing ${totalTests} total tests.`,
+          ),
+        );
         lines.push('');
 
         const CAP = 50;
@@ -100,7 +104,11 @@ export function renderTesting(ctx: RenderContext): string {
       if (tests.coverageDataPath) {
         lines.push(sectionIntro(`Coverage data found at ${codeRef(tests.coverageDataPath)}.`));
       } else {
-        lines.push(sectionIntro('No coverage data found. Consider configuring a coverage reporter for your test framework.'));
+        lines.push(
+          sectionIntro(
+            'No coverage data found. Consider configuring a coverage reporter for your test framework.',
+          ),
+        );
       }
       lines.push('');
 
@@ -127,24 +135,37 @@ export function renderTesting(ctx: RenderContext): string {
           f.path.includes('/playwright/'),
       );
       const otherTests = tests.testFiles.filter(
-        (f) =>
-          !unitTests.includes(f) &&
-          !integrationTests.includes(f) &&
-          !e2eTests.includes(f),
+        (f) => !unitTests.includes(f) && !integrationTests.includes(f) && !e2eTests.includes(f),
       );
 
       const orgRows: string[][] = [];
       if (unitTests.length > 0) {
-        orgRows.push(['Unit', String(unitTests.length), String(unitTests.reduce((sum, f) => sum + f.testCount, 0))]);
+        orgRows.push([
+          'Unit',
+          String(unitTests.length),
+          String(unitTests.reduce((sum, f) => sum + f.testCount, 0)),
+        ]);
       }
       if (integrationTests.length > 0) {
-        orgRows.push(['Integration', String(integrationTests.length), String(integrationTests.reduce((sum, f) => sum + f.testCount, 0))]);
+        orgRows.push([
+          'Integration',
+          String(integrationTests.length),
+          String(integrationTests.reduce((sum, f) => sum + f.testCount, 0)),
+        ]);
       }
       if (e2eTests.length > 0) {
-        orgRows.push(['E2E', String(e2eTests.length), String(e2eTests.reduce((sum, f) => sum + f.testCount, 0))]);
+        orgRows.push([
+          'E2E',
+          String(e2eTests.length),
+          String(e2eTests.reduce((sum, f) => sum + f.testCount, 0)),
+        ]);
       }
       if (otherTests.length > 0) {
-        orgRows.push(['Other', String(otherTests.length), String(otherTests.reduce((sum, f) => sum + f.testCount, 0))]);
+        orgRows.push([
+          'Other',
+          String(otherTests.length),
+          String(otherTests.reduce((sum, f) => sum + f.testCount, 0)),
+        ]);
       }
 
       if (orgRows.length > 0) {
@@ -183,7 +204,9 @@ export function renderTesting(ctx: RenderContext): string {
             conv.pattern.toLowerCase().includes('test') ||
             conv.description.toLowerCase().includes('test')
           ) {
-            testInsights.push(`**Cross-cutting**: ${conv.pattern} (${conv.frequency}) -- ${conv.description}`);
+            testInsights.push(
+              `**Cross-cutting**: ${conv.pattern} (${conv.frequency}) -- ${conv.description}`,
+            );
           }
         }
 

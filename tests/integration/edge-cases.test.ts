@@ -58,8 +58,9 @@ describe('enormous file skipping', () => {
 
   beforeEach(() => {
     // Create a fixture with one normal file and one enormous file (>2MB)
-    const normalContent = Array.from({ length: 50 }, (_, i) =>
-      `export function handler${i}(): string { return 'ok'; }`,
+    const normalContent = Array.from(
+      { length: 50 },
+      (_, i) => `export function handler${i}(): string { return 'ok'; }`,
     ).join('\n');
 
     // Generate 2.1MB of content to exceed the 2MB threshold
@@ -108,7 +109,7 @@ describe('binary-only directory', () => {
     scope.addBinaryFile(
       fixtureDir,
       'assets/logo.png',
-      Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     );
     scope.addBinaryFile(
       fixtureDir,

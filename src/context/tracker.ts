@@ -11,7 +11,10 @@ export class TokenUsageTracker {
   private rounds: TokenUsage[] = [];
   private readonly warnThreshold: number;
 
-  private static readonly MODEL_COSTS: Record<string, { inputPerMillion: number; outputPerMillion: number }> = {
+  private static readonly MODEL_COSTS: Record<
+    string,
+    { inputPerMillion: number; outputPerMillion: number }
+  > = {
     // Anthropic
     'claude-opus-4-6': { inputPerMillion: 15, outputPerMillion: 75 },
     'claude-opus-4-5': { inputPerMillion: 5, outputPerMillion: 25 },
@@ -21,18 +24,24 @@ export class TokenUsageTracker {
     'gpt-4o': { inputPerMillion: 2.5, outputPerMillion: 10 },
     'gpt-4o-mini': { inputPerMillion: 0.15, outputPerMillion: 0.6 },
     'gpt-4.1': { inputPerMillion: 2, outputPerMillion: 8 },
-    'o3-mini': { inputPerMillion: 1.10, outputPerMillion: 4.40 },
+    'o3-mini': { inputPerMillion: 1.1, outputPerMillion: 4.4 },
     // Groq
     'llama-3.3-70b-versatile': { inputPerMillion: 0.59, outputPerMillion: 0.79 },
     // Together
-    'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo': { inputPerMillion: 0.88, outputPerMillion: 0.88 },
+    'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo': {
+      inputPerMillion: 0.88,
+      outputPerMillion: 0.88,
+    },
     // DeepSeek
     'deepseek-chat': { inputPerMillion: 0.28, outputPerMillion: 0.42 },
     // Default fallback (most expensive = safe for cost estimates)
-    'default': { inputPerMillion: 15, outputPerMillion: 75 },
+    default: { inputPerMillion: 15, outputPerMillion: 75 },
   };
 
-  constructor(warnThreshold = 0.85, private readonly model: string = 'default') {
+  constructor(
+    warnThreshold = 0.85,
+    private readonly model: string = 'default',
+  ) {
     this.warnThreshold = warnThreshold;
   }
 
@@ -44,10 +53,7 @@ export class TokenUsageTracker {
   recordRound(usage: TokenUsage): void {
     this.rounds.push(usage);
 
-    const utilization =
-      usage.budgetTokens > 0
-        ? usage.inputTokens / usage.budgetTokens
-        : 0;
+    const utilization = usage.budgetTokens > 0 ? usage.inputTokens / usage.budgetTokens : 0;
 
     if (utilization >= this.warnThreshold) {
       logger.warn(
@@ -84,9 +90,7 @@ export class TokenUsageTracker {
    * Get the most recently recorded round, or undefined if none.
    */
   getLastRound(): TokenUsage | undefined {
-    return this.rounds.length > 0
-      ? this.rounds[this.rounds.length - 1]
-      : undefined;
+    return this.rounds.length > 0 ? this.rounds[this.rounds.length - 1] : undefined;
   }
 
   /**
@@ -101,9 +105,7 @@ export class TokenUsageTracker {
 
     for (const r of this.rounds) {
       const util =
-        r.budgetTokens > 0
-          ? `${Math.round((r.inputTokens / r.budgetTokens) * 100)}%`
-          : 'N/A';
+        r.budgetTokens > 0 ? `${Math.round((r.inputTokens / r.budgetTokens) * 100)}%` : 'N/A';
 
       lines.push(
         `  Round ${r.round}: ${r.inputTokens.toLocaleString()} input, ${r.outputTokens.toLocaleString()} output (${util} budget)`,
@@ -124,8 +126,12 @@ export class TokenUsageTracker {
    * based on the configured model's pricing.
    */
   estimateCost(inputTokens: number, outputTokens: number): number {
-    const costs = TokenUsageTracker.MODEL_COSTS[this.model] ?? TokenUsageTracker.MODEL_COSTS['default'];
-    return (inputTokens / 1_000_000) * costs.inputPerMillion + (outputTokens / 1_000_000) * costs.outputPerMillion;
+    const costs =
+      TokenUsageTracker.MODEL_COSTS[this.model] ?? TokenUsageTracker.MODEL_COSTS['default'];
+    return (
+      (inputTokens / 1_000_000) * costs.inputPerMillion +
+      (outputTokens / 1_000_000) * costs.outputPerMillion
+    );
   }
 
   /**

@@ -13,20 +13,12 @@ interface FrameworkPattern {
 const FRAMEWORK_PATTERNS: Record<string, FrameworkPattern> = {
   vitest: {
     filePatterns: [/\.test\.[tj]sx?$/, /\.spec\.[tj]sx?$/],
-    configFiles: [
-      'vitest.config.ts',
-      'vitest.config.js',
-      'vitest.config.mts',
-    ],
+    configFiles: ['vitest.config.ts', 'vitest.config.js', 'vitest.config.mts'],
     testPatterns: [/\b(?:it|test|describe)\s*\(/g],
   },
   jest: {
     filePatterns: [/\.test\.[tj]sx?$/, /\.spec\.[tj]sx?$/],
-    configFiles: [
-      'jest.config.ts',
-      'jest.config.js',
-      'jest.config.mjs',
-    ],
+    configFiles: ['jest.config.ts', 'jest.config.js', 'jest.config.mjs'],
     testPatterns: [/\b(?:it|test|describe)\s*\(/g],
   },
   mocha: {
@@ -60,9 +52,7 @@ const FRAMEWORK_PATTERNS: Record<string, FrameworkPattern> = {
  * by pattern matching across six framework patterns: vitest, jest, mocha,
  * pytest, go_test, and rust_test.
  */
-export async function analyzeTests(
-  ctx: AnalysisContext,
-): Promise<AnalyzerResult<TestResult>> {
+export async function analyzeTests(ctx: AnalysisContext): Promise<AnalyzerResult<TestResult>> {
   const start = performance.now();
 
   try {
@@ -80,12 +70,8 @@ export async function analyzeTests(
     for (const file of ctx.files) {
       const fileName = basename(file.path);
 
-      for (const [framework, patterns] of Object.entries(
-        FRAMEWORK_PATTERNS,
-      )) {
-        const isTestFile = patterns.filePatterns.some((re) =>
-          re.test(fileName),
-        );
+      for (const [framework, patterns] of Object.entries(FRAMEWORK_PATTERNS)) {
+        const isTestFile = patterns.filePatterns.some((re) => re.test(fileName));
         if (isTestFile) {
           testFiles.push({
             path: file.path,
@@ -108,9 +94,7 @@ export async function analyzeTests(
         if (allFileNames.has(configFile)) {
           detectedFrameworks.add(framework);
           // Find the full path of the config file
-          const match = ctx.files.find(
-            (f) => basename(f.path) === configFile,
-          );
+          const match = ctx.files.find((f) => basename(f.path) === configFile);
           if (match) {
             configFiles.push(match.path);
           }
@@ -119,20 +103,12 @@ export async function analyzeTests(
     }
 
     // Check package.json devDependencies for JS test frameworks
-    const packageJsonFile = ctx.files.find(
-      (f) => f.path === 'package.json',
-    );
+    const packageJsonFile = ctx.files.find((f) => f.path === 'package.json');
     if (packageJsonFile) {
       try {
-        const content = await readFile(
-          packageJsonFile.absolutePath,
-          'utf-8',
-        );
+        const content = await readFile(packageJsonFile.absolutePath, 'utf-8');
         const pkg = JSON.parse(content) as Record<string, unknown>;
-        const devDeps = (pkg.devDependencies ?? {}) as Record<
-          string,
-          string
-        >;
+        const devDeps = (pkg.devDependencies ?? {}) as Record<string, string>;
         const allDeps = {
           ...((pkg.dependencies ?? {}) as Record<string, string>),
           ...devDeps,
@@ -153,8 +129,7 @@ export async function analyzeTests(
         if (!file) continue;
 
         const content = await readFile(file.absolutePath, 'utf-8');
-        const patterns =
-          FRAMEWORK_PATTERNS[testFile.framework]?.testPatterns ?? [];
+        const patterns = FRAMEWORK_PATTERNS[testFile.framework]?.testPatterns ?? [];
         let count = 0;
         for (const pattern of patterns) {
           // Reset lastIndex for each file since we reuse global regexes

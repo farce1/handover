@@ -43,7 +43,9 @@ export function renderEdgeCases(ctx: RenderContext): string {
     renderBody: (lines) => {
       // Warning banner if static-only
       if (!hasR5) {
-        lines.push('> **Note:** AI analysis for this section was unavailable. Content is based on static analysis only and may be incomplete.');
+        lines.push(
+          '> **Note:** AI analysis for this section was unavailable. Content is based on static analysis only and may be incomplete.',
+        );
         lines.push('');
       }
 
@@ -64,14 +66,16 @@ export function renderEdgeCases(ctx: RenderContext): string {
 
         lines.push('## Summary');
         lines.push('');
-        lines.push(buildTable(
-          ['Severity', 'Count'],
-          [
-            ['Critical', String(severityCounts.critical)],
-            ['Warning', String(severityCounts.warning)],
-            ['Info', String(severityCounts.info)],
-          ],
-        ));
+        lines.push(
+          buildTable(
+            ['Severity', 'Count'],
+            [
+              ['Critical', String(severityCounts.critical)],
+              ['Warning', String(severityCounts.warning)],
+              ['Info', String(severityCounts.info)],
+            ],
+          ),
+        );
         lines.push('');
 
         // ── By Module ─────────────────────────────────────────────────
@@ -89,16 +93,18 @@ export function renderEdgeCases(ctx: RenderContext): string {
             (a, b) => severityOrder[a.severity] - severityOrder[b.severity],
           );
 
-          lines.push(buildTable(
-            ['Description', 'File', 'Line', 'Severity', 'Evidence'],
-            sorted.map((ec) => [
-              ec.description,
-              codeRef(ec.file),
-              ec.line !== undefined ? String(ec.line) : '-',
-              ec.severity,
-              ec.evidence,
-            ]),
-          ));
+          lines.push(
+            buildTable(
+              ['Description', 'File', 'Line', 'Severity', 'Evidence'],
+              sorted.map((ec) => [
+                ec.description,
+                codeRef(ec.file),
+                ec.line !== undefined ? String(ec.line) : '-',
+                ec.severity,
+                ec.evidence,
+              ]),
+            ),
+          );
           lines.push('');
 
           pushStructuredBlock(lines, ctx, {
@@ -110,7 +116,10 @@ export function renderEdgeCases(ctx: RenderContext): string {
 
         // ── Error Handling Patterns ───────────────────────────────────
         const modulesWithErrorHandling = r5.modules.filter(
-          (m) => m.errorHandling.strategy || m.errorHandling.gaps.length > 0 || m.errorHandling.patterns.length > 0,
+          (m) =>
+            m.errorHandling.strategy ||
+            m.errorHandling.gaps.length > 0 ||
+            m.errorHandling.patterns.length > 0,
         );
 
         if (modulesWithErrorHandling.length > 0) {
@@ -161,15 +170,17 @@ export function renderEdgeCases(ctx: RenderContext): string {
         lines.push('');
         lines.push(sectionIntro('Issues detected from code markers in the source files.'));
         lines.push('');
-        lines.push(buildTable(
-          ['Description', 'File', 'Line', 'Category'],
-          staticTodos.map((todo) => [
-            todo.text,
-            codeRef(todo.file),
-            String(todo.line),
-            todo.category,
-          ]),
-        ));
+        lines.push(
+          buildTable(
+            ['Description', 'File', 'Line', 'Category'],
+            staticTodos.map((todo) => [
+              todo.text,
+              codeRef(todo.file),
+              String(todo.line),
+              todo.category,
+            ]),
+          ),
+        );
         lines.push('');
       }
     },

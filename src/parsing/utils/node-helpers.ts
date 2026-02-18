@@ -7,19 +7,14 @@ import type { Node as SyntaxNode } from 'web-tree-sitter';
  * Needed because some web-tree-sitter versions type namedChildren as (Node | null)[].
  */
 export function getNamedChildren(node: SyntaxNode): SyntaxNode[] {
-  return (node.namedChildren as (SyntaxNode | null)[]).filter(
-    (c): c is SyntaxNode => c != null,
-  );
+  return (node.namedChildren as (SyntaxNode | null)[]).filter((c): c is SyntaxNode => c != null);
 }
 
 /**
  * Walk the named children of a node using the cursor API for efficiency.
  * More efficient than iterating node.namedChildren for large ASTs.
  */
-export function walkChildren(
-  node: SyntaxNode,
-  visitor: (child: SyntaxNode) => void,
-): void {
+export function walkChildren(node: SyntaxNode, visitor: (child: SyntaxNode) => void): void {
   const cursor = node.walk();
   if (!cursor.gotoFirstChild()) return;
 
@@ -34,10 +29,7 @@ export function walkChildren(
  * Find the first child node with a matching type string.
  * Returns null if no child matches.
  */
-export function findChildByType(
-  node: SyntaxNode,
-  type: string,
-): SyntaxNode | null {
+export function findChildByType(node: SyntaxNode, type: string): SyntaxNode | null {
   for (const child of getNamedChildren(node)) {
     if (child.type === type) return child;
   }
@@ -47,10 +39,7 @@ export function findChildByType(
 /**
  * Find all children with a matching type string.
  */
-export function findChildrenByType(
-  node: SyntaxNode,
-  type: string,
-): SyntaxNode[] {
+export function findChildrenByType(node: SyntaxNode, type: string): SyntaxNode[] {
   const results: SyntaxNode[] = [];
   for (const child of getNamedChildren(node)) {
     if (child.type === type) results.push(child);
@@ -62,10 +51,7 @@ export function findChildrenByType(
  * Get a child node by field name with null safety.
  * Wrapper around SyntaxNode.childForFieldName().
  */
-export function getFieldNode(
-  node: SyntaxNode,
-  fieldName: string,
-): SyntaxNode | null {
+export function getFieldNode(node: SyntaxNode, fieldName: string): SyntaxNode | null {
   return node.childForFieldName(fieldName);
 }
 

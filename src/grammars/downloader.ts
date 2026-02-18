@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -22,14 +22,7 @@ const GRAMMAR_CDN_BASE = 'https://unpkg.com/tree-sitter-wasms@0.1.13/out';
  * Full tree-sitter-wasms package is ~50MB for 36 grammars;
  * our subset is ~6MB total.
  */
-const SUPPORTED_GRAMMARS = new Set([
-  'typescript',
-  'tsx',
-  'javascript',
-  'python',
-  'rust',
-  'go',
-]);
+const SUPPORTED_GRAMMARS = new Set(['typescript', 'tsx', 'javascript', 'python', 'rust', 'go']);
 
 /**
  * Expected file sizes (bytes) for basic integrity check.
@@ -60,9 +53,7 @@ const EXPECTED_SIZES: Record<string, { min: number; max: number }> = {
  * @returns Absolute path to the cached WASM file
  * @throws If grammarName is unsupported or download fails
  */
-export async function downloadGrammarIfNeeded(
-  grammarName: string,
-): Promise<string> {
+export async function downloadGrammarIfNeeded(grammarName: string): Promise<string> {
   if (!SUPPORTED_GRAMMARS.has(grammarName)) {
     throw new Error(`Unsupported grammar: ${grammarName}`);
   }

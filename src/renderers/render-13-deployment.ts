@@ -23,7 +23,7 @@ export function renderDeployment(ctx: RenderContext): string {
   const roundsUsed = collectRoundsUsed(ctx, 1, 2, 6);
 
   const platformDesc = hasR6
-    ? (r6.deployment.platform || r6.deployment.ciProvider || 'undetermined platform')
+    ? r6.deployment.platform || r6.deployment.ciProvider || 'undetermined platform'
     : detectCIFromFileTree(fileTree) || 'undetermined platform';
 
   return renderDocument(ctx, {
@@ -40,7 +40,9 @@ export function renderDeployment(ctx: RenderContext): string {
     renderBody: (lines) => {
       // Warning banner if static-only
       if (!hasR6) {
-        lines.push('> **Note:** AI analysis for this section was unavailable. Content is based on static analysis only and may be incomplete.');
+        lines.push(
+          '> **Note:** AI analysis for this section was unavailable. Content is based on static analysis only and may be incomplete.',
+        );
         lines.push('');
       }
 
@@ -103,10 +105,12 @@ export function renderDeployment(ctx: RenderContext): string {
         if (scriptEntries.length > 0) {
           lines.push('**Scripts:**');
           lines.push('');
-          lines.push(buildTable(
-            ['Script', 'Command'],
-            scriptEntries.map(([name, cmd]) => [name, `\`${cmd}\``]),
-          ));
+          lines.push(
+            buildTable(
+              ['Script', 'Command'],
+              scriptEntries.map(([name, cmd]) => [name, `\`${cmd}\``]),
+            ),
+          );
           lines.push('');
         }
 
@@ -114,14 +118,16 @@ export function renderDeployment(ctx: RenderContext): string {
         if (r6.infrastructure.length > 0) {
           lines.push('## Infrastructure');
           lines.push('');
-          lines.push(buildTable(
-            ['Service', 'Purpose', 'Evidence'],
-            r6.infrastructure.map((infra) => [
-              infra.service,
-              infra.purpose,
-              codeRef(infra.evidence),
-            ]),
-          ));
+          lines.push(
+            buildTable(
+              ['Service', 'Purpose', 'Evidence'],
+              r6.infrastructure.map((infra) => [
+                infra.service,
+                infra.purpose,
+                codeRef(infra.evidence),
+              ]),
+            ),
+          );
           lines.push('');
         }
 
@@ -129,17 +135,21 @@ export function renderDeployment(ctx: RenderContext): string {
         if (r6.envVars.length > 0) {
           lines.push('## Environment Variables');
           lines.push('');
-          lines.push(sectionIntro(
-            `See ${crossRef('08-ENVIRONMENT', undefined, 'Environment')} for full details. Deployment-critical variables listed below.`,
-          ));
+          lines.push(
+            sectionIntro(
+              `See ${crossRef('08-ENVIRONMENT', undefined, 'Environment')} for full details. Deployment-critical variables listed below.`,
+            ),
+          );
           lines.push('');
 
           const deployVars = r6.envVars.filter((v) => v.required);
           if (deployVars.length > 0) {
-            lines.push(buildTable(
-              ['Name', 'Purpose', 'Source'],
-              deployVars.map((v) => [`\`${v.name}\``, v.purpose, v.source]),
-            ));
+            lines.push(
+              buildTable(
+                ['Name', 'Purpose', 'Source'],
+                deployVars.map((v) => [`\`${v.name}\``, v.purpose, v.source]),
+              ),
+            );
             lines.push('');
           }
         }
@@ -211,13 +221,16 @@ function detectCIFromFileTree(
   return null;
 }
 
-function detectCIFiles(
-  fileTree: RenderContext['staticAnalysis']['fileTree'],
-): string[] {
+function detectCIFiles(fileTree: RenderContext['staticAnalysis']['fileTree']): string[] {
   const ciPatterns = [
-    /\.github\/workflows/i, /\.gitlab-ci/i, /Jenkinsfile/i,
-    /\.circleci/i, /\.travis\.yml/i, /azure-pipelines/i,
-    /dockerfile/i, /docker-compose/i,
+    /\.github\/workflows/i,
+    /\.gitlab-ci/i,
+    /Jenkinsfile/i,
+    /\.circleci/i,
+    /\.travis\.yml/i,
+    /azure-pipelines/i,
+    /dockerfile/i,
+    /docker-compose/i,
   ];
 
   return fileTree.directoryTree

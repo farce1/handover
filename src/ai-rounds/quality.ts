@@ -18,8 +18,7 @@ const ROUND_THRESHOLDS: Record<number, QualityThresholds> = {
 
 // ─── Code reference detection pattern ───────────────────────────────────────
 
-const CODE_REF_PATTERN =
-  /(?:src\/|\.ts\b|\.js\b|\.py\b|\.rs\b|\.go\b|function\s+\w+|class\s+\w+)/g;
+const CODE_REF_PATTERN = /(?:src\/|\.ts\b|\.js\b|\.py\b|\.rs\b|\.go\b|function\s+\w+|class\s+\w+)/g;
 
 // ─── Quality checker ────────────────────────────────────────────────────────
 

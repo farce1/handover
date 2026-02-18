@@ -42,15 +42,12 @@ export abstract class BaseProvider implements LLMProvider {
     options?: { onRetry?: (attempt: number, delayMs: number, reason: string) => void },
   ): Promise<CompletionResult & { data: T }> {
     return this.rateLimiter.withLimit(async () => {
-      return retryWithBackoff(
-        () => this.doComplete(request, schema),
-        {
-          maxRetries: 3,
-          baseDelayMs: 30_000,
-          isRetryable: (err: unknown) => this.isRetryable(err),
-          onRetry: options?.onRetry,
-        },
-      );
+      return retryWithBackoff(() => this.doComplete(request, schema), {
+        maxRetries: 3,
+        baseDelayMs: 30_000,
+        isRetryable: (err: unknown) => this.isRetryable(err),
+        onRetry: options?.onRetry,
+      });
     });
   }
 
@@ -65,6 +62,8 @@ export abstract class BaseProvider implements LLMProvider {
    * Log provider initialization.
    */
   protected logInit(displayName: string, concurrency: number): void {
-    logger.log(`${displayName} provider initialized (model: ${this.model}, concurrency: ${concurrency})`);
+    logger.log(
+      `${displayName} provider initialized (model: ${this.model}, concurrency: ${concurrency})`,
+    );
   }
 }

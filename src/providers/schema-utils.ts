@@ -8,6 +8,9 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 export function zodToToolSchema<T>(schema: z.ZodType<T>): Record<string, unknown> {
   const jsonSchema = zodToJsonSchema(schema, 'response');
   return (jsonSchema as Record<string, unknown>).definitions
-    ? ((jsonSchema as Record<string, Record<string, unknown>>).definitions?.response as Record<string, unknown>)
+    ? ((jsonSchema as Record<string, Record<string, unknown>>).definitions?.response as Record<
+        string,
+        unknown
+      >)
     : (jsonSchema as Record<string, unknown>);
 }

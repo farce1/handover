@@ -1,7 +1,7 @@
 name: Documentation Improvement
 description: Report missing, incorrect, or unclear documentation
-title: "[Docs]: "
-labels: ["documentation"]
+title: '[Docs]: '
+labels: ['documentation']
 body:
   - type: markdown
     attributes:
@@ -12,7 +12,7 @@ body:
     attributes:
       label: Documentation Location
       description: Which file or page needs improvement?
-      placeholder: "e.g. README.md, CONTRIBUTING.md, --help output"
+      placeholder: 'e.g. README.md, CONTRIBUTING.md, --help output'
     validations:
       required: true
   - type: textarea

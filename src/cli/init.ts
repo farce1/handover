@@ -54,8 +54,7 @@ export async function runInit(): Promise<void> {
         if (results.provider === 'ollama') {
           return Promise.resolve('');
         }
-        const defaultEnv =
-          DEFAULT_API_KEY_ENV[results.provider as string] ?? 'LLM_API_KEY';
+        const defaultEnv = DEFAULT_API_KEY_ENV[results.provider as string] ?? 'LLM_API_KEY';
         return p.text({
           message: `Environment variable for API key:`,
           initialValue: defaultEnv,
@@ -79,9 +78,7 @@ export async function runInit(): Promise<void> {
 
   const projectInfo = detectProject();
 
-  s.stop(
-    `Detected: ${pc.cyan(projectInfo.name)} (${projectInfo.language})`,
-  );
+  s.stop(`Detected: ${pc.cyan(projectInfo.name)} (${projectInfo.language})`);
 
   // Build config
   const config: Record<string, unknown> = {
@@ -89,8 +86,7 @@ export async function runInit(): Promise<void> {
   };
 
   // Only add apiKeyEnv if non-default
-  const defaultEnv =
-    DEFAULT_API_KEY_ENV[answers.provider] ?? '';
+  const defaultEnv = DEFAULT_API_KEY_ENV[answers.provider] ?? '';
   if (answers.apiKeyEnv && answers.apiKeyEnv !== defaultEnv) {
     config.apiKeyEnv = answers.apiKeyEnv;
   }
@@ -125,9 +121,7 @@ export async function runInit(): Promise<void> {
     'Configuration',
   );
 
-  p.outro(
-    `Run ${pc.cyan('handover generate')} to analyze your codebase`,
-  );
+  p.outro(`Run ${pc.cyan('handover generate')} to analyze your codebase`);
 }
 
 /**
@@ -151,8 +145,7 @@ function detectProject(): { name: string; language: string } {
   // Detect language from files if not from package.json
   if (language === 'unknown') {
     if (existsSync('tsconfig.json')) language = 'typescript';
-    else if (existsSync('pyproject.toml') || existsSync('setup.py'))
-      language = 'python';
+    else if (existsSync('pyproject.toml') || existsSync('setup.py')) language = 'python';
     else if (existsSync('Cargo.toml')) language = 'rust';
     else if (existsSync('go.mod')) language = 'go';
     else if (existsSync('package.json')) language = 'javascript';

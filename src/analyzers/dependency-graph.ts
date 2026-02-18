@@ -1,12 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parse as parseTOML } from 'smol-toml';
-import type {
-  AnalysisContext,
-  AnalyzerResult,
-  DependencyInfo,
-  DependencyResult,
-} from './types.js';
+import type { AnalysisContext, AnalyzerResult, DependencyInfo, DependencyResult } from './types.js';
 
 /**
  * STAT-02: DependencyGraph Analyzer
@@ -30,14 +25,9 @@ function parsePackageJson(content: string): DependencyInfo[] {
   const pkg = JSON.parse(content) as Record<string, unknown>;
   const deps: DependencyInfo[] = [];
 
-  const extract = (
-    section: unknown,
-    type: DependencyInfo['type'],
-  ) => {
+  const extract = (section: unknown, type: DependencyInfo['type']) => {
     if (!section || typeof section !== 'object') return;
-    for (const [name, version] of Object.entries(
-      section as Record<string, unknown>,
-    )) {
+    for (const [name, version] of Object.entries(section as Record<string, unknown>)) {
       deps.push({ name, version: String(version), type });
     }
   };
@@ -54,14 +44,9 @@ function parseCargoToml(content: string): DependencyInfo[] {
   const cargo = parseTOML(content) as Record<string, unknown>;
   const deps: DependencyInfo[] = [];
 
-  const extractDeps = (
-    section: unknown,
-    type: DependencyInfo['type'],
-  ) => {
+  const extractDeps = (section: unknown, type: DependencyInfo['type']) => {
     if (!section || typeof section !== 'object') return;
-    for (const [name, spec] of Object.entries(
-      section as Record<string, unknown>,
-    )) {
+    for (const [name, spec] of Object.entries(section as Record<string, unknown>)) {
       // Handle both string values ("1.0") and inline tables ({ version = "1.0" })
       const version =
         typeof spec === 'string'
@@ -76,14 +61,8 @@ function parseCargoToml(content: string): DependencyInfo[] {
   };
 
   extractDeps(cargo.dependencies, 'production');
-  extractDeps(
-    (cargo as Record<string, unknown>)['dev-dependencies'],
-    'development',
-  );
-  extractDeps(
-    (cargo as Record<string, unknown>)['build-dependencies'],
-    'development',
-  );
+  extractDeps((cargo as Record<string, unknown>)['dev-dependencies'], 'development');
+  extractDeps((cargo as Record<string, unknown>)['build-dependencies'], 'development');
 
   return deps;
 }
@@ -112,8 +91,7 @@ function parseGoMod(content: string): DependencyInfo[] {
   }
 
   // Match single require lines (not inside blocks)
-  const singleRequireRegex =
-    /^require\s+(\S+)\s+(\S+)/gm;
+  const singleRequireRegex = /^require\s+(\S+)\s+(\S+)/gm;
   let singleMatch: RegExpExecArray | null;
 
   while ((singleMatch = singleRequireRegex.exec(content)) !== null) {
@@ -161,9 +139,7 @@ function parsePyprojectToml(content: string): DependencyInfo[] {
   const pyproject = parseTOML(content) as Record<string, unknown>;
   const deps: DependencyInfo[] = [];
 
-  const project = pyproject.project as
-    | Record<string, unknown>
-    | undefined;
+  const project = pyproject.project as Record<string, unknown> | undefined;
 
   // PEP 621: [project].dependencies
   if (project?.dependencies && Array.isArray(project.dependencies)) {
@@ -180,14 +156,8 @@ function parsePyprojectToml(content: string): DependencyInfo[] {
   }
 
   // [project].optional-dependencies => development
-  if (
-    project?.['optional-dependencies'] &&
-    typeof project['optional-dependencies'] === 'object'
-  ) {
-    const optDeps = project['optional-dependencies'] as Record<
-      string,
-      unknown
-    >;
+  if (project?.['optional-dependencies'] && typeof project['optional-dependencies'] === 'object') {
+    const optDeps = project['optional-dependencies'] as Record<string, unknown>;
     for (const group of Object.values(optDeps)) {
       if (Array.isArray(group)) {
         for (const dep of group) {

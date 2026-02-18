@@ -168,9 +168,20 @@ export const GROUP_ALIASES: Record<string, string[]> = {
   onboard: ['overview', 'getting-started', 'arch', 'files'],
   quality: ['edge-cases', 'tech-debt', 'testing', 'conventions'],
   all: [
-    'index', 'overview', 'getting-started', 'arch', 'files',
-    'features', 'modules', 'deps', 'env', 'edge-cases',
-    'tech-debt', 'conventions', 'testing', 'deploy',
+    'index',
+    'overview',
+    'getting-started',
+    'arch',
+    'files',
+    'features',
+    'modules',
+    'deps',
+    'env',
+    'edge-cases',
+    'tech-debt',
+    'conventions',
+    'testing',
+    'deploy',
   ],
 };
 
@@ -208,7 +219,10 @@ export function resolveSelectedDocs(
     return registry;
   }
 
-  const tokens = onlyFlag.split(',').map((t) => t.trim()).filter(Boolean);
+  const tokens = onlyFlag
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
   const selectedIds = new Set<string>();
 
   for (const token of tokens) {

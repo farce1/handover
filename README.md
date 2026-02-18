@@ -40,22 +40,22 @@ npx handover-cli generate --static-only   # free, no AI calls
 
 handover produces 14 documents that together form a comprehensive knowledge base:
 
-| Document | What it covers |
-|----------|----------------|
-| `00-INDEX.md` | Master index with status and navigation |
-| `01-PROJECT-OVERVIEW.md` | Purpose, tech stack, entry points |
-| `02-GETTING-STARTED.md` | Setup, first run, dev workflow |
-| `03-ARCHITECTURE.md` | System design, patterns, module relationships |
-| `04-FILE-STRUCTURE.md` | Annotated directory tree |
-| `05-FEATURES.md` | Feature inventory with code traces |
-| `06-MODULES.md` | Module-by-module deep dive |
-| `07-DEPENDENCIES.md` | External deps, internal graph, risk assessment |
-| `08-ENVIRONMENT.md` | Env vars, secrets, config files |
-| `09-EDGE-CASES.md` | Gotchas, error handling, failure modes |
-| `10-TECH-DEBT.md` | TODOs, complexity hotspots, refactoring opportunities |
-| `11-CONVENTIONS.md` | Coding patterns, naming, project-specific rules |
-| `12-TESTING.md` | Test strategy, coverage, test file locations |
-| `13-DEPLOYMENT.md` | Build process, CI/CD, deployment targets |
+| Document                 | What it covers                                        |
+| ------------------------ | ----------------------------------------------------- |
+| `00-INDEX.md`            | Master index with status and navigation               |
+| `01-PROJECT-OVERVIEW.md` | Purpose, tech stack, entry points                     |
+| `02-GETTING-STARTED.md`  | Setup, first run, dev workflow                        |
+| `03-ARCHITECTURE.md`     | System design, patterns, module relationships         |
+| `04-FILE-STRUCTURE.md`   | Annotated directory tree                              |
+| `05-FEATURES.md`         | Feature inventory with code traces                    |
+| `06-MODULES.md`          | Module-by-module deep dive                            |
+| `07-DEPENDENCIES.md`     | External deps, internal graph, risk assessment        |
+| `08-ENVIRONMENT.md`      | Env vars, secrets, config files                       |
+| `09-EDGE-CASES.md`       | Gotchas, error handling, failure modes                |
+| `10-TECH-DEBT.md`        | TODOs, complexity hotspots, refactoring opportunities |
+| `11-CONVENTIONS.md`      | Coding patterns, naming, project-specific rules       |
+| `12-TESTING.md`          | Test strategy, coverage, test file locations          |
+| `13-DEPLOYMENT.md`       | Build process, CI/CD, deployment targets              |
 
 Documents are cross-referenced with links and include YAML front-matter for programmatic consumption.
 
@@ -115,16 +115,16 @@ npx handover generate
 
 handover supports 8 LLM providers. Set the appropriate environment variable and optionally configure the provider in `.handover.yml`.
 
-| Provider | Env var | Default model | Local? |
-|----------|---------|---------------|--------|
-| **Anthropic** (default) | `ANTHROPIC_API_KEY` | `claude-opus-4-6` | No |
-| **OpenAI** | `OPENAI_API_KEY` | `gpt-4o` | No |
-| **Ollama** | -- | `llama3.1:8b` | Yes |
-| **Groq** | `GROQ_API_KEY` | `llama-3.3-70b-versatile` | No |
-| **Together** | `TOGETHER_API_KEY` | `Meta-Llama-3.1-70B-Instruct-Turbo` | No |
-| **DeepSeek** | `DEEPSEEK_API_KEY` | `deepseek-chat` | No |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` | `gpt-4o` | No |
-| **Custom** | `LLM_API_KEY` | -- | Varies |
+| Provider                | Env var                | Default model                       | Local? |
+| ----------------------- | ---------------------- | ----------------------------------- | ------ |
+| **Anthropic** (default) | `ANTHROPIC_API_KEY`    | `claude-opus-4-6`                   | No     |
+| **OpenAI**              | `OPENAI_API_KEY`       | `gpt-4o`                            | No     |
+| **Ollama**              | --                     | `llama3.1:8b`                       | Yes    |
+| **Groq**                | `GROQ_API_KEY`         | `llama-3.3-70b-versatile`           | No     |
+| **Together**            | `TOGETHER_API_KEY`     | `Meta-Llama-3.1-70B-Instruct-Turbo` | No     |
+| **DeepSeek**            | `DEEPSEEK_API_KEY`     | `deepseek-chat`                     | No     |
+| **Azure OpenAI**        | `AZURE_OPENAI_API_KEY` | `gpt-4o`                            | No     |
+| **Custom**              | `LLM_API_KEY`          | --                                  | Varies |
 
 ```bash
 # Anthropic (default)
@@ -148,21 +148,21 @@ handover works with zero configuration. For customization, create a `.handover.y
 provider: anthropic
 model: claude-sonnet-4-5
 output: docs/handover
-audience: human           # or "ai" for RAG-optimized output
+audience: human # or "ai" for RAG-optimized output
 
 project:
   name: My Project
-  description: "E-commerce platform for artisan goods"
+  description: 'E-commerce platform for artisan goods'
 
 exclude:
-  - "**/*.generated.ts"
-  - "legacy/**"
+  - '**/*.generated.ts'
+  - 'legacy/**'
 
 contextWindow:
   pin:
-    - "src/core/**"       # always include in AI context
+    - 'src/core/**' # always include in AI context
   boost:
-    - "src/api/**"        # prioritize in context window
+    - 'src/api/**' # prioritize in context window
 ```
 
 Run `handover init` for an interactive config wizard.
@@ -172,29 +172,29 @@ Run `handover init` for an interactive config wizard.
 <details>
 <summary>All config fields</summary>
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `provider` | string | `anthropic` | LLM provider |
-| `model` | string | Provider default | Model name |
-| `output` | string | `./handover` | Output directory |
-| `audience` | string | `human` | `human` or `ai` for RAG-optimized output |
-| `include` | string[] | `["**/*"]` | Glob patterns to include |
-| `exclude` | string[] | `[]` | Glob patterns to exclude |
-| `context` | string | | Additional project context |
-| `costWarningThreshold` | number | `1.00` | Cost warning threshold (USD) |
-| `apiKeyEnv` | string | Provider default | Custom env var for API key |
-| `baseUrl` | string | Provider default | Custom API endpoint |
-| `timeout` | number | Provider default | Request timeout (ms) |
-| `project.name` | string | | Project name override |
-| `project.description` | string | | Brief description |
-| `project.domain` | string | | Business domain |
-| `project.teamSize` | string | | Team size context |
-| `project.deployTarget` | string | | Deployment target |
-| `analysis.concurrency` | number | `4` | Max concurrent API calls |
-| `analysis.staticOnly` | boolean | `false` | Static analysis only |
-| `contextWindow.maxTokens` | number | Auto | Token budget override |
-| `contextWindow.pin` | string[] | `[]` | Files to always include |
-| `contextWindow.boost` | string[] | `[]` | Files to prioritize |
+| Field                     | Type     | Default          | Description                              |
+| ------------------------- | -------- | ---------------- | ---------------------------------------- |
+| `provider`                | string   | `anthropic`      | LLM provider                             |
+| `model`                   | string   | Provider default | Model name                               |
+| `output`                  | string   | `./handover`     | Output directory                         |
+| `audience`                | string   | `human`          | `human` or `ai` for RAG-optimized output |
+| `include`                 | string[] | `["**/*"]`       | Glob patterns to include                 |
+| `exclude`                 | string[] | `[]`             | Glob patterns to exclude                 |
+| `context`                 | string   |                  | Additional project context               |
+| `costWarningThreshold`    | number   | `1.00`           | Cost warning threshold (USD)             |
+| `apiKeyEnv`               | string   | Provider default | Custom env var for API key               |
+| `baseUrl`                 | string   | Provider default | Custom API endpoint                      |
+| `timeout`                 | number   | Provider default | Request timeout (ms)                     |
+| `project.name`            | string   |                  | Project name override                    |
+| `project.description`     | string   |                  | Brief description                        |
+| `project.domain`          | string   |                  | Business domain                          |
+| `project.teamSize`        | string   |                  | Team size context                        |
+| `project.deployTarget`    | string   |                  | Deployment target                        |
+| `analysis.concurrency`    | number   | `4`              | Max concurrent API calls                 |
+| `analysis.staticOnly`     | boolean  | `false`          | Static analysis only                     |
+| `contextWindow.maxTokens` | number   | Auto             | Token budget override                    |
+| `contextWindow.pin`       | string[] | `[]`             | Files to always include                  |
+| `contextWindow.boost`     | string[] | `[]`             | Files to prioritize                      |
 
 </details>
 
@@ -208,15 +208,15 @@ Run the full analysis and documentation pipeline.
 handover generate [options]
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--provider <name>` | LLM provider override |
-| `--model <name>` | Model override |
-| `--only <docs>` | Generate specific docs (comma-separated) |
-| `--audience <mode>` | `human` (default) or `ai` |
-| `--static-only` | Static analysis only, no AI calls (free) |
-| `--no-cache` | Discard cached round results |
-| `-v, --verbose` | Verbose output |
+| Flag                | Description                              |
+| ------------------- | ---------------------------------------- |
+| `--provider <name>` | LLM provider override                    |
+| `--model <name>`    | Model override                           |
+| `--only <docs>`     | Generate specific docs (comma-separated) |
+| `--audience <mode>` | `human` (default) or `ai`                |
+| `--static-only`     | Static analysis only, no AI calls (free) |
+| `--no-cache`        | Discard cached round results             |
+| `-v, --verbose`     | Verbose output                           |
 
 ```bash
 # Full pipeline
@@ -255,13 +255,13 @@ handover init
 
 ## Language support
 
-| Language | Parsing | Notes |
-|----------|---------|-------|
-| TypeScript / JavaScript | Full AST (tree-sitter) | Classes, functions, imports, exports |
-| Python | Full AST (tree-sitter) | Classes, functions, imports |
-| Rust | Full AST (tree-sitter) | Structs, impls, traits, functions |
-| Go | Full AST (tree-sitter) | Types, functions, interfaces |
-| All others | Regex fallback | Function/class detection, best-effort |
+| Language                | Parsing                | Notes                                 |
+| ----------------------- | ---------------------- | ------------------------------------- |
+| TypeScript / JavaScript | Full AST (tree-sitter) | Classes, functions, imports, exports  |
+| Python                  | Full AST (tree-sitter) | Classes, functions, imports           |
+| Rust                    | Full AST (tree-sitter) | Structs, impls, traits, functions     |
+| Go                      | Full AST (tree-sitter) | Types, functions, interfaces          |
+| All others              | Regex fallback         | Function/class detection, best-effort |
 
 Static analysis (file structure, dependencies, git history, TODOs) works with any language.
 

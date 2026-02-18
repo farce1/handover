@@ -44,17 +44,11 @@ export function createRound6Step(
     deps: ['ai-round-2'],
     maxTokens: 4096,
     schema: Round6OutputSchema as z.ZodType<Round6Output>,
-    buildData: (analysis, _config, _getter) =>
-      buildRound6Data(analysis, packedContext),
+    buildData: (analysis, _config, _getter) => buildRound6Data(analysis, packedContext),
     buildFallback: buildRound6Fallback,
     getPriorContexts: (getter) => {
-      const contexts = [
-        getter<Round1Output>(1)?.context,
-        getter<Round2Output>(2)?.context,
-      ];
-      return contexts.filter(
-        (ctx): ctx is NonNullable<typeof ctx> => ctx !== undefined,
-      );
+      const contexts = [getter<Round1Output>(1)?.context, getter<Round2Output>(2)?.context];
+      return contexts.filter((ctx): ctx is NonNullable<typeof ctx> => ctx !== undefined);
     },
   };
 
@@ -125,10 +119,7 @@ const DEPLOYMENT_FILE_PATTERNS = [
 /**
  * Build the round-specific data string for Round 6 focused on deployment signals.
  */
-function buildRound6Data(
-  analysis: StaticAnalysisResult,
-  packedContext: PackedContext,
-): string {
+function buildRound6Data(analysis: StaticAnalysisResult, packedContext: PackedContext): string {
   const sections: string[] = [];
 
   // Env vars from static analysis
@@ -166,10 +157,7 @@ function buildRound6Data(
   }
 
   // Dockerfile/docker-compose presence
-  const dockerFiles = findMatchingFiles(
-    analysis,
-    DEPLOYMENT_FILE_PATTERNS,
-  );
+  const dockerFiles = findMatchingFiles(analysis, DEPLOYMENT_FILE_PATTERNS);
 
   if (dockerFiles.length > 0) {
     sections.push('## Docker Configuration Files');
@@ -179,8 +167,8 @@ function buildRound6Data(
 
     // Include actual content of Dockerfiles from packed context if available
     for (const dockerFile of dockerFiles) {
-      const packed = packedContext.files.find((f) =>
-        f.path === dockerFile || f.path.endsWith(dockerFile),
+      const packed = packedContext.files.find(
+        (f) => f.path === dockerFile || f.path.endsWith(dockerFile),
       );
       if (packed && packed.tier !== 'skip') {
         sections.push(`### Content of ${dockerFile}`);
@@ -203,9 +191,7 @@ function buildRound6Data(
 
     // Include actual content of CI configs from packed context
     for (const ciFile of ciFiles) {
-      const packed = packedContext.files.find((f) =>
-        f.path === ciFile || f.path.endsWith(ciFile),
-      );
+      const packed = packedContext.files.find((f) => f.path === ciFile || f.path.endsWith(ciFile));
       if (packed && packed.tier !== 'skip') {
         sections.push(`### Content of ${ciFile}`);
         sections.push('```');
@@ -222,9 +208,7 @@ function buildRound6Data(
     sections.push('## Package Manifests');
     for (const manifest of manifests) {
       sections.push(`  ${manifest.file} (${manifest.packageManager})`);
-      const prodDeps = manifest.dependencies
-        .filter((d) => d.type === 'production')
-        .slice(0, 15);
+      const prodDeps = manifest.dependencies.filter((d) => d.type === 'production').slice(0, 15);
       if (prodDeps.length > 0) {
         sections.push('  Production dependencies:');
         for (const dep of prodDeps) {
@@ -236,9 +220,7 @@ function buildRound6Data(
     // Include actual content of package.json from packed context
     // (may contain scripts section with build/deploy commands)
     for (const manifest of manifests) {
-      const packed = packedContext.files.find((f) =>
-        f.path === manifest.file,
-      );
+      const packed = packedContext.files.find((f) => f.path === manifest.file);
       if (packed && packed.tier !== 'skip') {
         sections.push(`### Content of ${manifest.file}`);
         sections.push('```');
@@ -260,8 +242,8 @@ function buildRound6Data(
 
     // Include actual content if available
     for (const infraFile of infraFiles) {
-      const packed = packedContext.files.find((f) =>
-        f.path === infraFile || f.path.endsWith(infraFile),
+      const packed = packedContext.files.find(
+        (f) => f.path === infraFile || f.path.endsWith(infraFile),
       );
       if (packed && packed.tier !== 'skip') {
         sections.push(`### Content of ${infraFile}`);
@@ -290,18 +272,12 @@ function buildRound6Data(
 /**
  * Find files in the directory tree matching any of the given patterns.
  */
-function findMatchingFiles(
-  analysis: StaticAnalysisResult,
-  patterns: string[],
-): string[] {
+function findMatchingFiles(analysis: StaticAnalysisResult, patterns: string[]): string[] {
   const matches: string[] = [];
 
   for (const entry of analysis.fileTree.directoryTree) {
     for (const pattern of patterns) {
-      if (
-        entry.path.includes(pattern) ||
-        entry.path.endsWith(pattern)
-      ) {
+      if (entry.path.includes(pattern) || entry.path.endsWith(pattern)) {
         matches.push(entry.path);
         break; // Only add once per entry
       }

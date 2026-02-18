@@ -27,10 +27,7 @@ export class AnalysisCache {
     if (!existsSync(this.cachePath)) return;
     try {
       const raw = await readFile(this.cachePath, 'utf-8');
-      const data = JSON.parse(raw) as Record<
-        string,
-        { hash: string; analyzedAt: number }
-      >;
+      const data = JSON.parse(raw) as Record<string, { hash: string; analyzedAt: number }>;
       for (const [key, value] of Object.entries(data)) {
         this.entries.set(key, value);
       }
@@ -65,10 +62,7 @@ export class AnalysisCache {
   async save(): Promise<void> {
     if (!this.dirty) return;
     await mkdir(dirname(this.cachePath), { recursive: true });
-    await writeFile(
-      this.cachePath,
-      JSON.stringify(Object.fromEntries(this.entries), null, 2),
-    );
+    await writeFile(this.cachePath, JSON.stringify(Object.fromEntries(this.entries), null, 2));
   }
 
   /**

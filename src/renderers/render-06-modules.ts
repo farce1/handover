@@ -1,5 +1,5 @@
 import type { RenderContext } from './types.js';
-import { codeRef, buildTable, sectionIntro } from './utils.js';
+import { codeRef, buildTable } from './utils.js';
 import { buildModuleDiagram } from './mermaid.js';
 import { renderDocument, collectRoundsUsed, pushStructuredBlock } from './render-template.js';
 
@@ -16,9 +16,7 @@ export function renderModules(ctx: RenderContext): string {
   const r2 = ctx.rounds.r2?.data;
   const hasR2 = !!r2;
 
-  const modules = hasR2
-    ? r2.modules
-    : deriveModulesFromFileTree(ctx);
+  const modules = hasR2 ? r2.modules : deriveModulesFromFileTree(ctx);
 
   if (modules.length === 0) return '';
 
@@ -38,7 +36,9 @@ export function renderModules(ctx: RenderContext): string {
     renderBody: (lines) => {
       // Warning banner if static-only
       if (!hasR2) {
-        lines.push('> **Note:** AI analysis for this section was unavailable. Content is based on static analysis only and may be incomplete.');
+        lines.push(
+          '> **Note:** AI analysis for this section was unavailable. Content is based on static analysis only and may be incomplete.',
+        );
         lines.push('');
       }
 
@@ -51,15 +51,17 @@ export function renderModules(ctx: RenderContext): string {
       // ── Module Overview ─────────────────────────────────────────────
       lines.push('## Module Overview');
       lines.push('');
-      lines.push(buildTable(
-        ['Name', 'Path', 'Purpose', 'Files Count'],
-        modules.map((mod) => [
-          mod.name,
-          codeRef(mod.path),
-          mod.purpose,
-          String(mod.files.length),
-        ]),
-      ));
+      lines.push(
+        buildTable(
+          ['Name', 'Path', 'Purpose', 'Files Count'],
+          modules.map((mod) => [
+            mod.name,
+            codeRef(mod.path),
+            mod.purpose,
+            String(mod.files.length),
+          ]),
+        ),
+      );
       lines.push('');
 
       // ── Module Details ──────────────────────────────────────────────
@@ -114,15 +116,12 @@ export function renderModules(ctx: RenderContext): string {
       if (hasR2 && r2.relationships.length > 0) {
         lines.push('## Module Relationships');
         lines.push('');
-        lines.push(buildTable(
-          ['From', 'To', 'Type', 'Evidence'],
-          r2.relationships.map((rel) => [
-            rel.from,
-            rel.to,
-            rel.type,
-            rel.evidence,
-          ]),
-        ));
+        lines.push(
+          buildTable(
+            ['From', 'To', 'Type', 'Evidence'],
+            r2.relationships.map((rel) => [rel.from, rel.to, rel.type, rel.evidence]),
+          ),
+        );
         lines.push('');
       }
 

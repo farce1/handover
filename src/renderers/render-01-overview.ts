@@ -83,14 +83,10 @@ export function renderOverview(ctx: RenderContext): string {
           `- **Project scale:** ${r1.projectScale.fileCount} files, ${r1.projectScale.estimatedComplexity} complexity`,
         );
         if (r1.projectScale.mainConcerns.length > 0) {
-          lines.push(
-            `- **Main concerns:** ${r1.projectScale.mainConcerns.join(', ')}`,
-          );
+          lines.push(`- **Main concerns:** ${r1.projectScale.mainConcerns.join(', ')}`);
         }
       } else {
-        const langBreakdown = Object.entries(
-          ctx.staticAnalysis.fileTree.filesByExtension,
-        )
+        const langBreakdown = Object.entries(ctx.staticAnalysis.fileTree.filesByExtension)
           .sort(([, a], [, b]) => b - a)
           .slice(0, 5);
         for (const [ext, count] of langBreakdown) {

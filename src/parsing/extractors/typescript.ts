@@ -1,8 +1,18 @@
 import type { Tree, Node as SyntaxNode } from 'web-tree-sitter';
 
 import { LanguageExtractor, type ExtractorResult } from './base.js';
-import { findChildByType, findChildrenByType, getFieldNode, hasChildOfType, getNamedChildren } from '../utils/node-helpers.js';
-import { getText, getTextTrimmed, getDocstringAbove, getDecoratorTexts } from '../utils/text-extract.js';
+import {
+  findChildByType,
+  getFieldNode,
+  hasChildOfType,
+  getNamedChildren,
+} from '../utils/node-helpers.js';
+import {
+  getText,
+  getTextTrimmed,
+  getDocstringAbove,
+  getDecoratorTexts,
+} from '../utils/text-extract.js';
 import type {
   FunctionSymbol,
   ClassSymbol,
@@ -40,11 +50,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
 
   // ─── Top-level AST walking ───────────────────────────────────────────────
 
-  private walkProgram(
-    root: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private walkProgram(root: SyntaxNode, source: string, result: ExtractorResult): void {
     for (const child of getNamedChildren(root)) {
       switch (child.type) {
         case 'function_declaration':
@@ -132,8 +138,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
 
     // Generator detection
     const isGenerator =
-      node.type === 'generator_function_declaration' ||
-      node.type === 'generator_function';
+      node.type === 'generator_function_declaration' || node.type === 'generator_function';
 
     const docstring = this.getDocstring(node, source);
     const decorators = getDecoratorTexts(node, source);
@@ -142,12 +147,8 @@ export class TypeScriptExtractor extends LanguageExtractor {
       kind: 'function',
       name,
       parameters: paramsNode ? this.extractParameters(paramsNode, source) : [],
-      returnType: returnTypeNode
-        ? this.extractTypeAnnotation(returnTypeNode, source)
-        : undefined,
-      typeParameters: typeParamsNode
-        ? this.extractTypeParameters(typeParamsNode, source)
-        : [],
+      returnType: returnTypeNode ? this.extractTypeAnnotation(returnTypeNode, source) : undefined,
+      typeParameters: typeParamsNode ? this.extractTypeParameters(typeParamsNode, source) : [],
       isAsync,
       isGenerator,
       visibility: contextVisibility ?? 'public',
@@ -174,8 +175,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
 
     const isAsync = this.hasKeywordChild(funcNode, 'async');
     const isGenerator =
-      funcNode.type === 'generator_function' ||
-      funcNode.type === 'generator_function_expression';
+      funcNode.type === 'generator_function' || funcNode.type === 'generator_function_expression';
 
     const docstring = getDocstringAbove(outerNode, source);
     const decorators = getDecoratorTexts(outerNode, source);
@@ -183,20 +183,14 @@ export class TypeScriptExtractor extends LanguageExtractor {
     // Check for JSX return (component detection)
     const bodyNode = getFieldNode(funcNode, 'body');
     const hasJsx = bodyNode ? this.containsJsx(bodyNode) : false;
-    const allDecorators = hasJsx
-      ? [...decorators, '@component']
-      : decorators;
+    const allDecorators = hasJsx ? [...decorators, '@component'] : decorators;
 
     return {
       kind: 'function',
       name,
       parameters: paramsNode ? this.extractParameters(paramsNode, source) : [],
-      returnType: returnTypeNode
-        ? this.extractTypeAnnotation(returnTypeNode, source)
-        : undefined,
-      typeParameters: typeParamsNode
-        ? this.extractTypeParameters(typeParamsNode, source)
-        : [],
+      returnType: returnTypeNode ? this.extractTypeAnnotation(returnTypeNode, source) : undefined,
+      typeParameters: typeParamsNode ? this.extractTypeParameters(typeParamsNode, source) : [],
       isAsync,
       isGenerator,
       visibility: 'public',
@@ -209,10 +203,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
 
   // ─── Parameter extraction ────────────────────────────────────────────────
 
-  private extractParameters(
-    paramsNode: SyntaxNode,
-    source: string,
-  ): Parameter[] {
+  private extractParameters(paramsNode: SyntaxNode, source: string): Parameter[] {
     const params: Parameter[] = [];
 
     for (const child of getNamedChildren(paramsNode)) {
@@ -246,10 +237,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
     return params;
   }
 
-  private extractSingleParameter(
-    node: SyntaxNode,
-    source: string,
-  ): Parameter | null {
+  private extractSingleParameter(node: SyntaxNode, source: string): Parameter | null {
     // Look for pattern/name
     const patternNode = getFieldNode(node, 'pattern');
     const nameIdentifier = patternNode ?? findChildByType(node, 'identifier');
@@ -273,7 +261,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
     // Check for rest parameter
     const isRest =
       node.type === 'rest_pattern' ||
-      (patternNode?.type === 'rest_pattern') ||
+      patternNode?.type === 'rest_pattern' ||
       this.hasChildType(node, 'rest_pattern');
 
     // Type annotation
@@ -297,10 +285,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
 
   // ─── Class extraction ────────────────────────────────────────────────────
 
-  private extractClass(
-    node: SyntaxNode,
-    source: string,
-  ): ClassSymbol | null {
+  private extractClass(node: SyntaxNode, source: string): ClassSymbol | null {
     const nameNode = getFieldNode(node, 'name');
     if (!nameNode) return null;
 
@@ -362,9 +347,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
     return {
       kind: 'class',
       name,
-      typeParameters: typeParamsNode
-        ? this.extractTypeParameters(typeParamsNode, source)
-        : [],
+      typeParameters: typeParamsNode ? this.extractTypeParameters(typeParamsNode, source) : [],
       extends: extendsArr,
       implements: implementsArr,
       mixins: [],
@@ -403,10 +386,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
     }
   }
 
-  private extractMethodDefinition(
-    node: SyntaxNode,
-    source: string,
-  ): FunctionSymbol | null {
+  private extractMethodDefinition(node: SyntaxNode, source: string): FunctionSymbol | null {
     const nameNode = getFieldNode(node, 'name');
     if (!nameNode) return null;
 
@@ -423,7 +403,8 @@ export class TypeScriptExtractor extends LanguageExtractor {
     const isAsync = this.hasKeywordChild(node, 'async');
     const isAbstract = this.hasKeywordChild(node, 'abstract');
     const isOverride = this.hasKeywordChild(node, 'override');
-    const isGenerator = node.type === 'generator_function_declaration' ||
+    const isGenerator =
+      node.type === 'generator_function_declaration' ||
       this.hasChildType(node, 'generator_function');
 
     // Get/set accessor
@@ -449,12 +430,8 @@ export class TypeScriptExtractor extends LanguageExtractor {
       kind: 'function',
       name: methodName,
       parameters: paramsNode ? this.extractParameters(paramsNode, source) : [],
-      returnType: returnTypeNode
-        ? this.extractTypeAnnotation(returnTypeNode, source)
-        : undefined,
-      typeParameters: typeParamsNode
-        ? this.extractTypeParameters(typeParamsNode, source)
-        : [],
+      returnType: returnTypeNode ? this.extractTypeAnnotation(returnTypeNode, source) : undefined,
+      typeParameters: typeParamsNode ? this.extractTypeParameters(typeParamsNode, source) : [],
       isAsync,
       isGenerator,
       visibility,
@@ -465,10 +442,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
     };
   }
 
-  private extractFieldDefinition(
-    node: SyntaxNode,
-    source: string,
-  ): Field | null {
+  private extractFieldDefinition(node: SyntaxNode, source: string): Field | null {
     const nameNode = getFieldNode(node, 'name');
     if (!nameNode) {
       // Some grammars use 'property_name' or first identifier
@@ -497,10 +471,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
 
   // ─── Interface extraction ────────────────────────────────────────────────
 
-  private extractInterface(
-    node: SyntaxNode,
-    source: string,
-  ): ClassSymbol | null {
+  private extractInterface(node: SyntaxNode, source: string): ClassSymbol | null {
     const nameNode = getFieldNode(node, 'name');
     if (!nameNode) return null;
 
@@ -549,9 +520,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
     return {
       kind: 'class',
       name,
-      typeParameters: typeParamsNode
-        ? this.extractTypeParameters(typeParamsNode, source)
-        : [],
+      typeParameters: typeParamsNode ? this.extractTypeParameters(typeParamsNode, source) : [],
       extends: extendsArr,
       implements: [],
       mixins: [],
@@ -565,10 +534,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
     };
   }
 
-  private extractMethodSignature(
-    node: SyntaxNode,
-    source: string,
-  ): FunctionSymbol | null {
+  private extractMethodSignature(node: SyntaxNode, source: string): FunctionSymbol | null {
     const nameNode = getFieldNode(node, 'name');
     if (!nameNode) return null;
 
@@ -580,12 +546,8 @@ export class TypeScriptExtractor extends LanguageExtractor {
       kind: 'function',
       name: getText(nameNode, source),
       parameters: paramsNode ? this.extractParameters(paramsNode, source) : [],
-      returnType: returnTypeNode
-        ? this.extractTypeAnnotation(returnTypeNode, source)
-        : undefined,
-      typeParameters: typeParamsNode
-        ? this.extractTypeParameters(typeParamsNode, source)
-        : [],
+      returnType: returnTypeNode ? this.extractTypeAnnotation(returnTypeNode, source) : undefined,
+      typeParameters: typeParamsNode ? this.extractTypeParameters(typeParamsNode, source) : [],
       isAsync: false,
       isGenerator: false,
       visibility: 'public',
@@ -596,10 +558,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
     };
   }
 
-  private extractPropertySignature(
-    node: SyntaxNode,
-    source: string,
-  ): Field | null {
+  private extractPropertySignature(node: SyntaxNode, source: string): Field | null {
     const nameNode = getFieldNode(node, 'name');
     if (!nameNode) return null;
 
@@ -616,13 +575,9 @@ export class TypeScriptExtractor extends LanguageExtractor {
 
   // ─── Import extraction ───────────────────────────────────────────────────
 
-  private extractImport(
-    node: SyntaxNode,
-    source: string,
-  ): ImportInfo | null {
+  private extractImport(node: SyntaxNode, source: string): ImportInfo | null {
     // Find source string (module path)
-    const sourceNode = getFieldNode(node, 'source')
-      ?? findChildByType(node, 'string');
+    const sourceNode = getFieldNode(node, 'source') ?? findChildByType(node, 'string');
     if (!sourceNode) return null;
 
     const importSource = this.stripQuotes(getText(sourceNode, source));
@@ -698,22 +653,15 @@ export class TypeScriptExtractor extends LanguageExtractor {
 
   // ─── Export extraction ───────────────────────────────────────────────────
 
-  private handleExportStatement(
-    node: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private handleExportStatement(node: SyntaxNode, source: string, result: ExtractorResult): void {
     const line = node.startPosition.row + 1;
 
     // Check for type-only export
     const isTypeOnly = this.hasKeywordChild(node, 'type');
 
     // Check for re-export source: export { X } from './module'
-    const sourceNode = getFieldNode(node, 'source')
-      ?? findChildByType(node, 'string');
-    const reExportSource = sourceNode
-      ? this.stripQuotes(getText(sourceNode, source))
-      : undefined;
+    const sourceNode = getFieldNode(node, 'source') ?? findChildByType(node, 'string');
+    const reExportSource = sourceNode ? this.stripQuotes(getText(sourceNode, source)) : undefined;
 
     // Check for wildcard/barrel re-export: export * from './module'
     if (this.hasChildText(node, '*') && reExportSource) {
@@ -744,7 +692,9 @@ export class TypeScriptExtractor extends LanguageExtractor {
           const aliasNode = getFieldNode(spec, 'alias');
           const exportName = aliasNode
             ? getText(aliasNode, source)
-            : (nameNode ? getText(nameNode, source) : '');
+            : nameNode
+              ? getText(nameNode, source)
+              : '';
 
           const exportInfo: ExportInfo = {
             name: exportName,
@@ -930,9 +880,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
         const constant: ConstantSymbol = {
           kind: 'constant',
           name,
-          type: typeAnnotation
-            ? this.extractTypeAnnotation(typeAnnotation, source)
-            : undefined,
+          type: typeAnnotation ? this.extractTypeAnnotation(typeAnnotation, source) : undefined,
           value: valueNode ? this.getShortValue(valueNode, source) : undefined,
           isExported: true,
           docstring: getDocstringAbove(node, source),
@@ -1003,10 +951,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
 
   // ─── Type parameter extraction ───────────────────────────────────────────
 
-  private extractTypeParameters(
-    node: SyntaxNode,
-    source: string,
-  ): string[] {
+  private extractTypeParameters(node: SyntaxNode, source: string): string[] {
     const params: string[] = [];
 
     for (const child of getNamedChildren(node)) {
@@ -1020,10 +965,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
 
   // ─── Type annotation extraction ──────────────────────────────────────────
 
-  private extractTypeAnnotation(
-    node: SyntaxNode,
-    source: string,
-  ): string {
+  private extractTypeAnnotation(node: SyntaxNode, source: string): string {
     // type_annotation nodes have ': Type' -- strip the colon prefix
     const text = getTextTrimmed(node, source);
     return text.replace(/^:\s*/, '');
@@ -1104,9 +1046,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
     return false;
   }
 
-  private getAccessibilityModifier(
-    node: SyntaxNode,
-  ): 'public' | 'private' | 'protected' {
+  private getAccessibilityModifier(node: SyntaxNode): 'public' | 'private' | 'protected' {
     const accessMod = findChildByType(node, 'accessibility_modifier');
     if (accessMod) {
       const text = accessMod.text;
@@ -1122,10 +1062,7 @@ export class TypeScriptExtractor extends LanguageExtractor {
     return 'public';
   }
 
-  private getMethodDecorators(
-    node: SyntaxNode,
-    source: string,
-  ): string[] {
+  private getMethodDecorators(node: SyntaxNode, source: string): string[] {
     // Method decorators appear as preceding sibling decorator nodes
     const decorators: string[] = [];
     let sibling = node.previousNamedSibling;

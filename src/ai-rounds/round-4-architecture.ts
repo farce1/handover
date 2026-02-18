@@ -6,12 +6,7 @@ import type { HandoverConfig } from '../config/schema.js';
 import type { TokenUsageTracker } from '../context/tracker.js';
 import type { StepDefinition } from '../orchestrator/types.js';
 import type { RoundExecutionResult } from './types.js';
-import type {
-  Round1Output,
-  Round2Output,
-  Round3Output,
-  Round4Output,
-} from './schemas.js';
+import type { Round1Output, Round2Output, Round3Output, Round4Output } from './schemas.js';
 import type { StandardRoundConfig } from './round-factory.js';
 import { Round4OutputSchema } from './schemas.js';
 import { buildRound4Fallback } from './fallbacks.js';
@@ -40,9 +35,7 @@ export const ROUND_4_CONFIG: StandardRoundConfig<Round4Output> = {
       getter<Round2Output>(2)?.context,
       getter<Round3Output>(3)?.context,
     ];
-    return contexts.filter(
-      (ctx): ctx is NonNullable<typeof ctx> => ctx !== undefined,
-    );
+    return contexts.filter((ctx): ctx is NonNullable<typeof ctx> => ctx !== undefined);
   },
 };
 
@@ -116,9 +109,7 @@ function buildRound4Data(
     if (round2Data.relationships.length > 0) {
       sections.push('## Module Relationships (from Round 2)');
       for (const rel of round2Data.relationships) {
-        sections.push(
-          `  ${rel.from} -> ${rel.to} (${rel.type}): ${rel.evidence}`,
-        );
+        sections.push(`  ${rel.from} -> ${rel.to} (${rel.type}): ${rel.evidence}`);
       }
       sections.push('');
     }
@@ -151,9 +142,7 @@ function buildRound4Data(
       sections.push('## Features (from Round 3)');
       for (const feat of round3Data.features.slice(0, 20)) {
         const modList = feat.modules.join(', ');
-        sections.push(
-          `  ${feat.name}: ${feat.description} [modules: ${modList}]`,
-        );
+        sections.push(`  ${feat.name}: ${feat.description} [modules: ${modList}]`);
       }
       sections.push('');
     }

@@ -43,7 +43,8 @@ export function createRound1Step(
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): StepDefinition {
   // Round 1 has no prior results, so the getter always returns undefined
-  const roundGetter = <U>(_n: number) => undefined as (import('./types.js').RoundExecutionResult<U> | undefined);
+  const roundGetter = <U>(_n: number) =>
+    undefined as import('./types.js').RoundExecutionResult<U> | undefined;
 
   return createStandardRoundStep(
     ROUND_1_CONFIG,
@@ -65,10 +66,7 @@ export function createRound1Step(
  * Includes file tree summary, dependency summary, git history, docs coverage,
  * and business context from config.
  */
-function buildRound1Data(
-  analysis: StaticAnalysisResult,
-  config: HandoverConfig,
-): string {
+function buildRound1Data(analysis: StaticAnalysisResult, config: HandoverConfig): string {
   const sections: string[] = [];
 
   // File tree summary
@@ -98,9 +96,7 @@ function buildRound1Data(
 
   // Dependency summary
   const deps = analysis.dependencies.manifests
-    .flatMap((m) =>
-      m.dependencies.map((d) => `  ${d.name}@${d.version} (${d.type})`),
-    )
+    .flatMap((m) => m.dependencies.map((d) => `  ${d.name}@${d.version} (${d.type})`))
     .slice(0, 30);
 
   if (deps.length > 0) {
@@ -146,11 +142,7 @@ function buildRound1Data(
 
   // Business context from config
   if (config.context) {
-    sections.push(
-      '',
-      '## Business Context (from project configuration)',
-      config.context,
-    );
+    sections.push('', '## Business Context (from project configuration)', config.context);
   }
 
   if (config.project?.name || config.project?.description || config.project?.domain) {

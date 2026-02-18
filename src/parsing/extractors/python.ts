@@ -1,18 +1,14 @@
 import type { Tree, Node as SyntaxNode } from 'web-tree-sitter';
 
 import { LanguageExtractor, type ExtractorResult } from './base.js';
-import { findChildByType, findChildrenByType, getFieldNode, getNamedChildren } from '../utils/node-helpers.js';
-import { getText, getTextTrimmed, getDocstringAbove, getDecoratorTexts } from '../utils/text-extract.js';
-import type {
-  FunctionSymbol,
-  ClassSymbol,
-  ImportInfo,
-  ImportSpecifier,
-  ExportInfo,
-  ConstantSymbol,
-  Parameter,
-  Field,
-} from '../types.js';
+import { getFieldNode, getNamedChildren } from '../utils/node-helpers.js';
+import {
+  getText,
+  getTextTrimmed,
+  getDocstringAbove,
+  getDecoratorTexts,
+} from '../utils/text-extract.js';
+import type { FunctionSymbol, ClassSymbol, ImportSpecifier, Parameter, Field } from '../types.js';
 
 // ─── Python extractor ───────────────────────────────────────────────────────
 
@@ -40,11 +36,7 @@ export class PythonExtractor extends LanguageExtractor {
 
   // ─── Top-level module walking ──────────────────────────────────────────
 
-  private walkModule(
-    root: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private walkModule(root: SyntaxNode, source: string, result: ExtractorResult): void {
     // Track __all__ for explicit re-exports
     let allExports: string[] | null = null;
 
@@ -162,10 +154,7 @@ export class PythonExtractor extends LanguageExtractor {
 
   private findInnerDefinition(node: SyntaxNode): SyntaxNode | null {
     for (const child of getNamedChildren(node)) {
-      if (
-        child.type === 'function_definition' ||
-        child.type === 'class_definition'
-      ) {
+      if (child.type === 'function_definition' || child.type === 'class_definition') {
         return child;
       }
       // Nested decorated_definition (multiple decorators)
@@ -201,19 +190,13 @@ export class PythonExtractor extends LanguageExtractor {
     const decorators = getDecoratorTexts(node, source);
 
     // Docstring from first statement in body
-    const docstring = bodyNode
-      ? this.extractPythonDocstring(bodyNode, source)
-      : undefined;
+    const docstring = bodyNode ? this.extractPythonDocstring(bodyNode, source) : undefined;
 
     return {
       kind: 'function',
       name,
-      parameters: paramsNode
-        ? this.extractParameters(paramsNode, source, isMethod)
-        : [],
-      returnType: returnTypeNode
-        ? this.extractReturnType(returnTypeNode, source)
-        : undefined,
+      parameters: paramsNode ? this.extractParameters(paramsNode, source, isMethod) : [],
+      returnType: returnTypeNode ? this.extractReturnType(returnTypeNode, source) : undefined,
       typeParameters: [], // Python doesn't have type parameters on functions (TypeVar is different)
       isAsync,
       isGenerator: false, // Python generators use 'yield' in body; not easily detectable from signature
@@ -377,10 +360,7 @@ export class PythonExtractor extends LanguageExtractor {
 
   // ─── Return type extraction ────────────────────────────────────────────
 
-  private extractReturnType(
-    node: SyntaxNode,
-    source: string,
-  ): string {
+  private extractReturnType(node: SyntaxNode, source: string): string {
     // return_type has -> type_annotation; strip the arrow
     const text = getTextTrimmed(node, source);
     return text.replace(/^->\s*/, '');
@@ -388,10 +368,7 @@ export class PythonExtractor extends LanguageExtractor {
 
   // ─── Class extraction ─────────────────────────────────────────────────
 
-  private extractClass(
-    node: SyntaxNode,
-    source: string,
-  ): ClassSymbol | null {
+  private extractClass(node: SyntaxNode, source: string): ClassSymbol | null {
     const nameNode = getFieldNode(node, 'name');
     if (!nameNode) return null;
 
@@ -448,7 +425,7 @@ export class PythonExtractor extends LanguageExtractor {
     source: string,
     methods: FunctionSymbol[],
     fields: Field[],
-    className: string,
+    _className: string,
   ): void {
     for (const child of getNamedChildren(bodyNode)) {
       switch (child.type) {
@@ -490,11 +467,7 @@ export class PythonExtractor extends LanguageExtractor {
     }
   }
 
-  private extractInitFields(
-    initNode: SyntaxNode,
-    source: string,
-    fields: Field[],
-  ): void {
+  private extractInitFields(initNode: SyntaxNode, source: string, fields: Field[]): void {
     const bodyNode = getFieldNode(initNode, 'body');
     if (!bodyNode) return;
 
@@ -538,11 +511,7 @@ export class PythonExtractor extends LanguageExtractor {
     }
   }
 
-  private extractClassAttribute(
-    stmtNode: SyntaxNode,
-    source: string,
-    fields: Field[],
-  ): void {
+  private extractClassAttribute(stmtNode: SyntaxNode, source: string, fields: Field[]): void {
     const expr = getNamedChildren(stmtNode)[0];
     if (!expr) return;
 
@@ -564,11 +533,7 @@ export class PythonExtractor extends LanguageExtractor {
 
   // ─── Import extraction ─────────────────────────────────────────────────
 
-  private extractImportStatement(
-    node: SyntaxNode,
-    source: string,
-    result: ExtractorResult,
-  ): void {
+  private extractImportStatement(node: SyntaxNode, source: string, result: ExtractorResult): void {
     // import X, Y, Z
     const specifiers: ImportSpecifier[] = [];
 
@@ -718,10 +683,7 @@ export class PythonExtractor extends LanguageExtractor {
    * Find and parse __all__ assignment in the module.
    * Returns the list of exported names, or null if __all__ is not found.
    */
-  private findAllExports(
-    root: SyntaxNode,
-    source: string,
-  ): string[] | null {
+  private findAllExports(root: SyntaxNode, source: string): string[] | null {
     for (const child of getNamedChildren(root)) {
       if (child.type === 'expression_statement') {
         const expr = getNamedChildren(child)[0];
@@ -738,10 +700,7 @@ export class PythonExtractor extends LanguageExtractor {
     return null;
   }
 
-  private parseListLiteral(
-    node: SyntaxNode,
-    source: string,
-  ): string[] {
+  private parseListLiteral(node: SyntaxNode, source: string): string[] {
     const names: string[] = [];
 
     if (node.type === 'list' || node.type === 'tuple') {
@@ -762,10 +721,7 @@ export class PythonExtractor extends LanguageExtractor {
    * Extract Python docstring from the first statement in a body block.
    * Python docstrings are the first expression_statement containing a string literal.
    */
-  private extractPythonDocstring(
-    bodyNode: SyntaxNode,
-    source: string,
-  ): string | undefined {
+  private extractPythonDocstring(bodyNode: SyntaxNode, source: string): string | undefined {
     const children = getNamedChildren(bodyNode);
     if (children.length === 0) return undefined;
 
@@ -853,10 +809,7 @@ export class PythonExtractor extends LanguageExtractor {
   }
 
   private stripPythonQuotes(str: string): string {
-    if (
-      (str.startsWith("'") && str.endsWith("'")) ||
-      (str.startsWith('"') && str.endsWith('"'))
-    ) {
+    if ((str.startsWith("'") && str.endsWith("'")) || (str.startsWith('"') && str.endsWith('"'))) {
       return str.slice(1, -1);
     }
     // Triple quotes

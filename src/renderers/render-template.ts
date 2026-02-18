@@ -25,17 +25,19 @@ export function renderDocument(ctx: RenderContext, options: RenderDocumentOption
   const lines: string[] = [];
 
   // YAML front-matter
-  lines.push(buildFrontMatter({
-    title: options.title,
-    document_id: options.documentId,
-    category: options.category,
-    project: ctx.projectName,
-    generated_at: ctx.generatedAt,
-    handover_version: '0.1.0',
-    audience: ctx.audience,
-    ai_rounds_used: options.aiRoundsUsed,
-    status: options.status,
-  }));
+  lines.push(
+    buildFrontMatter({
+      title: options.title,
+      document_id: options.documentId,
+      category: options.category,
+      project: ctx.projectName,
+      generated_at: ctx.generatedAt,
+      handover_version: '0.1.0',
+      audience: ctx.audience,
+      ai_rounds_used: options.aiRoundsUsed,
+      status: options.status,
+    }),
+  );
 
   // Title heading (strip number prefix from title if no explicit heading)
   const heading = options.heading ?? options.title.replace(/^\d+\s*-\s*/, '');
@@ -67,7 +69,12 @@ export function renderDocument(ctx: RenderContext, options: RenderDocumentOption
 export function collectRoundsUsed(ctx: RenderContext, ...roundNumbers: number[]): number[] {
   const used: number[] = [];
   const roundKeys: Record<number, keyof RenderContext['rounds']> = {
-    1: 'r1', 2: 'r2', 3: 'r3', 4: 'r4', 5: 'r5', 6: 'r6',
+    1: 'r1',
+    2: 'r2',
+    3: 'r3',
+    4: 'r4',
+    5: 'r5',
+    6: 'r6',
   };
   for (const n of roundNumbers) {
     const key = roundKeys[n];

@@ -3,7 +3,7 @@ import type { LLMProvider } from './base.js';
 import { AnthropicProvider } from './anthropic.js';
 import { OpenAICompatibleProvider } from './openai-compat.js';
 import { PROVIDER_PRESETS, type ProviderPreset } from './presets.js';
-import { DEFAULT_API_KEY_ENV, DEFAULT_CONCURRENCY } from '../config/defaults.js';
+import { DEFAULT_CONCURRENCY } from '../config/defaults.js';
 import { ProviderError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 
@@ -60,10 +60,14 @@ export function validateProviderConfig(config: HandoverConfig): void {
     }
 
     // Warn on unknown model (non-blocking)
-    if (config.model && preset.supportedModels.length > 0 && !preset.supportedModels.includes(config.model)) {
+    if (
+      config.model &&
+      preset.supportedModels.length > 0 &&
+      !preset.supportedModels.includes(config.model)
+    ) {
       logger.warn(
         `Model "${config.model}" is not in the known models for ${preset.displayName}. ` +
-        `Known models: ${preset.supportedModels.join(', ')}. Proceeding anyway.`,
+          `Known models: ${preset.supportedModels.join(', ')}. Proceeding anyway.`,
       );
     }
   }
@@ -111,13 +115,7 @@ export function createProvider(config: HandoverConfig): LLMProvider {
       timeoutMs: config.timeout ?? 120_000,
     };
 
-    return new OpenAICompatibleProvider(
-      customPreset,
-      apiKey,
-      model,
-      concurrency,
-      config.baseUrl,
-    );
+    return new OpenAICompatibleProvider(customPreset, apiKey, model, concurrency, config.baseUrl);
   }
 
   // Resolve configuration with preset fallbacks
@@ -133,13 +131,7 @@ export function createProvider(config: HandoverConfig): LLMProvider {
       return new AnthropicProvider(apiKey, model, concurrency);
 
     case 'openai-compat':
-      return new OpenAICompatibleProvider(
-        preset,
-        apiKey,
-        model,
-        concurrency,
-        config.baseUrl,
-      );
+      return new OpenAICompatibleProvider(preset, apiKey, model, concurrency, config.baseUrl);
 
     default:
       throw new ProviderError(

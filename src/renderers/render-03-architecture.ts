@@ -31,7 +31,11 @@ export function renderArchitecture(ctx: RenderContext): string {
     ],
     renderBody: (lines) => {
       // 2-sentence summary (DOC-17)
-      const patternNames = r4.patterns.map((p) => p.name).slice(0, 3).join(', ') || 'undetermined';
+      const patternNames =
+        r4.patterns
+          .map((p) => p.name)
+          .slice(0, 3)
+          .join(', ') || 'undetermined';
       lines.push(
         `${ctx.projectName} follows a ${patternNames} architecture. This document maps patterns, layers, and data flows with concrete code evidence.`,
       );
@@ -41,7 +45,9 @@ export function renderArchitecture(ctx: RenderContext): string {
       if (r4.patterns.length > 0) {
         lines.push('## Architecture Patterns');
         lines.push('');
-        lines.push(sectionIntro('These are the dominant architecture patterns identified in the codebase.'));
+        lines.push(
+          sectionIntro('These are the dominant architecture patterns identified in the codebase.'),
+        );
         lines.push('');
 
         for (const pattern of r4.patterns) {
@@ -81,14 +87,16 @@ export function renderArchitecture(ctx: RenderContext): string {
       lines.push('');
 
       if (r4.layering?.layers.length) {
-        lines.push(buildTable(
-          ['Layer', 'Modules', 'Responsibility'],
-          r4.layering.layers.map((layer) => [
-            layer.name,
-            layer.modules.join(', '),
-            layer.responsibility,
-          ]),
-        ));
+        lines.push(
+          buildTable(
+            ['Layer', 'Modules', 'Responsibility'],
+            r4.layering.layers.map((layer) => [
+              layer.name,
+              layer.modules.join(', '),
+              layer.responsibility,
+            ]),
+          ),
+        );
         lines.push('');
       } else {
         lines.push('No clear layering detected.');

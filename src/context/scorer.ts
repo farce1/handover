@@ -31,24 +31,11 @@ const CONFIG_FILE_PATTERNS = [
 
 // ─── Test file patterns ─────────────────────────────────────────────────────
 
-const TEST_PATTERNS = [
-  /\.test\./,
-  /\.spec\./,
-  /__tests__\//,
-  /__test__\//,
-];
+const TEST_PATTERNS = [/\.test\./, /\.spec\./, /__tests__\//, /__test__\//];
 
 // ─── Commonly tried extensions for import resolution ────────────────────────
 
-const EXTENSION_SUFFIXES = [
-  '',
-  '.ts',
-  '.js',
-  '.tsx',
-  '.jsx',
-  '/index.ts',
-  '/index.js',
-];
+const EXTENSION_SUFFIXES = ['', '.ts', '.js', '.tsx', '.jsx', '/index.ts', '/index.js'];
 
 // ─── Path resolution helpers ────────────────────────────────────────────────
 
@@ -56,10 +43,7 @@ const EXTENSION_SUFFIXES = [
  * Resolve an import path relative to the importing file's directory.
  * Returns null for external packages (no `.` or `..` prefix).
  */
-function resolveImportPath(
-  fromDir: string,
-  importSource: string,
-): string | null {
+function resolveImportPath(fromDir: string, importSource: string): string | null {
   // Skip external packages
   if (!importSource.startsWith('.') && !importSource.startsWith('..')) {
     return null;
@@ -85,10 +69,7 @@ function resolveImportPath(
 /**
  * Build a reverse-import map: for each file path, how many unique files import it.
  */
-function buildReverseImportMap(
-  files: ParsedFile[],
-  knownPaths: Set<string>,
-): Map<string, number> {
+function buildReverseImportMap(files: ParsedFile[], knownPaths: Set<string>): Map<string, number> {
   // Track which importers reference which paths (avoid double-counting)
   const importerSets = new Map<string, Set<string>>();
 
@@ -157,9 +138,7 @@ export function scoreFiles(analysis: StaticAnalysisResult): FilePriority[] {
   // ─── Step 1: Build known paths set and reverse-import map ───────────
 
   const knownPaths = new Set<string>(
-    fileTree.directoryTree
-      .filter((e) => e.type === 'file')
-      .map((e) => e.path),
+    fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path),
   );
 
   const importerCount = buildReverseImportMap(ast.files, knownPaths);
@@ -186,9 +165,7 @@ export function scoreFiles(analysis: StaticAnalysisResult): FilePriority[] {
 
   // ─── Step 3: Collect all file paths ────────────────────────────────
 
-  const allPaths = fileTree.directoryTree
-    .filter((e) => e.type === 'file')
-    .map((e) => e.path);
+  const allPaths = fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path);
 
   // ─── Step 4: Score each file ───────────────────────────────────────
 
@@ -206,9 +183,7 @@ export function scoreFiles(analysis: StaticAnalysisResult): FilePriority[] {
 
   for (const path of allPaths) {
     // Skip lock files
-    const basename = path.includes('/')
-      ? path.substring(path.lastIndexOf('/') + 1)
-      : path;
+    const basename = path.includes('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
     if (LOCK_FILES.has(basename)) {
       continue;
     }
@@ -217,10 +192,10 @@ export function scoreFiles(analysis: StaticAnalysisResult): FilePriority[] {
       entryPoint: ENTRY_POINT_PATTERNS.some((p) => p.test(path)) ? 30 : 0,
 
       importCount: Math.min(
-        ((importerCount.get(path) ??
+        (importerCount.get(path) ??
           // Also try extensionless matching for files imported without extension
           importerCount.get(stripExtension(path)) ??
-          0)) * 3,
+          0) * 3,
         30,
       ),
 

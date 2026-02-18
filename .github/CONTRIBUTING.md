@@ -27,12 +27,12 @@ If all tests pass, you're ready to make changes.
 
 ## Development Commands
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Run CLI from source with tsx (no build step needed) |
-| `npm run build` | Build production output with tsup |
-| `npm test` | Run test suite with Vitest |
-| `npm run typecheck` | Type-check source files with tsc (no emit) |
+| Command             | Description                                         |
+| ------------------- | --------------------------------------------------- |
+| `npm run dev`       | Run CLI from source with tsx (no build step needed) |
+| `npm run build`     | Build production output with tsup                   |
+| `npm test`          | Run test suite with Vitest                          |
+| `npm run typecheck` | Type-check source files with tsc (no emit)          |
 
 Run `npm test` and `npm run typecheck` before pushing any changes.
 
@@ -50,6 +50,7 @@ chore/short-description
 ```
 
 Examples:
+
 - `feat/add-gemini-provider`
 - `fix/parser-null-check`
 - `docs/contributing-guide`
@@ -68,6 +69,7 @@ type(scope): description
 **Types:** `feat`, `fix`, `docs`, `chore`, `refactor`, `test`
 
 **Examples:**
+
 - `feat(providers): add Gemini support`
 - `fix(parser): handle empty files`
 - `docs(readme): update usage examples`
@@ -104,7 +106,7 @@ Community reviewers are welcome to review each other's PRs — this speeds thing
 ## Code Review Process
 
 - Be specific and constructive. Point to code, not people.
-- Explain *why* you're requesting a change, not just *what* to change.
+- Explain _why_ you're requesting a change, not just _what_ to change.
 - Contributors are encouraged to review open PRs — it's a great way to learn the codebase.
 - The maintainer gives final approval on all merges.
 
@@ -114,21 +116,21 @@ Community reviewers are welcome to review each other's PRs — this speeds thing
 
 The source lives under `src/`. Here's a quick tour:
 
-| Directory | Purpose |
-|-----------|---------|
-| `src/cli/` | CLI entry point (Commander.js) |
-| `src/config/` | Configuration loading and validation |
-| `src/domain/` | Zod domain models and types |
-| `src/parsing/` | Language parsers (tree-sitter) |
-| `src/analyzers/` | Static analysis pipeline (8 analyzers) |
-| `src/providers/` | LLM provider adapters (Anthropic, OpenAI, etc.) |
-| `src/ai-rounds/` | Multi-round AI analysis orchestration |
-| `src/orchestrator/` | DAG-based pipeline orchestrator |
-| `src/renderers/` | Document output renderers |
-| `src/context/` | Context window management |
-| `src/grammars/` | Tree-sitter grammar loading |
-| `src/cache/` | Response caching |
-| `src/ui/` | Terminal UI components |
-| `src/utils/` | Shared utilities |
+| Directory           | Purpose                                         |
+| ------------------- | ----------------------------------------------- |
+| `src/cli/`          | CLI entry point (Commander.js)                  |
+| `src/config/`       | Configuration loading and validation            |
+| `src/domain/`       | Zod domain models and types                     |
+| `src/parsing/`      | Language parsers (tree-sitter)                  |
+| `src/analyzers/`    | Static analysis pipeline (8 analyzers)          |
+| `src/providers/`    | LLM provider adapters (Anthropic, OpenAI, etc.) |
+| `src/ai-rounds/`    | Multi-round AI analysis orchestration           |
+| `src/orchestrator/` | DAG-based pipeline orchestrator                 |
+| `src/renderers/`    | Document output renderers                       |
+| `src/context/`      | Context window management                       |
+| `src/grammars/`     | Tree-sitter grammar loading                     |
+| `src/cache/`        | Response caching                                |
+| `src/ui/`           | Terminal UI components                          |
+| `src/utils/`        | Shared utilities                                |
 
 If you're adding a new LLM provider, look at `src/providers/`. If you're adding a new language parser, start in `src/parsing/`.

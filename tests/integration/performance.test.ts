@@ -52,9 +52,7 @@ describe('performance', () => {
     const elapsed = Date.now() - start;
 
     // Log actual time for visibility
-    console.log(
-      `Static-only pipeline (200 files): ${elapsed}ms (${(elapsed / 1000).toFixed(1)}s)`,
-    );
+    console.log(`Static-only pipeline (200 files): ${elapsed}ms (${(elapsed / 1000).toFixed(1)}s)`);
 
     // Hard threshold: must complete in under 2 minutes
     expect(elapsed).toBeLessThan(120_000);

@@ -43,9 +43,7 @@ const INLINE_DOC_PATTERNS: Array<{
  * inline documentation coverage (JSDoc, docstrings, rustdoc) across
  * a sample of source files.
  */
-export async function analyzeDocs(
-  ctx: AnalysisContext,
-): Promise<AnalyzerResult<DocResult>> {
+export async function analyzeDocs(ctx: AnalysisContext): Promise<AnalyzerResult<DocResult>> {
   const start = performance.now();
 
   try {
@@ -91,9 +89,7 @@ export async function analyzeDocs(
         !isBinaryFile(f.extension) &&
         !DOC_EXTENSIONS.has(f.extension) &&
         !README_PATTERN.test(basename(f.path)) &&
-        INLINE_DOC_PATTERNS.some((p) =>
-          p.extensions.includes(f.extension),
-        ),
+        INLINE_DOC_PATTERNS.some((p) => p.extensions.includes(f.extension)),
     );
 
     const sampleFiles = sourceFiles.slice(0, 100);
@@ -118,10 +114,7 @@ export async function analyzeDocs(
     }
 
     const totalSampled = sampleFiles.length;
-    const percentage =
-      totalSampled > 0
-        ? Math.round((filesWithDocs / totalSampled) * 100)
-        : 0;
+    const percentage = totalSampled > 0 ? Math.round((filesWithDocs / totalSampled) * 100) : 0;
 
     // ── Build result ─────────────────────────────────────────────────────
 

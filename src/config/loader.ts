@@ -11,9 +11,7 @@ import { ConfigError, ProviderError } from '../utils/errors.js';
  * CONF-04: Configuration follows precedence order.
  * Zero-config: works with just ANTHROPIC_API_KEY in env.
  */
-export function loadConfig(
-  cliOverrides: Record<string, unknown> = {},
-): HandoverConfig {
+export function loadConfig(cliOverrides: Record<string, unknown> = {}): HandoverConfig {
   // Layer 2: File config (Layer 1 is defaults from Zod .default())
   let fileConfig: Record<string, unknown> = {};
   const configPath = '.handover.yml';
@@ -26,10 +24,7 @@ export function loadConfig(
         fileConfig = parsed as Record<string, unknown>;
       }
     } catch (err) {
-      throw ConfigError.invalidYaml(
-        configPath,
-        err instanceof Error ? err.message : String(err),
-      );
+      throw ConfigError.invalidYaml(configPath, err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -90,8 +85,7 @@ export function resolveApiKey(config: HandoverConfig): string {
     return '';
   }
 
-  const envVarName =
-    config.apiKeyEnv ?? DEFAULT_API_KEY_ENV[config.provider] ?? '';
+  const envVarName = config.apiKeyEnv ?? DEFAULT_API_KEY_ENV[config.provider] ?? '';
 
   if (!envVarName) {
     throw ProviderError.missingApiKey(config.provider);

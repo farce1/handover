@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import type { LLMProvider } from '../providers/base.js';
 import type { CompletionRequest } from '../domain/types.js';
 import type { TokenUsageTracker } from '../context/tracker.js';
-import type { RoundExecutionResult, ValidationResult, QualityMetrics } from './types.js';
+import type { RoundExecutionResult } from './types.js';
 import type { RoundContext } from '../context/types.js';
 import { compressRoundOutput } from '../context/compressor.js';
 import { checkRoundQuality } from './quality.js';
@@ -77,10 +77,7 @@ export async function executeRound<T>(
     }
 
     // 6. Quality check
-    const quality = checkRoundQuality(
-      result.data as Record<string, unknown>,
-      roundNumber,
-    );
+    const quality = checkRoundQuality(result.data as Record<string, unknown>, roundNumber);
 
     // 7. Retry on quality failure if not already retried
     if (!quality.isAcceptable && !hasRetried) {
@@ -116,11 +113,8 @@ export async function executeRound<T>(
     return await attempt(false);
   } catch (error) {
     // Failed round: degrade gracefully with static fallback data
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
-    logger.warn(
-      `Round ${roundNumber} failed: ${errorMessage} -- falling back to static data`,
-    );
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.warn(`Round ${roundNumber} failed: ${errorMessage} -- falling back to static data`);
 
     const fallbackData = buildFallback();
 
@@ -134,9 +128,7 @@ export async function executeRound<T>(
 
     // Use tracker data if available (partial round may have recorded usage), otherwise 0
     const roundUsage = tracker.getRoundUsage(roundNumber);
-    const fallbackTokens = roundUsage
-      ? roundUsage.inputTokens + roundUsage.outputTokens
-      : 0;
+    const fallbackTokens = roundUsage ? roundUsage.inputTokens + roundUsage.outputTokens : 0;
     const fallbackCost = tracker.getRoundCost(roundNumber);
 
     return {

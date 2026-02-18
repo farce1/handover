@@ -1,7 +1,7 @@
 name: Bug Report
 description: File a bug report to help us improve
-title: "[Bug]: "
-labels: ["bug"]
+title: '[Bug]: '
+labels: ['bug']
 body:
   - type: markdown
     attributes:
@@ -33,7 +33,7 @@ body:
     id: version
     attributes:
       label: handover-cli Version
-      placeholder: "e.g. 0.1.0 (run `npx handover-cli --version`)"
+      placeholder: 'e.g. 0.1.0 (run `npx handover-cli --version`)'
     validations:
       required: true
   - type: dropdown
@@ -50,7 +50,7 @@ body:
     id: node-version
     attributes:
       label: Node.js Version
-      placeholder: "e.g. 20.10.0 (run `node --version`)"
+      placeholder: 'e.g. 20.10.0 (run `node --version`)'
     validations:
       required: true
   - type: textarea

@@ -54,7 +54,9 @@ export function renderFeatures(ctx: RenderContext): string {
       if (internal.length > 0) {
         lines.push('## Internal Features');
         lines.push('');
-        lines.push(sectionIntro('Features used internally by the system, not directly exposed to users.'));
+        lines.push(
+          sectionIntro('Features used internally by the system, not directly exposed to users.'),
+        );
         lines.push('');
 
         for (const feature of internal) {
@@ -96,7 +98,14 @@ export function renderFeatures(ctx: RenderContext): string {
 function renderFeatureBlock(
   lines: string[],
   ctx: RenderContext,
-  feature: { name: string; description: string; entryPoint: string; modules: string[]; files: string[]; userFacing: boolean },
+  feature: {
+    name: string;
+    description: string;
+    entryPoint: string;
+    modules: string[];
+    files: string[];
+    userFacing: boolean;
+  },
 ): void {
   lines.push(`### ${feature.name}`);
   lines.push('');

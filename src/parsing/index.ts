@@ -6,7 +6,7 @@
  */
 
 import { ParserService } from './parser-service.js';
-import { EXTENSION_MAP, getLanguageInfo, isSupportedFile } from './language-map.js';
+import { EXTENSION_MAP } from './language-map.js';
 import { RustExtractor } from './extractors/rust.js';
 import { GoExtractor } from './extractors/go.js';
 import { RegexFallbackExtractor } from './extractors/regex-fallback.js';

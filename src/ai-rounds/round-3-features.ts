@@ -6,11 +6,7 @@ import type { HandoverConfig } from '../config/schema.js';
 import type { TokenUsageTracker } from '../context/tracker.js';
 import type { StepDefinition } from '../orchestrator/types.js';
 import type { RoundExecutionResult } from './types.js';
-import type {
-  Round1Output,
-  Round2Output,
-  Round3Output,
-} from './schemas.js';
+import type { Round1Output, Round2Output, Round3Output } from './schemas.js';
 import type { StandardRoundConfig } from './round-factory.js';
 import { Round3OutputSchema } from './schemas.js';
 import { buildRound3Fallback } from './fallbacks.js';
@@ -33,13 +29,8 @@ export const ROUND_3_CONFIG: StandardRoundConfig<Round3Output> = {
   },
   buildFallback: buildRound3Fallback,
   getPriorContexts: (getter) => {
-    const contexts = [
-      getter<Round1Output>(1)?.context,
-      getter<Round2Output>(2)?.context,
-    ];
-    return contexts.filter(
-      (ctx): ctx is NonNullable<typeof ctx> => ctx !== undefined,
-    );
+    const contexts = [getter<Round1Output>(1)?.context, getter<Round2Output>(2)?.context];
+    return contexts.filter((ctx): ctx is NonNullable<typeof ctx> => ctx !== undefined);
   },
 };
 
@@ -114,7 +105,9 @@ function buildRound3Data(
         sections.push(`Public API: ${mod.publicApi.join(', ')}`);
       }
       if (mod.files.length > 0) {
-        sections.push(`Files: ${mod.files.slice(0, 20).join(', ')}${mod.files.length > 20 ? ` ... and ${mod.files.length - 20} more` : ''}`);
+        sections.push(
+          `Files: ${mod.files.slice(0, 20).join(', ')}${mod.files.length > 20 ? ` ... and ${mod.files.length - 20} more` : ''}`,
+        );
       }
       sections.push('');
     }
@@ -180,9 +173,7 @@ function buildRound3Data(
   if (analysis.tests.testFiles.length > 0) {
     sections.push('## Test File Mapping');
     for (const testFile of analysis.tests.testFiles.slice(0, 30)) {
-      sections.push(
-        `  ${testFile.path} (${testFile.framework}, ${testFile.testCount} tests)`,
-      );
+      sections.push(`  ${testFile.path} (${testFile.framework}, ${testFile.testCount} tests)`);
     }
     sections.push('');
   }

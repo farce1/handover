@@ -55,7 +55,12 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
       'claude-sonnet-4-5': { inputPerMillion: 3, outputPerMillion: 15 },
       'claude-haiku-4-5': { inputPerMillion: 1, outputPerMillion: 5 },
     },
-    supportedModels: ['claude-opus-4-6', 'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    supportedModels: [
+      'claude-opus-4-6',
+      'claude-opus-4-5',
+      'claude-sonnet-4-5',
+      'claude-haiku-4-5',
+    ],
     timeoutMs: 120_000,
   },
 
@@ -120,7 +125,10 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     isLocal: false,
     sdkType: 'openai-compat',
     pricing: {
-      'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo': { inputPerMillion: 0.88, outputPerMillion: 0.88 },
+      'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo': {
+        inputPerMillion: 0.88,
+        outputPerMillion: 0.88,
+      },
     },
     supportedModels: ['meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'],
     timeoutMs: 120_000,

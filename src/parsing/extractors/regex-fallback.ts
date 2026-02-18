@@ -1,11 +1,6 @@
 import type { Tree } from 'web-tree-sitter';
 
-import type {
-  FunctionSymbol,
-  ClassSymbol,
-  ImportInfo,
-  ConstantSymbol,
-} from '../types.js';
+import type { FunctionSymbol, ClassSymbol, ImportInfo } from '../types.js';
 import { LanguageExtractor, type ExtractorResult } from './base.js';
 
 // ─── Language family type ──────────────────────────────────────────────────
@@ -46,20 +41,16 @@ const C_LIKE_PATTERNS: FamilyPatterns = {
     /^[ \t]*(?:(?:public|private|protected|internal|static|abstract|final|async|override|virtual|extern|inline|suspend|native|synchronized)\s+)*(?:fun\s+|func\s+)?(?:[\w<>\[\],\s]+?\s+)?([\w$]+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)/,
   classPattern:
     /^[ \t]*(?:(?:public|private|protected|internal|abstract|final|sealed|static|open|data|value)\s+)*(?:class|struct|interface|enum|object|trait|protocol)\s+([\w$]+)(?:\s*<[^>]*>)?(?:\s*(?:extends|implements|:|<)\s*([^{]+))?/,
-  importPattern:
-    /^[ \t]*(?:import|using|require|include)\s+(.+?)(?:\s*;|\s*$)/,
+  importPattern: /^[ \t]*(?:import|using|require|include)\s+(.+?)(?:\s*;|\s*$)/,
 };
 
 /**
  * Ruby-like family patterns: Ruby
  */
 const RUBY_LIKE_PATTERNS: FamilyPatterns = {
-  functionPattern:
-    /^[ \t]*def\s+(?:self\.)?([\w?!]+)(?:\(([^)]*)\))?/,
-  classPattern:
-    /^[ \t]*(?:class|module)\s+([\w:]+)(?:\s*<\s*([\w:]+))?/,
-  importPattern:
-    /^[ \t]*require(?:_relative)?\s+['"]([^'"]+)['"]/,
+  functionPattern: /^[ \t]*def\s+(?:self\.)?([\w?!]+)(?:\(([^)]*)\))?/,
+  classPattern: /^[ \t]*(?:class|module)\s+([\w:]+)(?:\s*<\s*([\w:]+))?/,
+  importPattern: /^[ \t]*require(?:_relative)?\s+['"]([^'"]+)['"]/,
 };
 
 /**
@@ -70,8 +61,7 @@ const PHP_PATTERNS: FamilyPatterns = {
     /^[ \t]*(?:(?:public|private|protected|static|abstract|final)\s+)*function\s+(\w+)\s*\(([^)]*)\)/,
   classPattern:
     /^[ \t]*(?:(?:abstract|final)\s+)*(?:class|interface|trait|enum)\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([^{]+))?/,
-  importPattern:
-    /^[ \t]*(?:use|require_once|include_once|require|include)\s+(.+?)(?:\s*;|\s*$)/,
+  importPattern: /^[ \t]*(?:use|require_once|include_once|require|include)\s+(.+?)(?:\s*;|\s*$)/,
 };
 
 const FAMILY_PATTERNS: Record<LanguageFamily, FamilyPatterns> = {
@@ -86,7 +76,7 @@ const JAVADOC_LINE = /^\s*\*\s?(.*)/;
 const LINE_COMMENT = /^\s*(?:\/\/\/?|#)\s?(.*)/;
 const XML_DOC_COMMENT = /^\s*\/\/\/\s?(.*)/;
 const BLOCK_COMMENT_START = /^\s*\/\*\*?\s*(.*)/;
-const BLOCK_COMMENT_END = /^(.*?)\*\/\s*$/;
+const _BLOCK_COMMENT_END = /^(.*?)\*\/\s*$/;
 
 // ─── Regex Fallback Extractor ──────────────────────────────────────────────
 
@@ -118,7 +108,9 @@ export class RegexFallbackExtractor extends LanguageExtractor {
   }
 
   extract(_tree: Tree, _source: string): ExtractorResult {
-    throw new Error('RegexFallbackExtractor only supports regex-based extraction via extractFromSource()');
+    throw new Error(
+      'RegexFallbackExtractor only supports regex-based extraction via extractFromSource()',
+    );
   }
 
   extractFromSource(source: string): ExtractorResult {
@@ -169,10 +161,16 @@ export class RegexFallbackExtractor extends LanguageExtractor {
           const docstring = this.extractDocCommentAbove(lines, i);
 
           const extendsArr = extendsStr
-            ? extendsStr.split(/\s*,\s*/).map((s) => s.trim()).filter(Boolean)
+            ? extendsStr
+                .split(/\s*,\s*/)
+                .map((s) => s.trim())
+                .filter(Boolean)
             : [];
           const implementsArr = implementsStr
-            ? implementsStr.split(/\s*,\s*/).map((s) => s.trim()).filter(Boolean)
+            ? implementsStr
+                .split(/\s*,\s*/)
+                .map((s) => s.trim())
+                .filter(Boolean)
             : [];
 
           const cls: ClassSymbol = {
@@ -241,7 +239,8 @@ export class RegexFallbackExtractor extends LanguageExtractor {
       const trimmed = part.trim();
       if (!trimmed) continue;
 
-      const isRest = trimmed.startsWith('...') || trimmed.startsWith('*') || trimmed.startsWith('**');
+      const isRest =
+        trimmed.startsWith('...') || trimmed.startsWith('*') || trimmed.startsWith('**');
       const cleanPart = trimmed.replace(/^\.{3}|\*{1,2}/, '').trim();
 
       // Try to split into type and name (C-like: "Type name" or "name: Type")
@@ -298,11 +297,7 @@ export class RegexFallbackExtractor extends LanguageExtractor {
 
   // ─── Import parsing ──────────────────────────────────────────────────────
 
-  private parseImport(
-    raw: string,
-    line: number,
-    family: LanguageFamily,
-  ): ImportInfo | null {
+  private parseImport(raw: string, line: number, family: LanguageFamily): ImportInfo | null {
     // Clean up trailing semicolons and quotes
     let source = raw.replace(/;$/, '').trim();
 
@@ -311,7 +306,9 @@ export class RegexFallbackExtractor extends LanguageExtractor {
       source = source.replace(/^['"]|['"]$/g, '');
       return {
         source,
-        specifiers: [{ name: source.split('/').pop() || source, isDefault: false, isNamespace: false }],
+        specifiers: [
+          { name: source.split('/').pop() || source, isDefault: false, isNamespace: false },
+        ],
         isTypeOnly: false,
         line,
       };
@@ -340,11 +337,13 @@ export class RegexFallbackExtractor extends LanguageExtractor {
 
     return {
       source,
-      specifiers: [{
-        name: name === '*' ? '*' : name,
-        isDefault: false,
-        isNamespace: name === '*',
-      }],
+      specifiers: [
+        {
+          name: name === '*' ? '*' : name,
+          isDefault: false,
+          isNamespace: name === '*',
+        },
+      ],
       isTypeOnly: false,
       line,
     };
@@ -352,10 +351,7 @@ export class RegexFallbackExtractor extends LanguageExtractor {
 
   // ─── Doc comment extraction ──────────────────────────────────────────────
 
-  private extractDocCommentAbove(
-    lines: string[],
-    lineIndex: number,
-  ): string | undefined {
+  private extractDocCommentAbove(lines: string[], lineIndex: number): string | undefined {
     if (lineIndex <= 0) return undefined;
 
     const docLines: string[] = [];
@@ -461,14 +457,46 @@ export class RegexFallbackExtractor extends LanguageExtractor {
   /**
    * Filter out common keywords that regex may misidentify as function names.
    */
-  private isKeyword(name: string, family: LanguageFamily): boolean {
+  private isKeyword(name: string, _family: LanguageFamily): boolean {
     const keywords = new Set([
-      'if', 'else', 'while', 'for', 'do', 'switch', 'case', 'return',
-      'try', 'catch', 'finally', 'throw', 'throws', 'new', 'delete',
-      'typeof', 'instanceof', 'void', 'null', 'true', 'false',
-      'class', 'interface', 'enum', 'struct', 'trait', 'object',
-      'import', 'export', 'package', 'module', 'require', 'include',
-      'using', 'namespace', 'public', 'private', 'protected',
+      'if',
+      'else',
+      'while',
+      'for',
+      'do',
+      'switch',
+      'case',
+      'return',
+      'try',
+      'catch',
+      'finally',
+      'throw',
+      'throws',
+      'new',
+      'delete',
+      'typeof',
+      'instanceof',
+      'void',
+      'null',
+      'true',
+      'false',
+      'class',
+      'interface',
+      'enum',
+      'struct',
+      'trait',
+      'object',
+      'import',
+      'export',
+      'package',
+      'module',
+      'require',
+      'include',
+      'using',
+      'namespace',
+      'public',
+      'private',
+      'protected',
     ]);
     return keywords.has(name);
   }

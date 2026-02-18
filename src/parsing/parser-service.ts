@@ -114,7 +114,9 @@ export class ParserService {
         constants: [],
         reExports: [],
         lineCount,
-        parseErrors: [{ line: 0, message: `No extractor registered for language "${langInfo.langId}"` }],
+        parseErrors: [
+          { line: 0, message: `No extractor registered for language "${langInfo.langId}"` },
+        ],
       };
     }
 
@@ -179,9 +181,7 @@ export class ParserService {
 
     // Try 1: Resolve from node_modules (dev mode)
     try {
-      wasmPath = require.resolve(
-        `tree-sitter-wasms/out/tree-sitter-${grammarName}.wasm`,
-      );
+      wasmPath = require.resolve(`tree-sitter-wasms/out/tree-sitter-${grammarName}.wasm`);
     } catch {
       // Try 2: Download to user cache if not in node_modules (production/npx mode)
       wasmPath = await downloadGrammarIfNeeded(grammarName);
