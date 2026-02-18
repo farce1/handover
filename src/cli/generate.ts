@@ -1,5 +1,6 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { hashContent } from '../analyzers/cache.js';
 import { loadConfig, resolveApiKey } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
 import { HandoverError, handleCliError } from '../utils/errors.js';
@@ -216,10 +217,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     resolveApiKey(config);
 
     // Initialize round cache for crash recovery
-    const roundCache = new RoundCache();
-    if (options.cache === false) {
-      await roundCache.clear();
-    }
+    const roundCache = new RoundCache(undefined, resolve(process.cwd()));
+    const noCacheMode = options.cache === false;
 
     // Show startup banner (SEC-03: provider/model in banner serves as cloud indicator)
     renderer.onBanner(displayState);
@@ -416,11 +415,20 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             isEmptyRepo = true;
           }
 
-          // Compute fingerprint for round cache invalidation
-          // Use directoryTree file entries (path + size) for deterministic hashing
-          const fileEntries = result.fileTree.directoryTree
-            .filter((e) => e.type === 'file')
-            .map((f) => ({ path: f.path, size: f.size ?? 0 }));
+          // Compute fingerprint for round cache invalidation (CACHE-01).
+          // Read file content and hash it so same-size edits are detected.
+          const discovered = result.fileTree.directoryTree.filter((e) => e.type === 'file');
+          const fileEntries = await Promise.all(
+            discovered.map(async (f) => {
+              try {
+                const content = await readFile(join(rootDir, f.path));
+                return { path: f.path, contentHash: hashContent(content) };
+              } catch {
+                // Unreadable file: use empty hash as fallback
+                return { path: f.path, contentHash: '' };
+              }
+            }),
+          );
           analysisFingerprint = RoundCache.computeAnalysisFingerprint(fileEntries);
 
           // Detect language from file extensions
@@ -454,7 +462,12 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
     // Wrap a round step with cache awareness: check cache before executing,
     // store result after successful execution. Cached rounds skip API calls entirely.
-    const wrapWithCache = (roundNum: number, step: StepDefinition): StepDefinition => {
+    // priorRoundNums: the round numbers whose outputs form the cascade hash chain (CACHE-02).
+    const wrapWithCache = (
+      roundNum: number,
+      step: StepDefinition,
+      priorRoundNums: number[],
+    ): StepDefinition => {
       const originalExecute = step.execute;
       return createStep({
         id: step.id,
@@ -467,25 +480,43 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           }
 
           const modelName = config.model ?? preset?.defaultModel ?? 'default';
-          const hash = roundCache.computeHash(roundNum, modelName, analysisFingerprint);
-          const cached = await roundCache.get(roundNum, hash);
-          if (cached) {
-            // Report cached round to display
-            const roundName = ROUND_NAMES[roundNum] ?? `Round ${roundNum}`;
-            displayState.rounds.set(roundNum, {
-              roundNumber: roundNum,
-              name: roundName,
-              status: 'cached',
-              elapsedMs: 0,
-            });
-            renderer.onRoundUpdate(displayState);
-            // Store in roundResults for downstream rounds
-            roundResults.set(roundNum, cached as RoundExecutionResult<unknown>);
-            return cached;
+
+          // Build prior round hashes for cascade invalidation (CACHE-02)
+          const priorHashes = priorRoundNums.map((n) => {
+            const prior = roundResults.get(n);
+            if (!prior) return '';
+            return RoundCache.computeResultHash(prior);
+          });
+
+          const hash = roundCache.computeHash(
+            roundNum,
+            modelName,
+            analysisFingerprint,
+            priorHashes,
+          );
+
+          // Gate cache reads on noCacheMode (--no-cache skips reads but preserves files)
+          if (!noCacheMode) {
+            const cached = await roundCache.get(roundNum, hash);
+            if (cached) {
+              // Report cached round to display
+              const roundName = ROUND_NAMES[roundNum] ?? `Round ${roundNum}`;
+              displayState.rounds.set(roundNum, {
+                roundNumber: roundNum,
+                name: roundName,
+                status: 'cached',
+                elapsedMs: 0,
+              });
+              renderer.onRoundUpdate(displayState);
+              // Store in roundResults for downstream rounds
+              roundResults.set(roundNum, cached as RoundExecutionResult<unknown>);
+              return cached;
+            }
           }
+
           // Execute normally
           const result = await originalExecute(context);
-          // Cache the result for future runs
+          // Cache writes always happen (even in no-cache mode) for future normal runs
           if (result) {
             await roundCache.set(roundNum, hash, result, modelName);
           }
@@ -505,7 +536,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         estimateTokensFn,
         makeOnRetry(1),
       );
-      steps.push(wrapWithCache(1, step));
+      steps.push(wrapWithCache(1, step, []));
     }
 
     if (requiredRounds.has(2)) {
@@ -519,7 +550,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         () => getRound<Round1Output>(1),
         makeOnRetry(2),
       );
-      steps.push(wrapWithCache(2, step));
+      steps.push(wrapWithCache(2, step, [1]));
     }
 
     if (requiredRounds.has(3)) {
@@ -536,7 +567,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         }),
         makeOnRetry(3),
       );
-      steps.push(wrapWithCache(3, step));
+      steps.push(wrapWithCache(3, step, [1, 2]));
     }
 
     if (requiredRounds.has(4)) {
@@ -554,7 +585,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         }),
         makeOnRetry(4),
       );
-      steps.push(wrapWithCache(4, step));
+      steps.push(wrapWithCache(4, step, [1, 2, 3]));
     }
 
     if (requiredRounds.has(5)) {
@@ -571,7 +602,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         }),
         makeOnRetry(5),
       );
-      steps.push(wrapWithCache(5, step));
+      steps.push(wrapWithCache(5, step, [1, 2]));
     }
 
     if (requiredRounds.has(6)) {
@@ -588,7 +619,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         }),
         makeOnRetry(6),
       );
-      steps.push(wrapWithCache(6, step));
+      steps.push(wrapWithCache(6, step, [1, 2]));
     }
 
     // Compute render step dependencies dynamically from registered rounds.
