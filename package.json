@@ -32,6 +32,10 @@
     "analysis"
   ],
   "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/farce1/handover/issues"
+  },
+  "homepage": "https://github.com/farce1/handover#readme",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@clack/prompts": "^0.10.0",
