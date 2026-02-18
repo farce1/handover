@@ -9,6 +9,21 @@
   <a href="https://www.npmjs.com/package/handover-cli"><img src="https://img.shields.io/npm/v/handover-cli?style=for-the-badge" alt="npm version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
   <a href="https://www.npmjs.com/package/handover-cli"><img src="https://img.shields.io/npm/dm/handover-cli?style=for-the-badge" alt="npm downloads"></a>
+  <a href="https://codecov.io/gh/farce1/handover"
+    ><img
+      src="https://img.shields.io/codecov/c/github/farce1/handover?style=for-the-badge"
+      alt="coverage"
+  /></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/farce1/handover"
+    ><img
+      src="https://img.shields.io/ossf-scorecard/github.com/farce1/handover?style=for-the-badge"
+      alt="OpenSSF Scorecard"
+  /></a>
+  <a href="https://github.com/farce1/handover/actions/workflows/codeql.yml"
+    ><img
+      src="https://img.shields.io/github/actions/workflow/status/farce1/handover/codeql.yml?branch=main&style=for-the-badge&label=CodeQL"
+      alt="CodeQL"
+  /></a>
 </p>
 
 **handover** scans your codebase, runs multi-round AI analysis, and produces 14 interconnected markdown documents that explain your project end-to-end. Use it for onboarding, knowledge transfer, due diligence, or as a RAG corpus for AI coding tools.
