@@ -10,8 +10,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/your-org/handover-cli.git
-cd handover-cli
+git clone https://github.com/farce1/handover.git
+cd handover
 npm install
 npm run build
 ```

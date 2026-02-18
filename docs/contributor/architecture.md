@@ -2,7 +2,7 @@
 
 ## Overview
 
-handover is a CLI tool that generates comprehensive codebase documentation by combining static analysis with LLM reasoning. When you run `handover generate`, it collects facts about your repository through eight concurrent analyzers, packs the most relevant source files into a context window, runs six sequential AI reasoning rounds through a DAG orchestrator, and renders up to fourteen structured markdown documents. The tool supports seven LLM providers out of the box, requires only an API key in your environment, and caches round outputs to make repeat runs fast.
+handover is a CLI tool that generates comprehensive codebase documentation by combining static analysis with LLM reasoning. When you run `handover generate`, it collects facts about your repository through eight concurrent analyzers, packs the most relevant source files into a context window, runs six sequential AI reasoning rounds through a DAG orchestrator, and renders up to fourteen structured markdown documents. The tool supports eight LLM providers out of the box, requires only an API key in your environment, and caches round outputs to make repeat runs fast.
 
 ## How a handover run works
 

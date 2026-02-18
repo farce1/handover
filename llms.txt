@@ -1,6 +1,6 @@
 # handover
 
-> handover is a CLI tool that generates comprehensive codebase documentation for knowledge transfer. It runs 8 concurrent static analyzers, packs source context into a configurable token budget, executes 6 rounds of LLM analysis via a DAG orchestrator, and renders 14 interconnected markdown documents in a single `npx handover generate` command. Supports 8 LLM providers including Anthropic, OpenAI, Gemini, Groq, and local models via Ollama.
+> handover is a CLI tool that generates comprehensive codebase documentation for knowledge transfer. It runs 8 concurrent static analyzers, packs source context into a configurable token budget, executes 6 rounds of LLM analysis via a DAG orchestrator, and renders 14 interconnected markdown documents in a single `npx handover generate` command. Supports 8 LLM providers including Anthropic, OpenAI, Groq, Together, DeepSeek, and local models via Ollama.
 
 Language-agnostic static analysis with cross-referenced markdown output designed for both human readers and AI assistants.
 
