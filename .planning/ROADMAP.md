@@ -56,13 +56,12 @@ Plans:
 3. Rounds 5 and 6 execute concurrently when run from scratch, visibly reducing total wall-clock time compared to sequential execution
 4. On a large repo run, the terminal shows how many files were analyzed vs. skipped, so the user knows the coverage scope of the output
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 
-- [ ] 05-01: Live token counter and elapsed timer — add onRoundToken() callback to TerminalRenderer; route all stdout through TerminalRenderer
-- [ ] 05-02: Streaming token output — extend provider interface with supportsStreaming() and completeStream(); upgrade @anthropic-ai/sdk and openai SDKs
-- [ ] 05-03: Parallel rounds 5 and 6 — audit and fix dep declarations in round-5-edge-cases.ts and round-6-deployment.ts; file coverage indicator
+- [ ] 05-01-PLAN.md — Provider streaming callbacks, live token counter, elapsed timer, progress line format
+- [ ] 05-02-PLAN.md — --stream flag, file coverage indicator, parallel round savings display
 
 ### Phase 6: Context Efficiency
 
@@ -96,5 +95,5 @@ Phases execute in numeric order: 4 → 5 → 6
 | 2. CI/CD Automation           | v1.0      | 4/4            | Complete    | 2026-02-18 |
 | 3. Docs and LLM Accessibility | v1.0      | 3/3            | Complete    | 2026-02-18 |
 | 4. Cache Correctness          | v2.0      | 0/2            | Not started | -          |
-| 5. UX Responsiveness          | v2.0      | 0/3            | Not started | -          |
+| 5. UX Responsiveness          | v2.0      | 0/2            | Not started | -          |
 | 6. Context Efficiency         | v2.0      | 0/3            | Not started | -          |
