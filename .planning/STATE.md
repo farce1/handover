@@ -52,6 +52,10 @@ Recent decisions affecting current work:
 - Used .yml extension (not .yaml) for GitHub issue form templates — GitHub requires .yml
 - Blank issues disabled via config.yml; non-issue questions redirected to GitHub Discussions
 - documentation label created via gh CLI (bug and enhancement exist by default on new repos)
+- @vitest/coverage-v8 pinned to ^3.x to match vitest@^3 peer requirement (v4 requires vitest@^4)
+- Codecov upload gated to Node 20 matrix leg — prevents duplicate reports
+- fail_ci_if_error: false for Codecov — CI passes before CODECOV_TOKEN is configured
+- coverage/ added to .gitignore — generated coverage artifacts must not be committed
 - Manifest config over standalone release-please (googleapis official recommendation)
 - PAT (RELEASE_PLEASE_TOKEN) required — GITHUB_TOKEN cannot trigger CI on release PRs
 - OIDC trusted publishing over NPM_TOKEN: no long-lived secrets, provenance included
@@ -73,5 +77,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 02-02 (release-please + OIDC npm publish workflow)
+Stopped at: Completed 02-01 (CI quality gate: vitest coverage + GitHub Actions workflow)
 Resume file: .planning/phases/02-ci-cd-automation/02-03-PLAN.md
