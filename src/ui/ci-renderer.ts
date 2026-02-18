@@ -77,8 +77,13 @@ export class CIRenderer implements Renderer {
   }
 
   onRoundsDone(state: DisplayState): void {
-    const roundCount = state.rounds.size;
-    console.log(`${this.timestamp()} [ai] ${roundCount} rounds complete`);
+    const allCached =
+      state.rounds.size > 0 && [...state.rounds.values()].every((r) => r.status === 'cached');
+    if (allCached) {
+      console.log(`${this.timestamp()} [ai] All ${state.rounds.size} rounds cached`);
+    } else {
+      console.log(`${this.timestamp()} [ai] ${state.rounds.size} rounds complete`);
+    }
   }
 
   onDocRendered(state: DisplayState): void {

@@ -255,6 +255,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     let packedContext: PackedContext | undefined;
     let analysisFingerprint = '';
     let isEmptyRepo = false;
+    let migrationWarned = false;
 
     const deferredAnalysis = new Proxy({} as StaticAnalysisResult, {
       get: (_target, prop) => (staticAnalysisResult as Record<string | symbol, unknown>)?.[prop],
@@ -431,6 +432,12 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           );
           analysisFingerprint = RoundCache.computeAnalysisFingerprint(fileEntries);
 
+          if (options.verbose) {
+            process.stderr.write(
+              `[verbose] Cache fingerprint: ${analysisFingerprint.substring(0, 12)}... (${fileEntries.length} files)\n`,
+            );
+          }
+
           // Detect language from file extensions
           const exts = result.fileTree.filesByExtension;
           const topExt = Object.entries(exts).sort((a, b) => b[1] - a[1])[0];
@@ -498,7 +505,19 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           // Gate cache reads on noCacheMode (--no-cache skips reads but preserves files)
           if (!noCacheMode) {
             const cached = await roundCache.get(roundNum, hash);
+
+            // Migration warning: show once when old cache format is detected
+            if (roundCache.wasMigrated && !migrationWarned) {
+              migrationWarned = true;
+              process.stderr.write('Cache format updated, rebuilding...\n');
+            }
+
             if (cached) {
+              if (options.verbose) {
+                process.stderr.write(
+                  `[verbose] Round ${roundNum} cache HIT (key: ${hash.substring(0, 12)}...)\n`,
+                );
+              }
               // Report cached round to display
               const roundName = ROUND_NAMES[roundNum] ?? `Round ${roundNum}`;
               displayState.rounds.set(roundNum, {
@@ -511,6 +530,12 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
               // Store in roundResults for downstream rounds
               roundResults.set(roundNum, cached as RoundExecutionResult<unknown>);
               return cached;
+            }
+
+            if (options.verbose) {
+              process.stderr.write(
+                `[verbose] Round ${roundNum} cache MISS (key: ${hash.substring(0, 12)}...)\n`,
+              );
             }
           }
 

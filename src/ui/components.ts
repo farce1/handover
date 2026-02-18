@@ -99,6 +99,11 @@ export function renderRoundBlock(
   const lines: string[] = [];
   const sep = pc.dim(' \u00B7 ');
 
+  const allCached = rounds.size > 0 && [...rounds.values()].every((r) => r.status === 'cached');
+  if (allCached) {
+    return [`  ${pc.dim(`All ${rounds.size} rounds cached`)}`];
+  }
+
   for (const [, rd] of rounds) {
     const roundLabel = `R${rd.roundNumber}`;
 
