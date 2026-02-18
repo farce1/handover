@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 
 ## Current Position
 
-Phase: 4 of 6 (Cache Correctness)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-18 — 04-01 cache correctness core fixes complete
+Phase: 4 of 6 (Cache Correctness) — COMPLETE
+Plan: 2 of 2 in current phase (phase complete)
+Status: Phase 4 complete, ready for Phase 5
+Last activity: 2026-02-18 — 04-02 cache UX feedback complete
 
-Progress: [█░░░░░░░░░] 12% (1/8 plans complete across v2.0)
+Progress: [██░░░░░░░░] 25% (2/8 plans complete across v2.0)
 
 ## Performance Metrics
 
@@ -38,6 +38,7 @@ Progress: [█░░░░░░░░░] 12% (1/8 plans complete across v2.0)
 | Plan                           | Duration | Tasks   | Files   |
 | ------------------------------ | -------- | ------- | ------- |
 | Phase 04-cache-correctness P01 | 3 min    | 2 tasks | 2 files |
+| Phase 04-cache-correctness P02 | 2 min    | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -52,6 +53,8 @@ v2.0 key constraints from research:
 - Streaming accumulates full response before Zod validation — never parse partial JSON mid-stream
 - [Phase 04-cache-correctness]: hashContent imported at generate.ts call site, not in round-cache.ts — keeps cache module decoupled from file I/O
 - [Phase 04-cache-correctness]: RoundCache.clear() preserved as public method for migration; --no-cache uses noCacheMode flag to skip reads only, always writes
+- [Phase 04-cache-correctness]: All-cached check in renderRoundBlock: early return with single summary line before per-round loop
+- [Phase 04-cache-correctness]: Migration warning uses process.stderr.write because logger is suppressed during renderer-managed output
 
 ### Pending Todos
 
@@ -76,5 +79,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 04-cache-correctness plan 1 (04-01-PLAN.md)
-Resume file: .planning/phases/04-cache-correctness/04-01-SUMMARY.md
+Stopped at: Completed 04-cache-correctness plan 2 (04-02-PLAN.md) — Phase 4 complete
+Resume file: .planning/phases/04-cache-correctness/04-02-SUMMARY.md
