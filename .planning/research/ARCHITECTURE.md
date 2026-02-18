@@ -1,366 +1,485 @@
 # Architecture Research
 
-**Domain:** OSS Infrastructure — Documentation, Contributor Onboarding, LLM Accessibility for a TypeScript CLI
+**Domain:** Performance Features — Caching, Parallel Execution, Streaming Output, Token Optimization
 **Researched:** 2026-02-18
-**Confidence:** HIGH (GitHub official docs verified; llms.txt spec verified at llmstxt.org; community health file placement verified via GitHub docs)
+**Confidence:** HIGH (existing codebase read directly; patterns grounded in source; streaming patterns MEDIUM from web sources)
 
 ---
 
 ## Standard Architecture
 
+This document covers how four performance features integrate with the existing DAG orchestrator and multi-round LLM pipeline. It does not re-document what already exists — it focuses on what changes and what is new.
+
 ### System Overview
 
-The OSS infrastructure for handover is organized into four distinct component layers. Each layer has clear ownership, communicates upward to users/contributors/LLMs, and has explicit file locations.
+Current pipeline (simplified):
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                        CONSUMER LAYER                               │
-│  ┌─────────────┐  ┌──────────────────┐  ┌────────────────────────┐ │
-│  │  End Users  │  │   Contributors   │  │    LLMs / AI Agents    │ │
-│  │ (npm/npx)   │  │ (fork+PR)        │  │ (docs ingestion)       │ │
-│  └──────┬──────┘  └────────┬─────────┘  └───────────┬────────────┘ │
-└─────────┼──────────────────┼────────────────────────┼──────────────┘
-          │                  │                         │
-          ▼                  ▼                         ▼
-┌─────────────────┐ ┌────────────────────┐ ┌──────────────────────┐
-│   README.md     │ │  .github/ Layer    │ │  LLM Accessibility   │
-│   (root)        │ │                    │ │  Layer               │
-│                 │ │ CONTRIBUTING.md    │ │                      │
-│ Quick start     │ │ CODE_OF_CONDUCT.md │ │ llms.txt (root)      │
-│ Provider table  │ │ SECURITY.md        │ │ AGENTS.md (revised)  │
-│ CLI reference   │ │ FUNDING.yml        │ │ docs/ (structured)   │
-│ Links to docs/  │ │ ISSUE_TEMPLATE/    │ │                      │
-│                 │ │ PULL_REQUEST_      │ │                      │
-│                 │ │ TEMPLATE.md        │ │                      │
-└────────┬────────┘ └────────┬───────────┘ └──────────┬───────────┘
-         │                   │                         │
-         └───────────────────┼─────────────────────────┘
-                             ▼
-┌────────────────────────────────────────────────────────────────────┐
-│                       DOCS/ LAYER                                   │
+CLI
+ └── generate.ts (orchestration coordinator)
+       ├── DAGOrchestrator.execute()
+       │     ├── static-analysis step (sequential, always runs)
+       │     ├── ai-round-1 step (depends on static-analysis)
+       │     ├── ai-round-2 step (depends on ai-round-1)
+       │     ├── ai-round-3 step (depends on ai-round-1, ai-round-2)
+       │     ├── ai-round-4 step (depends on ai-round-1..3)
+       │     ├── ai-round-5 step (depends on ai-round-1, ai-round-2)
+       │     ├── ai-round-6 step (depends on ai-round-1, ai-round-2)
+       │     └── render step (depends on terminal rounds)
+       ├── RoundCache (disk cache, already exists at src/cache/round-cache.ts)
+       ├── AnalysisCache (disk cache, already exists at src/analyzers/cache.ts)
+       ├── TokenUsageTracker (cost tracking, src/context/tracker.ts)
+       └── TerminalRenderer (progress UI, src/ui/renderer.ts)
+```
+
+Performance feature integration points:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  CACHING LAYER (already partially exists — extend, do not rewrite)  │
 │                                                                     │
-│  docs/                                                              │
-│  ├── user/                    # End-user documentation              │
-│  │   ├── getting-started.md   # Installation + first run            │
-│  │   ├── configuration.md     # Config file reference               │
-│  │   ├── providers.md         # LLM provider setup guides           │
-│  │   └── output-documents.md  # What the 14 docs mean               │
-│  └── contributor/             # Contributor documentation           │
-│      ├── architecture.md      # System design (distilled AGENTS.md) │
-│      ├── development.md       # Setup, build, test workflow          │
-│      ├── adding-providers.md  # How to add an LLM provider          │
-│      └── adding-analyzers.md  # How to add a static analyzer        │
-└────────────────────────────────────────────────────────────────────┘
+│  AnalysisCache (src/analyzers/cache.ts)                             │
+│    File-hash-based: skip re-parsing unchanged files                 │
+│                                                                     │
+│  RoundCache (src/cache/round-cache.ts)                              │
+│    Content-hash-based: skip LLM calls for unchanged codebases       │
+│    Already wired into generate.ts wrapWithCache()                   │
+│                                                                     │
+│  NEW: PromptCache coordination (Anthropic prompt caching API)       │
+│    Prefix caching: mark static system context as cacheable          │
+│    Lives in: src/providers/anthropic.ts (modify doComplete)         │
+└─────────────────────────────────────────────────────────────────────┘
          │
          ▼
-┌────────────────────────────────────────────────────────────────────┐
-│                       CI LAYER (.github/workflows/)                 │
+┌─────────────────────────────────────────────────────────────────────┐
+│  PARALLEL EXECUTION (extend DAGOrchestrator behavior)               │
 │                                                                     │
-│  ci.yml           — lint, typecheck, build, test (on push/PR)      │
-│  release.yml      — npm publish (on version tag push)              │
-└────────────────────────────────────────────────────────────────────┘
+│  Current: DAGOrchestrator already runs independent steps in         │
+│           parallel via Promise.race (lines 227-228 in dag.ts)       │
+│  Current: AI rounds 5 and 6 have identical deps (rounds 1,2)       │
+│           — they could run in parallel but don't because they are   │
+│             created sequentially with sequential dep declarations   │
+│                                                                     │
+│  NEW: Declare rounds 5 and 6 with same deps → DAG runs them        │
+│       concurrently automatically (no orchestrator changes needed)   │
+│                                                                     │
+│  NEW: AnalyzerConcurrencyConfig — expose config.analysis.concurrency│
+│       already exists in schema; verify coordinator uses it          │
+└─────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  STREAMING OUTPUT (new capability in providers)                     │
+│                                                                     │
+│  Current: providers use non-streaming tool_use / function calls     │
+│           Response arrives all at once; no progress during LLM wait │
+│                                                                     │
+│  NEW: StreamingProvider interface extension                         │
+│       Adds optional completeStream() method to BaseProvider         │
+│       Streaming incompatible with tool_use structured output        │
+│       → Stream text, then parse/validate JSON at stream end         │
+│       → Falls back to non-streaming if provider doesn't support it  │
+│                                                                     │
+│  UI integration: TerminalRenderer.onRoundToken() callback           │
+│  new: shows "receiving..." progress during LLM wait                 │
+└─────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  TOKEN OPTIMIZATION (extend existing context layer)                 │
+│                                                                     │
+│  Current: computeTokenBudget(), scoreFiles(), packFiles()           │
+│           compressRoundOutput() deterministic field extraction      │
+│           estimateTokens() uses chars/4 heuristic                   │
+│                                                                     │
+│  NEW: Anthropic prompt caching headers (cache_control blocks)       │
+│       Marks stable context prefix as cacheable → 90% token discount │
+│                                                                     │
+│  NEW: Improved token estimator (tiktoken or provider native)        │
+│       chars/4 is 15-20% inaccurate; inaccuracy wastes budget       │
+│                                                                     │
+│  NEW: Dynamic context budget tuning based on --only selection       │
+│       If only 2 rounds needed, budget can be larger per round       │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Component Responsibilities
+### Component Responsibilities (New vs Modified)
 
-| Component | Responsibility | Communicates With |
-|-----------|----------------|-------------------|
-| README.md (root) | First contact: what, why, quick start, links | Consumers → docs/, .github/ |
-| .github/CONTRIBUTING.md | How to contribute: setup, PR process, architecture summary | Contributors → docs/contributor/ |
-| .github/ISSUE_TEMPLATE/ | Bug report, feature request, docs improvement forms | Contributors → maintainers |
-| .github/PULL_REQUEST_TEMPLATE.md | PR quality checklist | Contributors → CI |
-| .github/workflows/ci.yml | Automated quality gate (lint, typecheck, build, test) | All pushes/PRs |
-| .github/workflows/release.yml | npm publish automation on tag | Maintainers → npm |
-| .github/FUNDING.yml | GitHub Sponsors button | GitHub UI → sponsors |
-| .github/CODE_OF_CONDUCT.md | Community norms (Contributor Covenant) | GitHub UI → contributors |
-| .github/SECURITY.md | Vulnerability reporting process | Users → maintainers |
-| docs/user/ | In-depth user guides | End users, README links |
-| docs/contributor/ | Deep architecture and dev workflow | Contributors, CONTRIBUTING links |
-| llms.txt (root) | Machine-readable project description for LLM context | LLMs, AI coding assistants |
-| AGENTS.md (revised) | AI agent working guidelines (operational, not educational) | AI agents working in the codebase |
-| CHANGELOG.md (root) | Version history, user-facing changes | Users, automated release tooling |
+| Component                             | Status | Responsibility                                                | Modified By                                                                |
+| ------------------------------------- | ------ | ------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `src/cache/round-cache.ts`            | EXISTS | Disk cache for AI round results                               | Already wired. Extension: expose `getCacheStatus()` for better UI feedback |
+| `src/analyzers/cache.ts`              | EXISTS | File-hash cache for static analysis                           | Already exists. Verify coordinator uses it                                 |
+| `src/providers/anthropic.ts`          | MODIFY | Add `cache_control` headers for prompt caching                | Prompt cache blocks                                                        |
+| `src/providers/base-provider.ts`      | MODIFY | Add optional streaming path (`completeStream`)                | Streaming support                                                          |
+| `src/providers/base.ts` (interface)   | MODIFY | Expose streaming capability flag                              | Streaming support                                                          |
+| `src/context/token-counter.ts`        | MODIFY | Improve token estimation accuracy                             | Token optimization                                                         |
+| `src/ai-rounds/round-5-edge-cases.ts` | MODIFY | Verify deps declare only rounds 1,2                           | Parallel execution                                                         |
+| `src/ai-rounds/round-6-deployment.ts` | MODIFY | Verify deps declare only rounds 1,2                           | Parallel execution                                                         |
+| `src/cli/generate.ts`                 | MODIFY | Expose --stream flag; parallel round sequencing               | All features                                                               |
+| `src/ui/renderer.ts`                  | MODIFY | Add `onRoundToken()` for streaming progress                   | Streaming support                                                          |
+| `src/ui/types.ts`                     | MODIFY | Add streaming state to DisplayState                           | Streaming support                                                          |
+| `src/config/schema.ts`                | MODIFY | Add `performance.promptCache`, `performance.streaming` fields | Config                                                                     |
+| NEW: `src/providers/streaming.ts`     | NEW    | Streaming result types and utilities                          | Streaming support                                                          |
 
 ---
 
 ## Recommended Project Structure
 
+The performance features do not require new top-level folders. All additions are targeted modifications or small new files within existing directories.
+
 ```
-handover/
-├── .github/
-│   ├── ISSUE_TEMPLATE/
-│   │   ├── bug-report.yml          # Structured form: reproduction, expected, actual
-│   │   ├── feature-request.yml     # Structured form: problem, solution, alternatives
-│   │   └── docs-improvement.yml    # Structured form: which doc, what's wrong
-│   ├── workflows/
-│   │   ├── ci.yml                  # Lint + typecheck + build + test
-│   │   └── release.yml             # npm publish on tag push
-│   ├── CODE_OF_CONDUCT.md          # Contributor Covenant (standard)
-│   ├── CONTRIBUTING.md             # Setup + PR process + architecture links
-│   ├── FUNDING.yml                 # GitHub Sponsors configuration
-│   ├── PULL_REQUEST_TEMPLATE.md    # PR checklist
-│   └── SECURITY.md                 # Vulnerability reporting
-├── docs/
-│   ├── user/
-│   │   ├── getting-started.md      # Installation, first run, quick wins
-│   │   ├── configuration.md        # Config file schema reference
-│   │   ├── providers.md            # API key setup per LLM provider
-│   │   └── output-documents.md     # What each of 14 docs contains
-│   └── contributor/
-│       ├── architecture.md         # DAG, analyzers, providers, renderers (distilled from AGENTS.md)
-│       ├── development.md          # Clone, build, test, debug
-│       ├── adding-providers.md     # BaseProvider pattern, required methods
-│       └── adding-analyzers.md     # Analyzer interface, coordinator registration
-├── src/                            # Unchanged
-├── tests/                          # Unchanged
-├── AGENTS.md                       # Revised: AI-agent operational guidelines only
-├── CHANGELOG.md                    # Version history (new)
-├── LICENSE                         # Existing MIT
-├── README.md                       # Existing — links added to docs/ and .github/
-├── llms.txt                        # Machine-readable project summary (new)
-├── package.json
-├── tsconfig.json
-└── tsup.config.ts
+src/
+├── cache/
+│   └── round-cache.ts          # EXISTS — minor: add getCacheStatus() helper
+├── analyzers/
+│   └── cache.ts                # EXISTS — verify coordinator uses it fully
+├── providers/
+│   ├── base.ts                 # MODIFY — add hasStreamingSupport() to interface
+│   ├── base-provider.ts        # MODIFY — add completeStream() with fallback
+│   ├── anthropic.ts            # MODIFY — add cache_control headers to doComplete()
+│   ├── openai-compat.ts        # MODIFY — add stream: true path for compatible providers
+│   └── streaming.ts            # NEW — StreamChunk type, streaming result utilities
+├── context/
+│   └── token-counter.ts        # MODIFY — optional: more accurate estimator
+├── ai-rounds/
+│   ├── round-5-edge-cases.ts   # VERIFY deps, no change if already correct
+│   └── round-6-deployment.ts   # VERIFY deps, no change if already correct
+├── cli/
+│   └── generate.ts             # MODIFY — --stream flag, wiring
+├── config/
+│   └── schema.ts               # MODIFY — performance config block
+└── ui/
+    ├── types.ts                 # MODIFY — streaming display state
+    └── renderer.ts              # MODIFY — onRoundToken() callback
 ```
 
 ### Structure Rationale
 
-- **.github/ for community health files:** GitHub searches `.github/` before root before `docs/` for CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md. Placing them in `.github/` keeps root uncluttered and is the GitHub-recommended location (source: GitHub docs, HIGH confidence).
-- **docs/user/ vs docs/contributor/ split:** Two distinct audiences with different mental models. User docs answer "how do I use this?" Contributor docs answer "how does this work?" Mixing them creates cognitive friction. Pattern used by GitHub CLI, oclif, and similar (MEDIUM confidence — observed across multiple projects).
-- **llms.txt at root:** The llms.txt spec (llmstxt.org) specifies `/llms.txt` at the root of the project/site. It requires an H1 title, optional summary blockquote, and H2-delimited sections with links to key documents. One file acts as a table of contents for LLMs ingesting the repo (HIGH confidence — spec verified).
-- **AGENTS.md revised (not retired):** AGENTS.md serves a different purpose than CONTRIBUTING.md — it is operational guidance for AI coding agents working inside the codebase (tool restrictions, patterns to follow, what not to do). The content currently in AGENTS.md that explains architecture for humans moves to `docs/contributor/architecture.md`. AI-operational rules stay in AGENTS.md.
-- **CHANGELOG.md at root:** Standard location. GitHub releases UI links to it. Users expect it here.
-- **CI workflows in .github/workflows/:** GitHub Actions only discovers workflows at this path (not configurable). Two workflows are distinct concerns (quality gate vs. publish) and should be separate files to avoid accidental coupling.
+- **No new top-level folders:** All performance features are modifications to existing layers. Creating `src/performance/` or `src/streaming/` would fragment cohesion — streaming belongs in `providers/`, caching belongs in `cache/`, token work belongs in `context/`.
+- **streaming.ts in providers/:** Streaming is a provider capability, not a pipeline concept. The type definitions and utilities belong alongside the providers that use them.
+- **Schema changes minimal:** One new `performance` block in `HandoverConfigSchema` controls all performance flags. This keeps config discoverable and opt-in.
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Community Health Files in .github/
+### Pattern 1: Prompt Caching via cache_control Headers (Anthropic)
 
-**What:** GitHub's community health file system discovers files in `.github/` first, then root, then `docs/`. Placing all community health files in `.github/` keeps root clean while GitHub still surfaces them in the UI.
+**What:** Anthropic's API supports marking message content blocks with `"cache_control": {"type": "ephemeral"}`. Cached blocks are stored for 5 minutes and cost 10% of normal input tokens on cache hit (90% discount). Cache miss costs 25% extra but subsequent hits recoup this immediately.
 
-**When to use:** Always — this is the canonical GitHub recommendation for OSS projects.
+**When to use:** Mark the static system context (file tree, dependency summary, static analysis data) as cacheable. This context is identical across all 6 rounds in a single run. Without prompt caching, this context is re-tokenized and billed 6 times. With prompt caching, it is tokenized once; rounds 2-6 pay 10%.
 
-**Trade-offs:** Slightly less discoverable for people browsing the file tree, but GitHub UI surfaces them prominently in the sidebar.
+**Trade-offs:** Only available on Anthropic provider. Other providers do not have equivalent. Must be guarded by provider check. Cache is ephemeral (5 minutes) — only useful within a single `handover generate` run, not across runs.
 
-**Example:**
-```
-.github/
-├── CODE_OF_CONDUCT.md      # GitHub links in "Insights > Community" tab
-├── CONTRIBUTING.md         # GitHub links on new issue/PR forms
-└── SECURITY.md             # GitHub links in "Security" tab
-```
+**Example — modified AnthropicProvider.doComplete():**
 
-### Pattern 2: docs/ Folder with Audience Segmentation
+```typescript
+// In src/providers/anthropic.ts
+protected async doComplete<T>(
+  request: CompletionRequest,
+  schema: z.ZodType<T>,
+): Promise<CompletionResult & { data: T }> {
+  const inputSchema = zodToToolSchema(schema) as Anthropic.Tool.InputSchema;
 
-**What:** Split docs/ into `user/` and `contributor/` subdirectories. Each subdirectory serves one audience exclusively.
+  // Mark the static context in system prompt as cacheable
+  // This is the large block of file content / static analysis data
+  const systemContent: Anthropic.TextBlockParam[] = request.cacheablePrefix
+    ? [
+        {
+          type: 'text',
+          text: request.cacheablePrefix,
+          cache_control: { type: 'ephemeral' },  // <-- NEW
+        },
+        {
+          type: 'text',
+          text: request.systemPrompt,
+        },
+      ]
+    : [{ type: 'text', text: request.systemPrompt }];
 
-**When to use:** When a project has both end users (who install the tool) and contributors (who modify the code). The handover CLI has both audiences.
-
-**Trade-offs:** Requires discipline to keep the split clean. Worth it: prevents a user looking for "how to configure providers" from wading through "how the DAG orchestrator works."
-
-**Example:**
-```
-docs/
-├── user/           # Everything an npm user needs
-│   └── providers.md    → "Set ANTHROPIC_API_KEY=..."
-└── contributor/    # Everything a code contributor needs
-    └── architecture.md → "DAG orchestrator uses Kahn's algorithm..."
-```
-
-### Pattern 3: llms.txt as Documentation Index
-
-**What:** A single file at the root that acts as a curated table of contents for LLMs. Uses H1 title, blockquote summary, and H2 sections with links to key markdown files. An LLM can read llms.txt first to orient itself, then follow links to specific docs.
-
-**When to use:** Any project that wants AI coding assistants to understand it quickly. Especially appropriate for handover, which positions itself as an AI tooling product.
-
-**Trade-offs:** Requires maintenance when docs are added/removed. Minor burden — it's a short file.
-
-**Example:**
-```markdown
-# handover
-
-> Generate a complete knowledge base from any codebase with a single command.
-
-## Documentation
-
-- [Getting Started](docs/user/getting-started.md): Installation and first run
-- [Configuration](docs/user/configuration.md): Config file reference
-- [LLM Providers](docs/user/providers.md): Provider setup
-
-## Contributing
-
-- [Architecture](docs/contributor/architecture.md): System design
-- [Development](docs/contributor/development.md): Local setup and testing
+  const response = await this.client.messages.create({
+    model: this.model,
+    max_tokens: request.maxTokens ?? 4096,
+    system: systemContent,  // now array, not string
+    messages: [{ role: 'user', content: request.userPrompt }],
+    // ... tools unchanged
+    betas: ['prompt-caching-2024-07-31'],  // required for cache_control
+  });
+  // ...
+}
 ```
 
-### Pattern 4: Two-Stage CI Workflow
+**CompletionRequest must be extended:**
 
-**What:** Separate the quality gate (ci.yml) from the publish workflow (release.yml). The quality gate runs on every push and every PR. The publish workflow runs only on version tag pushes (e.g., `v*`).
+```typescript
+// In src/domain/types.ts
+export interface CompletionRequest {
+  systemPrompt: string;
+  userPrompt: string;
+  maxTokens?: number;
+  temperature?: number;
+  cacheablePrefix?: string; // NEW — stable context block to cache
+}
+```
 
-**When to use:** Any npm package. Prevents accidental publishes and keeps CI feedback fast.
+**Where `cacheablePrefix` comes from:** The packed file context (`packedContext.fileContent`) is the stable prefix — it does not change between rounds. The per-round instructions go in `systemPrompt`. The round factory (`src/ai-rounds/round-factory.ts`) passes `packedContext` already; extracting the file content into `cacheablePrefix` is a targeted change there.
 
-**Trade-offs:** Two files to maintain rather than one. The clarity is worth the small overhead.
+### Pattern 2: Parallel Round Execution via DAG Dependency Declaration
 
-**Example ci.yml structure:**
-```yaml
-name: CI
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-jobs:
-  quality:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
-      - run: npm test
+**What:** The existing DAGOrchestrator already supports parallel execution — independent steps run via `Promise.race`. The bottleneck is dependency declarations. Rounds 5 and 6 both depend only on rounds 1 and 2, making them candidates for parallel execution.
+
+**When to use:** Any two rounds that do not consume each other's output can be declared with the same dependencies and will run in parallel automatically.
+
+**Trade-offs:** Round execution order becomes non-deterministic for rounds with same deps. This is fine — rounds are independent by design. The `roundResults` Map in generate.ts is safe because DAG guarantees a round's `execute()` only runs after its deps complete.
+
+**Example — verifying round dep declarations:**
+
+```typescript
+// src/ai-rounds/round-5-edge-cases.ts
+export const ROUND_5_CONFIG: StandardRoundConfig<Round5Output> = {
+  roundNumber: 5,
+  name: 'Edge Cases & Conventions',
+  deps: ['static-analysis', 'ai-round-1', 'ai-round-2'], // NOT round 3 or 4
+  // ...
+};
+
+// src/ai-rounds/round-6-deployment.ts
+export const ROUND_6_CONFIG: StandardRoundConfig<Round6Output> = {
+  roundNumber: 6,
+  name: 'Deployment Inference',
+  deps: ['static-analysis', 'ai-round-1', 'ai-round-2'], // NOT round 3 or 4
+  // ...
+};
+```
+
+If rounds 5 and 6 currently declare these deps, parallel execution is free — no orchestrator changes needed. If they over-declare (e.g., depending on round 3 or 4 when they don't use those results), removing the excess deps is the only change needed.
+
+**Analyzer parallelism:** `config.analysis.concurrency` already exists in the schema (default: 4). Verify `src/analyzers/coordinator.ts` respects this value when running the 8 analyzers concurrently.
+
+### Pattern 3: Streaming with Deferred Schema Validation
+
+**What:** LLM APIs support streaming responses (token by token) for faster perceived performance. However, Anthropic's `tool_use` and OpenAI's `function_call` structured output patterns require the complete JSON before Zod validation can run. The streaming pattern for structured output is: stream the raw text, accumulate it, then parse and validate the complete JSON at stream end.
+
+**When to use:** When `--stream` is enabled and the provider supports streaming. Stream is opt-in because it complicates error handling and adds UI state management complexity.
+
+**Trade-offs:** Streaming does not reduce total LLM token cost or total execution time — it only improves perceived latency (user sees activity rather than a spinning cursor). For long rounds (4096 max_tokens), streaming shows output token-by-token which is visible. For structured output, the JSON is not meaningful until complete — but the user sees characters appearing, signaling progress.
+
+**Example — new streaming.ts types:**
+
+```typescript
+// src/providers/streaming.ts
+export interface StreamChunk {
+  type: 'token' | 'done' | 'error';
+  content?: string; // token text
+  error?: Error; // on error
+  fullText?: string; // on done: accumulated text
+}
+
+export type StreamCallback = (chunk: StreamChunk) => void;
+```
+
+**Example — interface extension in base.ts:**
+
+```typescript
+// src/providers/base.ts
+export interface LLMProvider {
+  readonly name: string;
+  complete<T>(request: CompletionRequest, schema: z.ZodType<T>, options?: {...}): Promise<CompletionResult & { data: T }>;
+  estimateTokens(text: string): number;
+  maxContextTokens(): number;
+  supportsStreaming(): boolean;  // NEW — providers declare capability
+}
+```
+
+**Example — UI integration:**
+
+```typescript
+// src/ui/types.ts (extend Renderer interface)
+export interface Renderer {
+  // ... existing methods
+  onRoundToken?(roundNum: number, token: string): void; // NEW — optional
+}
+```
+
+The `TerminalRenderer` shows a character counter or partial text indicator when `onRoundToken` is called. The `CIRenderer` ignores it (no-op). Both are safe because the method is optional.
+
+### Pattern 4: Improved Token Estimation
+
+**What:** The current `estimateTokens(text)` uses `Math.ceil(text.length / 4)` — the chars/4 heuristic. This is accurate within 15-20% for English code. For token budget computation (`computeTokenBudget`), this inaccuracy compounds: if the budget is calculated at 200K tokens but the actual usage is 15% higher, files get packed that overflow the context window.
+
+**When to use:** A more accurate estimator benefits all runs. The improvement is in `src/context/token-counter.ts` and the provider's `estimateTokens()` implementation.
+
+**Recommended approach:** Use `js-tiktoken` (the JavaScript port of OpenAI's tiktoken) for GPT-family providers. For Anthropic, the chars/4 heuristic is closer to accurate because Claude uses a similar tokenizer. Alternatively, use the Anthropic token counting API endpoint (`/v1/messages/count_tokens`) as a pre-flight check — but this adds latency and an extra API call.
+
+**Practical recommendation:** Keep chars/4 as the default. Add `tiktoken` as an optional estimator for OpenAI-family providers when `performance.preciseTokenCounting: true` is in config. The complexity budget for this feature is low relative to prompt caching.
+
+**Example — config schema extension:**
+
+```typescript
+// src/config/schema.ts
+export const HandoverConfigSchema = z.object({
+  // ... existing fields
+  performance: z
+    .object({
+      promptCache: z.boolean().default(true), // Anthropic prompt caching
+      streaming: z.boolean().default(false), // streaming output
+      preciseTokenCounting: z.boolean().default(false), // tiktoken estimator
+    })
+    .default({}),
+});
 ```
 
 ---
 
 ## Data Flow
 
-### Documentation Authoring Flow
+### Caching Flow (per-run)
 
 ```
-AGENTS.md (existing, monolithic)
-  + PRD.md (existing, monolithic)
-    ↓ (distill and restructure)
-docs/contributor/architecture.md    # System design for humans
-docs/contributor/development.md     # Dev workflow for humans
-AGENTS.md (revised)                 # AI operational rules only
+generate.ts starts
+    ↓
+RoundCache.getCachedRounds()  → check what's already cached
+    ↓
+[for each required round]
+    wrapWithCache() checks hash
+        ├── HIT:  return cached result, mark UI as 'cached', skip LLM call
+        └── MISS: execute round → LLM call → store result → return
+    ↓
+All rounds complete (mix of cache hits and LLM calls)
+    ↓
+Render step (reads roundResults, all populated regardless of hit/miss)
 ```
 
-### User Discovery Flow
+### Parallel Round Flow
 
 ```
-npm search / Google / GitHub search
-    ↓
-README.md (first impression, quick start)
-    ↓
-docs/user/getting-started.md (installation details)
-docs/user/providers.md (API key setup)
-docs/user/configuration.md (advanced config)
+static-analysis step completes
+    ↓ (DAGOrchestrator checkDependents triggers)
+ai-round-1 starts
+    ↓ (ai-round-1 completes)
+ai-round-2 starts (depends on round-1)
+    ↓ (ai-round-2 completes)
+ai-round-3 starts (depends on rounds 1,2)
+ai-round-4 starts (depends on rounds 1,2,3 — waits for 3)
+ai-round-5 starts (depends on rounds 1,2 — starts same time as 3)  ← parallel
+ai-round-6 starts (depends on rounds 1,2 — starts same time as 3)  ← parallel
+    ↓ (all terminal rounds complete)
+render step starts
 ```
 
-### Contributor Discovery Flow
+Note: Rounds 3 and 4 remain sequential (4 depends on 3). Rounds 5 and 6 run in parallel with rounds 3 and 4 if their deps are correctly declared.
+
+### Streaming Flow (per round, when enabled)
 
 ```
-GitHub "Contribute" button / Issues
+provider.completeStream(request, onChunk) called
     ↓
-.github/CONTRIBUTING.md (setup instructions + links)
-    ↓
-docs/contributor/development.md (local dev workflow)
-docs/contributor/architecture.md (system design)
-docs/contributor/adding-providers.md (specific extension points)
+LLM streams tokens
+    ↓ (each token)
+onChunk({ type: 'token', content: '...' })
+    → renderer.onRoundToken(roundNum, token)
+    → UI shows partial output indicator
+    ↓ (stream ends)
+onChunk({ type: 'done', fullText: '...' })
+    → Zod schema.parse(JSON.parse(fullText))
+    → validation and quality check run on complete data
+    → RoundCache.set() stores complete validated result
 ```
 
-### LLM Ingestion Flow
+### Prompt Cache Flow (Anthropic, within a single run)
 
 ```
-AI agent receives task related to handover codebase
-    ↓
-llms.txt (orientation: what this is, key files)
-    ↓
-AGENTS.md (operational rules: do this, not that)
-    ↓
-docs/contributor/architecture.md (DAG, patterns, conventions)
-    ↓
-src/ (actual code)
-```
+Round 1 call:
+  system: [{ text: packedFileContent, cache_control: ephemeral }, { text: round1Instructions }]
+  → Anthropic stores packedFileContent in cache for 5 minutes
+  → Usage: cache_creation_input_tokens (billed at 125%)
 
-### CI Quality Gate Flow
+Round 2 call:
+  system: [{ text: packedFileContent, cache_control: ephemeral }, { text: round2Instructions }]
+  → Anthropic recognizes same prefix in cache
+  → Usage: cache_read_input_tokens (billed at 10%)
 
-```
-Developer opens PR
-    ↓
-ci.yml triggered
-    ├── npm run typecheck (tsc --noEmit)
-    ├── npm run build (tsup)
-    └── npm test (vitest, integration gated behind HANDOVER_INTEGRATION=1)
-    ↓
-All green → PR can be merged
+Rounds 3-6: same pattern → each pays 10% for the large static context block
 ```
 
 ### Key Data Flows
 
-1. **Content reuse:** AGENTS.md and PRD.md are sources; docs/contributor/ files are outputs. No duplication — originals retired after distillation.
-2. **Cross-linking:** README.md → docs/user/ → (no further links needed). README.md → .github/CONTRIBUTING.md → docs/contributor/ → src/. Each layer links forward, never backward.
-3. **CI to release:** ci.yml quality gate must pass before release.yml publish is triggered (enforced via branch protection or separate trigger conditions).
+1. **Cache hit bypasses `executeRound`:** When `wrapWithCache()` returns cached data, it stores directly into `roundResults` and updates UI state. The `executeRound` function is never called, saving the LLM API call, all retry logic, and quality checking.
+
+2. **Parallel rounds share `roundResults` safely:** The `roundResults` Map is shared mutable state. It is safe because the DAG guarantees sequential-by-dependency execution — a round's `execute()` cannot read from `roundResults` before its declared deps have written to it.
+
+3. **Prompt caching is transparent to round logic:** Round factories build prompts as normal. The `cacheablePrefix` extraction happens in the round factory or the prompt builder — round-specific logic does not change.
+
+4. **Streaming fallback is provider-local:** If `completeStream` is not implemented or `supportsStreaming()` returns false, `BaseProvider.complete()` is called unchanged. The streaming path is additive, not replacing the existing path.
 
 ---
 
 ## Scaling Considerations
 
-This is a documentation and CI infrastructure question, not a runtime scaling question. The relevant scaling axis is "repository complexity as the project grows."
+These performance features target the primary pain point: a single `handover generate` run takes 3-8 minutes on a medium-sized codebase, mostly waiting for 6 sequential LLM API calls.
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| v0.1 (current) | All files flat in .github/ and docs/ — no subdirectory complexity needed beyond user/contributor split |
-| v0.x growth (more providers, analyzers) | docs/contributor/ grows organically. One file per major extension point (already planned: adding-providers.md, adding-analyzers.md) |
-| v1.0+ (community grows) | Add GOVERNANCE.md if multiple maintainers emerge. Add docs site (Docusaurus/Nextra) as wrapper around existing markdown — no rewrite needed since docs are already in markdown |
-| Large community | Issue triage automation (GitHub Actions: auto-label, stale bot). Discussion templates. Separate SUPPORT.md |
+| Concern          | Current      | With Parallel (rounds 5+6) | With Prompt Cache                       | With Round Cache (2nd run)  |
+| ---------------- | ------------ | -------------------------- | --------------------------------------- | --------------------------- |
+| Total LLM calls  | 6 sequential | ~4 sequential steps        | 6 calls, 5 cached reads                 | 0 (full hit) or partial     |
+| Perceived wait   | 3-8 min      | ~2-4 min                   | 3-8 min (savings are cost, not latency) | <30s (static analysis only) |
+| Token cost       | 100%         | 100%                       | ~20-30%                                 | 0%                          |
+| Code change size | —            | Small (dep declarations)   | Medium (provider layer)                 | Already implemented         |
 
 ### Scaling Priorities
 
-1. **First pressure point:** CONTRIBUTING.md becomes too long as architecture grows. Mitigation: CONTRIBUTING.md is a gateway document with links, not a full reference. It stays short; detail lives in docs/contributor/.
-2. **Second pressure point:** llms.txt becomes stale as docs are added. Mitigation: Reviewers check llms.txt as part of PR checklist whenever docs/ is modified.
+1. **First win: Round cache is already implemented.** Second runs on an unchanged codebase skip all LLM calls. This is the highest-ROI feature. Ensure it is correctly wired and working.
+
+2. **Second win: Parallel rounds 5+6.** Rounds 5 and 6 have identical deps (rounds 1, 2) and do not consume each other's output. If their dep declarations are correct, the DAG runs them concurrently automatically. This is potentially zero code change if the dep declarations are already minimal.
+
+3. **Third win: Prompt caching.** 70-80% token cost reduction on rounds 2-6 for Anthropic users. Medium code change in the provider layer. No impact on other providers.
+
+4. **Fourth win: Streaming.** Improves perceived latency only. Medium complexity — new UI state, new provider path, careful error handling. Lower ROI than caching but noticeable UX improvement for first-time runs.
+
+5. **Defer: Precise token counting.** The chars/4 heuristic is sufficient. Tiktoken adds a dependency with marginal accuracy gain. Address only if token budget overflows are observed in practice.
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Documentation Alongside Code (Per-Module Docs)
+### Anti-Pattern 1: Adding a Separate Cache Layer for Prompt Caching
 
-**What people do:** Add README.md files inside src/ai-rounds/, src/providers/, etc., to explain each module.
+**What people do:** Create a new `src/cache/prompt-cache.ts` to "manage" Anthropic prompt caching.
 
-**Why it's wrong:** Creates a maintenance nightmare — docs are scattered, hard to discover, and GitHub doesn't surface them. For a TypeScript CLI with a CLI-first audience, users never read src/ files. The architecture docs belong in docs/contributor/architecture.md as a unified document.
+**Why it's wrong:** Anthropic prompt caching is managed entirely by the Anthropic API — it's ephemeral (5 minute TTL), automatic on subsequent calls with the same prefix, and requires no client-side state management. Adding a client-side cache layer for something the API already manages is pure overhead.
 
-**Do this instead:** Use AGENTS.md for AI agent guidance, docs/contributor/architecture.md for human contributor guidance. Use clear module-level JSDoc comments in source for inline documentation (visible in IDE, TypeDoc-generatable).
+**Do this instead:** Add `cache_control` headers in `AnthropicProvider.doComplete()` and add `cacheablePrefix` to `CompletionRequest`. That's the entire implementation. No new cache class.
 
-### Anti-Pattern 2: Monolithic CONTRIBUTING.md
+### Anti-Pattern 2: Streaming with Partial JSON Validation
 
-**What people do:** Put everything in CONTRIBUTING.md — setup, testing, architecture, PR process, coding conventions, provider implementation guide, analyzer guide.
+**What people do:** Try to validate the streaming Zod schema as tokens arrive, using partial JSON parsers.
 
-**Why it's wrong:** CONTRIBUTING.md becomes 2000+ lines and nobody reads it. New contributors are overwhelmed before they write a line of code.
+**Why it's wrong:** Handover's structured output uses Anthropic's `tool_use` block and OpenAI's `function_call`, both of which require the complete JSON string before Zod can validate. Partial JSON parsers are fragile and add complexity without benefit — the schema validation needs the full response regardless.
 
-**Do this instead:** CONTRIBUTING.md is a 300-400 line gateway document: prerequisites, quick setup (10 commands to first test run), PR checklist, and links to docs/contributor/ for depth. Architecture and extension guides live separately.
+**Do this instead:** Stream tokens for UI feedback only. Accumulate the full text. Parse and validate at stream end exactly as the non-streaming path does.
 
-### Anti-Pattern 3: CI Workflow That Runs Integration Tests Unconditionally
+### Anti-Pattern 3: Changing DAGOrchestrator for Parallelism
 
-**What people do:** Add `npm test` to CI and let it fail for contributors who don't have API keys.
+**What people do:** Add concurrency controls, thread pools, or max-parallel settings to DAGOrchestrator.
 
-**Why it's wrong:** Handover's integration tests require `HANDOVER_INTEGRATION=1` and API keys. If CI runs tests without this guard, all PRs from external contributors fail immediately. This is documented in the project: "integration tests only, gated behind HANDOVER_INTEGRATION=1."
+**Why it's wrong:** The DAGOrchestrator already runs independent steps in parallel via `Promise.race` (line 227 in dag.ts). The concurrency model is correct. The only thing preventing rounds 5 and 6 from running in parallel is their dependency declarations. Fix the declarations, not the orchestrator.
 
-**Do this instead:** CI runs `npm test` normally (vitest will skip integration tests without the env var). Only a separate, secrets-enabled workflow step optionally runs integration tests on the main branch using repository secrets. This is explicitly called out in CONTRIBUTING.md.
+**Do this instead:** Audit the dep declarations in `round-5-edge-cases.ts` and `round-6-deployment.ts`. Remove any over-declared deps (deps that the round doesn't actually consume). The orchestrator will handle the rest.
 
-### Anti-Pattern 4: llms.txt as Full Documentation
+### Anti-Pattern 4: Caching LLM Responses by Prompt Hash
 
-**What people do:** Dump the entire README into llms.txt, or link every single file in the repo.
+**What people do:** Hash the full prompt text and use that as the cache key, storing LLM responses in a key-value store keyed by prompt hash.
 
-**Why it's wrong:** Defeats the purpose. llms.txt is a curated index, not a full dump. An LLM given 50 links has no meaningful orientation. The spec emphasizes curation.
+**Why it's wrong:** Handover already has the correct cache key: content hash of (round number + model name + analysis fingerprint). The analysis fingerprint is a hash of all file paths and sizes — a cheap proxy for "did the codebase change?" This is more stable than a prompt hash (prompts include timestamps, config values) and already implemented in `RoundCache.computeHash()`.
 
-**Do this instead:** llms.txt links to 8-12 essential files maximum. Each link has a one-sentence description of what's in it. Group under 4-5 H2 sections (Quick Start, Documentation, Contributing, Architecture).
+**Do this instead:** Keep the existing cache key strategy. The only valid reason to change it is if false cache hits occur in practice (cache returns stale data). Verify this doesn't happen before considering changes.
 
-### Anti-Pattern 5: Keeping AGENTS.md as a Human Doc
+### Anti-Pattern 5: Making Streaming Mandatory
 
-**What people do:** Revise AGENTS.md to be a combined human/AI document that explains the architecture fully.
+**What people do:** Replace `provider.complete()` calls with `provider.completeStream()` for all rounds.
 
-**Why it's wrong:** AGENTS.md is read by AI agents executing tasks. It should be dense with operational rules (what to do, what not to do, where things live). Architecture explanation for humans belongs in docs/contributor/architecture.md, where it can be narrative and thorough.
+**Why it's wrong:** Streaming complicates error handling (partial network failure mid-stream), requires UI state management for partial output, and has no benefit in CI environments or when piped output is used. The existing non-streaming path is simpler and more reliable.
 
-**Do this instead:** Keep AGENTS.md short and directive (current 105-line format is close to ideal). Move architecture explanation content to docs/contributor/architecture.md. Add a single link in AGENTS.md: "For architecture context: docs/contributor/architecture.md."
+**Do this instead:** Make streaming opt-in via `--stream` flag and `performance.streaming: true` in config. Default to non-streaming. The `supportsStreaming()` method on the provider interface allows the generate command to check capability before attempting to stream.
 
 ---
 
@@ -368,75 +487,84 @@ This is a documentation and CI infrastructure question, not a runtime scaling qu
 
 ### External Services
 
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| npm registry | Publish via `npm publish` in release.yml workflow | Use `NODE_AUTH_TOKEN` secret from npm; consider OIDC trusted publishing |
-| GitHub Actions | Triggered on push, PR, and tag events | ci.yml and release.yml are separate files |
-| GitHub Sponsors | .github/FUNDING.yml with `github: [username]` | Surfaces sponsor button in repo UI |
-| Contributor Covenant | CODE_OF_CONDUCT.md links to v2.1 at contributor-covenant.org | Don't copy the full text; link instead |
+| Service                       | Integration Pattern                                                                     | Notes                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Anthropic API                 | Add `cache_control` to system content array; add `betas: ['prompt-caching-2024-07-31']` | Only for Anthropic provider; must check API version support; beta header may change         |
+| Anthropic API (streaming)     | `client.messages.stream()` instead of `client.messages.create()`                        | Streaming path through beta streaming API; verify current Anthropic SDK version supports it |
+| OpenAI-compat API (streaming) | `client.chat.completions.create({ stream: true })`                                      | OpenAI SDK supports streaming natively; returns `Stream<ChatCompletionChunk>`               |
 
 ### Internal Boundaries
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| README.md ↔ docs/user/ | README links to docs; docs do not link back to README | One-way: README is entry, docs are depth |
-| CONTRIBUTING.md ↔ docs/contributor/ | CONTRIBUTING links to docs; docs are standalone | CONTRIBUTING is 300-400 lines max |
-| llms.txt ↔ all docs | llms.txt links to key files; files do not reference llms.txt | llms.txt is a generated index, not a document |
-| AGENTS.md ↔ docs/contributor/ | AGENTS.md links to architecture.md; architecture.md does not link to AGENTS.md | Separation of AI-operational vs. human-educational concerns |
-| ci.yml ↔ release.yml | release.yml has no dependency on ci.yml at workflow level | Branch protection rules enforce quality gate separately |
-| docs/user/ ↔ docs/contributor/ | No cross-links | Audience separation is strict |
+| Boundary                                  | Communication                                                               | Notes                                                                                                                             |
+| ----------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `generate.ts` ↔ `RoundCache`              | Direct instantiation, `wrapWithCache()` closure                             | Already implemented. No interface change needed.                                                                                  |
+| `generate.ts` ↔ `LLMProvider`             | Via `provider.complete()` and new `provider.completeStream()`               | `completeStream` is optional; generate.ts checks `supportsStreaming()` before using it                                            |
+| `CompletionRequest` ↔ `AnthropicProvider` | `cacheablePrefix` field on request object                                   | Anthropic-only field; OpenAI-compat provider ignores it (no `if` needed — just unused)                                            |
+| `round-factory.ts` ↔ `CompletionRequest`  | `buildPrompt()` extracts `packedContext.fileContent` into `cacheablePrefix` | Factory already receives `packedContext`; minimal change to split prompt into prefix + instructions                               |
+| `TerminalRenderer` ↔ streaming            | New `onRoundToken()` callback on `Renderer` interface (optional method)     | `CIRenderer` does not implement it; `TerminalRenderer` shows token counter; optional prevents breaking existing renderer contract |
+| `DisplayState` ↔ streaming                | New `streamingRound?: number` field                                         | Optional field; `buildRoundLines()` checks for it and shows partial indicator                                                     |
 
 ---
 
-## Build Order Implications
+## Build Order
 
-The components have a clear dependency order for implementation. Building in the wrong order causes rework.
+The four features have dependencies on each other and on codebase understanding. Build in this order:
 
 ```
-1. CI workflows (.github/workflows/)
-   — needed first so all subsequent work gets validated automatically
+1. Verify parallel round deps (rounds 5, 6)
+   — Read round-5-edge-cases.ts and round-6-deployment.ts
+   — Check which prior rounds they actually consume in getPriorContexts()
+   — If deps are already minimal: zero code change; document the finding
+   — If over-declared: remove excess deps; test that rounds still produce correct output
+   — Cost: 30 min to 2 hours
 
-2. Community health files (.github/ root files)
-   — CODE_OF_CONDUCT, SECURITY, FUNDING are boilerplate;
-     CONTRIBUTING needs architecture docs to link to (chicken-and-egg;
-     stub CONTRIBUTING first, fill links as docs/ is built)
+2. Extend CompletionRequest with cacheablePrefix
+   — Modify src/domain/types.ts
+   — Zero runtime behavior change: field is optional, providers ignore if not used
+   — Cost: 15 minutes
 
-3. GitHub issue + PR templates (.github/ISSUE_TEMPLATE/, PULL_REQUEST_TEMPLATE.md)
-   — independent of docs/, can be done in parallel with docs/
+3. Implement Anthropic prompt caching
+   — Modify src/providers/anthropic.ts: system as array, cache_control, betas header
+   — Modify src/ai-rounds/round-factory.ts: extract packedContext.fileContent → cacheablePrefix
+   — Test with actual Anthropic API: verify cache_read_input_tokens appear in usage
+   — Cost: 2-4 hours (includes API testing)
 
-4. docs/contributor/ (distilling AGENTS.md + PRD.md content)
-   — requires understanding the codebase (already done);
-     CONTRIBUTING.md links here, so docs/contributor/ must exist before
-     CONTRIBUTING.md is finalized
+4. Add performance config block
+   — Modify src/config/schema.ts: add performance.promptCache, performance.streaming, etc.
+   — Wire flags into generate.ts
+   — Cost: 1 hour
 
-5. docs/user/
-   — independent of docs/contributor/;
-     requires understanding the CLI from a user perspective
+5. Implement streaming (if in scope for this milestone)
+   — New src/providers/streaming.ts: StreamChunk type, StreamCallback
+   — Modify src/providers/base.ts: supportsStreaming() method
+   — Modify src/providers/base-provider.ts: default supportsStreaming() returns false
+   — Implement AnthropicProvider.completeStream() using client.messages.stream()
+   — Implement OpenAICompatibleProvider.completeStream() using stream: true
+   — Modify src/ui/types.ts: add onRoundToken to Renderer interface (optional)
+   — Modify src/ui/renderer.ts: implement onRoundToken for TerminalRenderer
+   — Modify src/cli/generate.ts: check supportsStreaming(), pass onChunk callback
+   — Cost: 4-8 hours
 
-6. llms.txt
-   — written last: indexes the docs that now exist;
-     needs final file paths to link correctly
-
-7. AGENTS.md revision
-   — trim to AI-operational content only after docs/contributor/architecture.md
-     exists to absorb the human-educational content
+6. Token estimation improvement (if in scope)
+   — Install js-tiktoken (or equivalent)
+   — Modify src/context/token-counter.ts: conditional tiktoken path
+   — Wire behind performance.preciseTokenCounting flag
+   — Cost: 2-3 hours
 ```
 
-**Critical dependency:** Do not finalize CONTRIBUTING.md before docs/contributor/ exists. CONTRIBUTING.md's primary value is as a gateway with working links. Stub it early; finalize it last.
+**Critical path:** Steps 1-3 are the highest-value changes. Steps 4-6 are improvements. If time is constrained, deliver steps 1-3 and defer streaming and token estimation.
 
 ---
 
 ## Sources
 
-- [GitHub Community Health Files — Official Docs](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/creating-a-default-community-health-file) — HIGH confidence
-- [llms.txt Specification — llmstxt.org](https://llmstxt.org/) — HIGH confidence
-- [Building and Testing Node.js — GitHub Actions Docs](https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs) — HIGH confidence
-- [GitHub CLI (cli/cli) — Reference OSS project structure](https://github.com/cli/cli) — MEDIUM confidence (observed pattern)
-- [oclif — Reference TypeScript CLI OSS structure](https://github.com/oclif/oclif) — MEDIUM confidence (observed pattern)
-- [Mintlify: What is llms.txt?](https://www.mintlify.com/blog/what-is-llms-txt) — MEDIUM confidence (secondary source confirming spec)
-- [Semantic-release GitHub Actions](https://semantic-release.gitbook.io/semantic-release/recipes/ci-configurations/github-actions) — MEDIUM confidence
+- Direct codebase reading: `src/orchestrator/dag.ts`, `src/cache/round-cache.ts`, `src/providers/anthropic.ts`, `src/providers/base-provider.ts`, `src/ai-rounds/runner.ts`, `src/cli/generate.ts`, `src/config/schema.ts` — HIGH confidence
+- [Anthropic Prompt Caching documentation](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) — MEDIUM confidence (API still beta as of research date; `betas` header requirement may change)
+- [OpenAI Streaming documentation](https://platform.openai.com/docs/api-reference/streaming) — HIGH confidence
+- [Streaming Structured LLM Response — Medium](https://medium.com/@amitsriv99/genai-streaming-structured-llm-response-over-http-2450ed7b6749) — MEDIUM confidence (secondary source)
+- [LLMOps Caching Guide — Redis](https://redis.io/blog/large-language-model-operations-guide/) — MEDIUM confidence (general patterns, not handover-specific)
 
 ---
 
-*Architecture research for: Handover OSS Infrastructure*
-*Researched: 2026-02-18*
+_Architecture research for: Handover CLI — Performance Features Milestone_
+_Researched: 2026-02-18_

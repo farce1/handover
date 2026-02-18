@@ -1,8 +1,28 @@
 # Feature Research
 
-**Domain:** OSS infrastructure and developer experience for a TypeScript CLI tool (handover-cli)
+**Domain:** Performance improvements for an AI-powered TypeScript CLI code analysis tool (handover-cli)
 **Researched:** 2026-02-18
-**Confidence:** HIGH — GitHub community standards are well-documented via official docs; badge and CI patterns verified via official sources; llms.txt is MEDIUM (proposed standard, real adoption); AGENTS.md is MEDIUM (emerging convention, 60k+ repos)
+**Confidence:** HIGH — existing codebase audited directly; performance patterns verified against Anthropic SDK docs, ESLint incremental caching, and LLM streaming patterns; token optimization techniques verified via multiple sources
+
+---
+
+## Context: What Is Already Built
+
+Before categorizing features, it is essential to map what performance infrastructure already exists. The milestone is additive — these are NOT features to build:
+
+| Component                           | Location                       | What It Does                                                                           | Status |
+| ----------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------- | ------ |
+| `RoundCache`                        | `src/cache/round-cache.ts`     | Content-hash disk cache for AI round results; JSON-per-round; survives process crashes | BUILT  |
+| `AnalysisCache`                     | `src/analyzers/cache.ts`       | File-content-hash map; skip re-parsing unchanged files on repeat runs                  | BUILT  |
+| `Promise.allSettled` in coordinator | `src/analyzers/coordinator.ts` | All 8 analyzers run concurrently; graceful degradation on individual failure           | BUILT  |
+| `DAGOrchestrator` parallel dispatch | `src/orchestrator/dag.ts`      | Independent DAG steps start immediately when deps resolve via `Promise.race()`         | BUILT  |
+| `TerminalRenderer` with throttle    | `src/ui/renderer.ts`           | In-place multi-line TTY updates at ~16fps; spinner ticks at 80ms                       | BUILT  |
+| `compressRoundOutput()`             | `src/context/compressor.ts`    | Deterministic 2000-token inter-round compression; no LLM calls                         | BUILT  |
+| `--only` selective rounds           | `src/cli/generate.ts`          | `computeRequiredRounds()` skips unneeded AI rounds based on requested docs             | BUILT  |
+| `--no-cache` flag                   | `src/cli/generate.ts`          | Clears `RoundCache` before execution; forces fresh LLM calls                           | BUILT  |
+| Size-based fingerprint              | `src/cache/round-cache.ts`     | `computeAnalysisFingerprint()` hashes file paths + sizes for round cache key           | BUILT  |
+
+**The existing cache is crash-recovery, not true incremental analysis.** The `RoundCache` fingerprint uses file paths and sizes — not content hashes. Any file size change (or any new/deleted file) invalidates all 6 round caches. The `AnalysisCache` uses content hashes but only for the static analysis layer (skipping re-parsing), not for deciding which LLM rounds need re-execution.
 
 ---
 
@@ -10,208 +30,168 @@
 
 ### Table Stakes (Users Expect These)
 
-Features that every serious open source project has. Missing any of these signals "hobby project" or "abandoned." GitHub's own community health checklist covers most of these explicitly.
+Features that users of performance-sensitive CLI tools assume exist. Missing these makes handover feel slow and opaque relative to tools like `eslint --cache`, `tsc --incremental`, or `jest --watch`.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| CONTRIBUTING.md | GitHub surfaces it as a tab in repo UI; every OSS tool expects it; contributors will look for it before submitting a PR | LOW | Should cover: local setup, test commands, PR process, commit convention, architecture overview. Distill from AGENTS.md + PRD.md — don't duplicate, consolidate. |
-| GitHub issue templates (bug, feature, docs) | GitHub community health checklist requires them; prevents low-quality bug reports; guides contributors to give useful information | LOW | Use YAML form syntax (.yml in .github/ISSUE_TEMPLATE/). Three templates minimum: bug-report, feature-request, documentation. Add config.yml to disable blank issues. |
-| GitHub PR template | Sets expectations before contributors submit; reduces back-and-forth on PRs | LOW | Single PULL_REQUEST_TEMPLATE.md in .github/. Checklist format: tests pass, changelog updated, docs updated if needed. |
-| CHANGELOG.md | Users and integrators need to know what changed; breaking change visibility; professional signal | MEDIUM | Follow Keep a Changelog format (keepachangelog.com). Seed with existing version history. Don't fully automate yet — manual is fine for v0.x. |
-| CODE_OF_CONDUCT.md | GitHub community health checklist item; sets norms for a welcoming project; blocks bad actors from claiming ambiguity | LOW | Use Contributor Covenant v2.1 verbatim. No customization needed — the standard text is the point. Place in repo root or .github/. |
-| SECURITY.md | GitHub community health checklist item; GitHub uses it to route security reports; required for responsible disclosure | LOW | Cover: how to report a vuln privately (GitHub private vuln reporting), expected response time, what NOT to open as a public issue. |
-| CI: lint + typecheck + build | Every serious npm package runs this on PRs; contributors expect to see CI pass before merge | MEDIUM | GitHub Actions workflow. Node.js matrix (20, 22). npm ci, tsc --noEmit, npm run build. Run on push to main and all PRs. |
-| CI: tests | Contributors expect CI runs tests; required for trust in contributions | MEDIUM | Integration tests need API keys — gate them behind HANDOVER_INTEGRATION=1 env var. Unit/static tests run always. Document this clearly. |
-| README badges (CI status, npm version, license, downloads) | Social proof; signals active project; users scan badges before reading; absence reads as "is this even maintained?" | LOW | Already in README but need to verify links work correctly. CI badge requires ci.yml workflow to exist. npm downloads badge via shields.io. |
-| npm package.json `bugs` and `homepage` fields | npm package health; package consumers check these | LOW | Add bugs URL and homepage URL to package.json. Currently likely missing. |
-| .github/FUNDING.yml | GitHub shows a "Sponsor" button when present; signals project is maintained and seeking support | LOW | Single entry: `github: [username]`. Requires GitHub Sponsors to be enabled on the account. |
+| Feature                                    | Why Expected                                                                                                                                                                                                                                                                                                                | Complexity | Notes                                                                                                                                                                                                                                                            |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Content-hash-based cache invalidation      | Users expect that only changing files triggers re-analysis, not file metadata changes. `eslint --cache` does this; TypeScript `--incremental` does this. Size-only fingerprinting invalidates on trivial changes (touch, line ending, formatting)                                                                           | MEDIUM     | **Gap identified**: `RoundCache` uses paths+sizes. Switch fingerprint to SHA-256 over file content for changed files. The `AnalysisCache` already has per-file content hashes — the round cache fingerprint should incorporate these, not recompute from sizes.  |
+| Live progress during LLM rounds            | Users staring at a spinner for 30-90 seconds with no output feel the tool is hung. Every modern CLI tool with long-running async work shows incremental progress. The current `TerminalRenderer` already has the spinner infra — but rounds show only "running/done/failed" with no tokens-generated count during execution | LOW-MEDIUM | The Anthropic SDK and OpenAI-compat SDK both support streaming responses. The `LLMProvider.complete()` interface is blocking — no `onToken` callback or `stream` option. Adding streaming output requires extending the provider interface and the round runner. |
+| Measurable time-to-first-output on re-runs | Users expect that if nothing changed, re-runs are fast (seconds, not minutes). The current re-run experience hits the `RoundCache` and returns cached results — but only if the fingerprint matches. Improving the fingerprint to be content-based is the prerequisite.                                                     | MEDIUM     | Prerequisite: content-hash fingerprint above. With correct invalidation, only truly-changed rounds re-execute. Unchanged rounds restore from cache in <100ms each.                                                                                               |
+| `--cache` / `--no-cache` flag transparency | Users need to know whether they're seeing cached or fresh results. The current UI shows "cached" status for rounds that hit cache — this is present. Missing: cache hit/miss stats in completion summary (how many rounds were cached vs re-run)                                                                            | LOW        | Extend the completion summary in `TerminalRenderer.onComplete()` to show "X/6 rounds from cache". The `displayState` already carries round statuses including 'cached'.                                                                                          |
+| Graceful handling of empty/tiny repos      | Repos with zero source files should fail fast and clearly, not run all 8 analyzers to discover nothing. The current code has an `isEmptyRepo` check but only after static analysis completes.                                                                                                                               | LOW        | Already partially addressed by `isEmptyRepo` guard. The gap: the check happens after `runStaticAnalysis()` completes (including all 8 analyzers). For truly empty repos, file discovery alone should trigger early exit.                                         |
 
 ### Differentiators (Competitive Advantage)
 
-Features that distinguish a well-maintained, standout OSS project from the median. Not expected, but noticed and valued by the developer community.
+Features that separate handover from generic code analysis tools and make it the fastest tool for its specific use case.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| docs/ folder with structured user + contributor docs | Handover's core pitch is "understand any codebase quickly" — the project itself should model that; in-repo markdown works for LLMs natively without a docs site | MEDIUM | Structure: docs/user/, docs/contributor/, docs/architecture/. Distills AGENTS.md + PRD.md into navigable, cross-linked docs. Retires monolithic files. |
-| llms.txt at repo root | Emerging standard (proposed Sept 2024, 60k+ early adopters by 2025); Anthropic, Cursor docs already serve it; directly aligned with handover's value proposition — a tool about LLM documentation should be LLM-friendly | LOW | Plain markdown file. H1 = project name. Blockquote = concise summary. Sections linking to key docs with descriptions. Companion llms-full.txt with flattened content is optional but valuable. |
-| AGENTS.md (LLM coding agent instructions) | 60,000+ repos adopt this; Cursor, Claude Code, GitHub Copilot send it with every LLM API call; handover already has one — surfacing and properly structuring it is differentiating | LOW | Handover already has AGENTS.md. Goal is to optimize it: clear headings, build commands, test commands, coding conventions, PR process — all structured for machine parsing. Don't conflate with CONTRIBUTING.md (human-facing). |
-| Dependabot configuration | Automated dependency PRs keep project secure; OpenSSF Scorecard checks for this; signals maintenance maturity | LOW | .github/dependabot.yml. npm ecosystem, weekly schedule, group updates. Scores on OpenSSF Scorecard's Dependency-Update-Tool check. |
-| OpenSSF Scorecard badge | Security credibility signal; increasingly checked by enterprise adopters; GitHub Action runs automatically | MEDIUM | Add scorecard.yml GitHub Actions workflow. Badge links to scorecard.dev results. Improves on Token-Permissions, Branch-Protection, Security-Policy, SAST checks automatically. |
-| npm automated publish workflow | Reduces friction for releases; shows project is actively shipped | MEDIUM | GitHub Actions workflow triggered on GitHub Release creation. Uses npm's OIDC trusted publishing (no long-lived NPM_TOKEN needed as of 2025). Runs CI checks first. |
-| Conventional commits enforcement | Machine-readable commit history; enables automated CHANGELOG generation later; signals professional development practice | MEDIUM | commitlint + @commitlint/config-conventional in CI. Reject PRs with non-conforming commit messages. Educate in CONTRIBUTING.md. |
-| CodeQL security scanning | OpenSSF Scorecard SAST check; GitHub provides it free for public repos; catches real vulnerabilities | LOW | GitHub Actions workflow: .github/workflows/codeql.yml. GitHub provides the action (github/codeql-action). Runs on push/PR and weekly schedule. |
+| Feature                                                           | Value Proposition                                                                                                                                                                                                                                                                                                                                                          | Complexity | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Streaming token output during LLM rounds                          | Shows live text being generated during each AI round — like watching Claude "think". Transforms a 45-second wait into 45 seconds of visible progress. Makes the tool feel interactive, not batch-style. No other code analysis CLI does this.                                                                                                                              | HIGH       | Requires: (1) adding `stream` option to `LLMProvider.complete()`, (2) Anthropic SDK streaming via `client.messages.stream()`, (3) OpenAI streaming via `for await (chunk of stream)`, (4) updating the `TerminalRenderer` to display a scrolling token buffer in the round block, (5) deciding whether to stream to the display only or also to the structured output (structured output requires tool_use, which may conflict with streaming in some providers). **CRITICAL CONSTRAINT**: Anthropic tool_use with streaming is supported — `stream` + `tool_choice: {type: 'tool'}` works in the Anthropic SDK. The structured JSON must be assembled from streamed input_json_delta events. This is non-trivial. |
+| Round-level incremental invalidation (only re-run changed rounds) | When a developer makes a small code change, only the round(s) whose inputs changed should re-execute. If only a test file changed, Round 5 (edge cases) re-runs but Rounds 1-3 (overview, modules, features) can remain cached. This gives 50%+ token reduction on typical incremental runs.                                                                               | HIGH       | Requires per-round input fingerprinting. Round N's cache key must incorporate: (a) the global file fingerprint for files relevant to that round, (b) the compressed output of all prior rounds that round N receives as input. This means Round 1's cache key is independent of Rounds 2-6. Round 2's key depends on Round 1's output hash. This is a cascading invalidation model, not a single global fingerprint. Implementation: `RoundCache.computeHash()` currently takes `(roundNumber, model, analysisFingerprint)` — extend to include `priorRoundOutputHash`.                                                                                                                                            |
+| Changed-files-only context packing                                | On incremental re-runs, skip full file content for files that haven't changed since the last run — send only signatures (or skip entirely) unless the file is marked as changed by the `AnalysisCache`. This reduces tokens sent per re-run proportionally to change ratio. In a 1000-file repo where 10 files changed, this is potentially 90% fewer file content tokens. | HIGH       | Requires: `AnalysisCache` to expose which files changed since last run (currently only exposes `isUnchanged(path, hash)`). The `packFiles()` function in `context/packer.ts` needs a "changed files" set parameter to force changed files to `full` tier and allow unchanged files to drop to `signatures` or `skip`. This is an additive change to `packFiles()`.                                                                                                                                                                                                                                                                                                                                                 |
+| Token usage summary with cache savings                            | Report: "Used 12,400 tokens (47% savings vs full re-run — 3 rounds cached)". Gives users concrete evidence of speed/cost improvement. Reinforces the value proposition on every incremental run.                                                                                                                                                                           | LOW-MEDIUM | `TokenUsageTracker` already accumulates token usage. Add a "baseline estimate" concept: at run start, compute what a full re-run would cost; at completion, show actual vs estimated. Or simpler: show "X rounds cached, saved ~Y tokens" based on average tokens per round from prior runs.                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Large repo file sampling with coverage indicator                  | For repos exceeding the context window capacity (e.g., 50,000+ lines after filtering), automatically sample files weighted by importance score and show "Analyzed N of M files (top by importance)" rather than silently truncating. The current `packFiles()` silently drops low-priority files when the budget fills — no indicator is shown.                            | MEDIUM     | The `PackedContext` type should expose how many files were full/signatures/skipped. The renderer should show this as a coverage indicator. The file scorer in `context/scorer.ts` already produces priority scores — expose the coverage ratio.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Parallel document rendering                                       | Currently, the render phase writes 14 documents sequentially (`for...of` loop in `generate.ts`). Since renderers are pure functions (`doc.render(ctx)` returning a string), they can run in parallel with `Promise.all()`. Small gain (rendering is fast), but eliminates the last sequential bottleneck.                                                                  | LOW        | Replace `for (const doc of selectedDocs)` with `await Promise.all(selectedDocs.map(...))`. Requires careful handling of `displayState.renderedDocs` ordering — use a pre-allocated results array, fill by index, then append in order. INDEX still goes last.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem like good ideas but create maintenance burden, scope creep, or signal the wrong thing at this stage.
-
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Dedicated docs site (Docusaurus, VitePress, MkDocs) | Looks professional; auto-generates nav; searchable | Maintenance overhead; CI pipeline complexity; separate deployment; the project's own tool (handover) is the answer to this eventually; in-repo markdown serves LLMs better today | In-repo docs/ folder in markdown. Migrate to docs site only when user base demands navigation that markdown can't provide. |
-| Discord / Slack community server | Community building; real-time support | Requires moderation time handover doesn't have; GitHub Discussions achieves 80% of the value with zero infrastructure overhead | Enable GitHub Discussions instead when community activity warrants it. |
-| Fully automated semantic release (semantic-release package) | Zero-touch version management; CHANGELOG auto-generation | At v0.x, manual control over what constitutes a release is valuable; semantic-release adds config complexity and requires consistent commit message discipline across all contributors; the ROI only appears at v1+ with multiple contributors | Manual CHANGELOG + GitHub Release creation. Adopt semantic-release when the project reaches v1 and has multiple active contributors. |
-| CODEOWNERS file | Auto-assigns reviewers; clear ownership | Only one maintainer currently; adds friction with no benefit until team grows | Add when second maintainer joins. |
-| Issue labels management tooling (GitHub CLI label sync) | Consistent labels across repos | Complexity for one-person project; GitHub defaults are sufficient | Use default labels plus 2-3 custom ones (e.g., "llm-provider", "documentation"). |
-| Comprehensive SBOM generation | Supply chain transparency; OpenSSF Scorecard check | High complexity for little gain at v0.x; npm audit provides adequate dependency vulnerability scanning | npm audit in CI is sufficient. Add SBOM when enterprise adopters specifically request it. |
-| All-in-one monorepo tooling (Nx, Turborepo) | Scale and caching | Handover is not a monorepo and has no plans to be; adds irrelevant complexity | Stay with npm workspaces if multi-package ever needed. |
+| Feature                                              | Why Requested                                                                     | Why Problematic                                                                                                                                                                                                                                                                                                                                                                                 | Alternative                                                                                                                                                                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Multi-threaded analyzer execution via worker_threads | "Run analyzers in true parallel threads for 8x speed"                             | The 8 analyzers already run concurrently via `Promise.allSettled()`. They are I/O-bound (file reads, git commands, tree-sitter parsing) — the bottleneck is I/O, not CPU. Worker threads add serialization overhead and complexity without meaningful speedup for I/O-bound work. The only CPU-intensive work is tree-sitter AST parsing, which is already done in the main thread efficiently. | Keep `Promise.allSettled()`. Profile before threading. If AST parsing becomes the bottleneck on very large repos, target that specific analyzer with a worker pool.                                          |
+| Persistent background daemon                         | "Run handover as a daemon that watches files and pre-caches results"              | File watchers in the background drain battery, have race conditions with editors saving partial files, and add IPC complexity. The disk cache already provides instant re-run results without a daemon. Users do not run handover frequently enough to justify always-on infrastructure.                                                                                                        | The disk cache (RoundCache) is the right solution. Fast enough on re-runs without a daemon. If watch mode is needed later, it belongs as a `handover watch` command with explicit lifecycle, not a daemon.   |
+| Streaming output to markdown files                   | "Stream LLM output directly to the output files as tokens arrive"                 | The output documents require complete, structured JSON from LLM tool calls before they can be rendered. The rendering phase transforms structured data into Markdown — it cannot be streamed because the Zod-validated schema output isn't known until the full response arrives. Partial streaming to files creates partial documents that would confuse consumers of the output.              | Stream tokens to the terminal display only. Write complete documents to disk only after all rounds complete.                                                                                                 |
+| Distributed analysis across machines                 | "Split the codebase across multiple machines for large repos"                     | Handover's analysis is inherently sequential at the AI rounds layer — Round 2 requires Round 1's output. Distributing the static analysis phase is possible but the benefit is small (static analysis takes 5-15 seconds even for large repos). The complexity of distributed coordination far exceeds the benefit.                                                                             | For very large repos: focus on file sampling/filtering to reduce context sent to the LLM. The bottleneck is LLM round latency, not static analysis. Sampling the right files beats distributing analysis.    |
+| Provider-level request batching                      | "Send all 6 rounds in one API call for efficiency"                                | The rounds are sequentially dependent — Round 2 uses Round 1's output, Round 3 uses Rounds 1+2, etc. They cannot be batched without fundamentally changing the architecture. Even if a batch API existed, the round architecture would need to be restructured to a single-pass design, losing the iterative refinement that makes the analysis high quality.                                   | The existing sequential round structure is correct. Optimize within each round (streaming, caching) rather than restructuring the round model.                                                               |
+| LLM-based context compression                        | "Use an LLM to intelligently summarize prior rounds before sending to next round" | The current `compressRoundOutput()` is deterministic and token-budget-bounded. Using another LLM call for compression adds: latency (one extra API call per round = 6 extra calls), cost (the compression tokens often exceed what's saved), and non-determinism (same inputs give different compressed outputs, breaking cache invalidation).                                                  | The deterministic compressor at 2000 tokens per round is already well-tuned. The real token savings come from the incremental context packing feature (sending only changed files' full content on re-runs). |
+| Aggressive file filtering to reduce context          | "Skip all test files, all docs, all config files automatically"                   | Aggressive auto-filtering removes context that rounds need for accurate analysis. Round 5 (edge cases) specifically benefits from test file analysis. Round 6 (deployment) needs config files. Filtering by file type trades analysis quality for speed — users who want speed should use `--only` to skip rounds they don't need, not filter out files that inform those rounds.               | Use `--only` to skip entire rounds. Use the importance scorer in `context/scorer.ts` to prioritize high-value files when the budget is tight, rather than blindly excluding categories.                      |
 
 ---
 
 ## Feature Dependencies
 
 ```
-CI workflow (lint + typecheck + build)
-    └──required before──> automated npm publish workflow
-                              └──required before──> release tagging
+Content-hash fingerprint (improved invalidation)
+    └──required before──> Round-level incremental invalidation
+                              └──required before──> Token savings reporting
+                                                        (needs baseline to compare against)
 
-CONTRIBUTING.md
-    └──distilled from──> AGENTS.md (existing) + PRD.md (existing)
-    └──links to──> docs/ folder content
+Changed-files-only context packing
+    └──requires──> AnalysisCache exposing changed-file set
+    └──requires──> packFiles() receiving changed-files parameter
 
-docs/ folder
-    └──replaces/distills──> AGENTS.md (monolithic internal doc)
-    └──replaces/distills──> PRD.md (90KB requirements doc)
+Streaming token output (provider-level)
+    └──requires──> LLMProvider interface extended with stream option
+    └──requires──> AnthropicProvider streaming implementation
+    └──requires──> OpenAI-compat provider streaming implementation
+    └──requires──> TerminalRenderer stream buffer in round display
+    └──blocks──> (nothing downstream, purely additive to UX)
 
-llms.txt
-    └──links to──> docs/ folder markdown files
-    └──references──> README.md
+Large repo file sampling indicator
+    └──requires──> PackedContext exposing coverage stats
+    └──builds on──> existing file scorer in context/scorer.ts
 
-AGENTS.md (optimized)
-    └──complements──> CONTRIBUTING.md (AGENTS.md = machine-facing, CONTRIBUTING.md = human-facing)
+Parallel document rendering
+    └──independent of──> all other features
+    └──requires──> careful ordering of displayState updates
 
-GitHub issue templates
-    └──enhances──> CONTRIBUTING.md (template references contributing guidelines)
-
-.github/FUNDING.yml
-    └──requires──> GitHub Sponsors enabled on account (external dependency)
-
-OpenSSF Scorecard badge
-    └──requires──> scorecard.yml GitHub Actions workflow
-    └──improves score via──> SECURITY.md, Dependabot, CodeQL, Branch Protection
-
-CodeQL workflow
-    └──improves──> OpenSSF Scorecard SAST check
-    └──independent of──> other CI workflows (can add anytime)
-
-Dependabot
-    └──improves──> OpenSSF Scorecard Dependency-Update-Tool check
-    └──requires──> active maintainer merging PRs (ongoing commitment)
+Cache hit/miss summary in completion
+    └──requires──> displayState tracking cached round count
+    └──builds on──> existing 'cached' round status already in displayState
 ```
 
 ### Dependency Notes
 
-- **docs/ folder requires AGENTS.md + PRD.md distillation:** The docs/ content is derived from existing internal docs. Must read and restructure existing content, not write from scratch.
-- **CI workflow must precede npm automated publish:** Trust in the automated publish comes from CI passing first. Never publish without CI gating.
-- **CONTRIBUTING.md and AGENTS.md are siblings, not duplicates:** CONTRIBUTING.md is human-readable onboarding for contributors. AGENTS.md is machine-parseable instructions for LLM coding agents. Keep both, optimize for their respective audiences.
-- **llms.txt links to docs/ — create docs/ first:** llms.txt is an index. It's only valuable if the docs it links to are already good.
+- **Content-hash fingerprint is a prerequisite for incremental invalidation:** Without content-based cache keys, the round cache cannot know which rounds are truly stale vs which are safe to reuse. This is the foundation feature for the "50%+ fewer tokens on incremental runs" goal.
+
+- **Streaming conflicts with structured output assembly:** Anthropic's `tool_use` with streaming delivers structured JSON as `input_json_delta` events — partial JSON fragments. The provider must accumulate these fragments and parse the complete JSON only at stream end before validating with Zod. The terminal display can show the raw text delta as "thinking" output. Implementation must not expose partially-assembled JSON to round runners.
+
+- **Changed-files context packing requires AnalysisCache to expose its diff:** The `AnalysisCache` currently only exposes `isUnchanged(path, hash)`. A new method `getChangedFiles(files)` returning the set of paths whose hash differs from cache is needed to feed `packFiles()`.
+
+- **Parallel rendering is independent:** It can be delivered in isolation as a small cleanup PR. It does not depend on or conflict with any other performance feature.
 
 ---
 
 ## MVP Definition
 
-This is a brownfield project — the CLI already exists and works. The "MVP" here is the minimum set of OSS infrastructure that takes the project from "published tool" to "credible open source project that welcomes contributors."
+This is a brownfield milestone. The "MVP" is the minimum set that delivers the user-visible goals: fast re-runs (seconds not minutes), responsive UX (live progress), measurable gains (2-5x faster, 50%+ fewer tokens on incremental runs).
 
-### Launch With (Phase 1 — Community Health Baseline)
+### Launch With (Phase 1 — Cache Correctness)
 
-These unblock contributors and satisfy GitHub's community health checklist. No contributor will submit a PR until these exist.
+The content-hash fingerprint is the enabler for everything else. Without it, incremental runs are unreliable — a formatting commit re-runs all 6 rounds unnecessarily; a pure rename does the same. Fix the foundation first.
 
-- [ ] CONTRIBUTING.md — establishes the contributor path; without it, contributors don't know where to start
-- [ ] GitHub issue templates (bug, feature, docs) + config.yml — structured issue reporting; without templates, issues are noise
-- [ ] GitHub PR template — sets review expectations before submission
-- [ ] CODE_OF_CONDUCT.md — signals the project is safe to contribute to
-- [ ] SECURITY.md — required for responsible disclosure; GitHub routes security reports here
-- [ ] README badges working correctly (CI, npm version, license, downloads) — credibility signals visible immediately
+- [ ] Content-hash-based cache invalidation — replaces size-based fingerprint in `RoundCache`; makes "fast re-runs" reliable rather than accidental
+- [ ] Round-level incremental invalidation — per-round cache keys that cascade from prior round outputs; delivers the 50%+ token reduction goal
+- [ ] Cache hit/miss summary in completion — shows users they got the benefit; required for "measurable gains" goal
 
-### Add After Phase 1 (Phase 2 — CI/CD + Automation)
+### Add After Phase 1 (Phase 2 — UX Responsiveness)
 
-These require Phase 1 community health baseline to exist and make sense in context.
+Once cache correctness is established, improve perceived speed and responsiveness during the LLM wait.
 
-- [ ] GitHub Actions CI workflow (lint + typecheck + build + tests) — gating contributions on passing CI
-- [ ] GitHub Actions automated npm publish workflow — reduced release friction
-- [ ] Dependabot configuration — automated dependency security
-- [ ] .github/FUNDING.yml — enables sponsor button
-- [ ] CHANGELOG.md (seeded with history) — version history for users
+- [ ] Live progress during LLM rounds (token counter + elapsed time update within round block) — the simplest responsiveness improvement; uses existing `TerminalRenderer` infra; does not require streaming API changes
+- [ ] Streaming token output during LLM rounds — shows raw model output live; the most impactful UX change; requires provider interface extension
+- [ ] Large repo file sampling coverage indicator — shows what percentage of the codebase was analyzed; addresses silent truncation problem
 
-### Add After Phase 2 (Phase 3 — Documentation + LLM-Friendliness)
+### Add After Phase 2 (Phase 3 — Context Efficiency)
 
-These require CI to exist (so docs are tested/linted in CI) and require Phase 1 community files to reference.
+Once UX is responsive and cache is correct, optimize what gets sent to the LLM on incremental runs.
 
-- [ ] docs/ folder structure with user and contributor docs (distilled from AGENTS.md + PRD.md)
-- [ ] llms.txt (and optionally llms-full.txt) — LLM-friendly project description
-- [ ] AGENTS.md optimization — structure for machine parsing, not human reading
-- [ ] CodeQL security scanning workflow
-- [ ] OpenSSF Scorecard badge + workflow
+- [ ] Changed-files-only context packing — reduces tokens sent on incremental runs to only files that changed; delivers the "50%+ fewer tokens" goal for context (complementing the round caching from Phase 1)
+- [ ] Parallel document rendering — small but clean win; eliminates last sequential bottleneck; simple implementation
+- [ ] Token usage summary with cache savings — concrete reporting of efficiency gains
 
 ---
 
 ## Feature Prioritization Matrix
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| CONTRIBUTING.md | HIGH — unblocks all contributors | LOW | P1 |
-| Issue templates (3x) + config.yml | HIGH — structures community communication | LOW | P1 |
-| PR template | HIGH — reduces review friction | LOW | P1 |
-| CODE_OF_CONDUCT.md | HIGH — community hygiene | LOW | P1 |
-| SECURITY.md | HIGH — responsible disclosure | LOW | P1 |
-| CI: lint + typecheck + build | HIGH — gating correctness | MEDIUM | P1 |
-| CI: test (with integration gate) | HIGH — confidence in contributions | MEDIUM | P1 |
-| CHANGELOG.md | HIGH — version history for users | MEDIUM | P1 |
-| .github/FUNDING.yml | MEDIUM — sustainability signal | LOW | P1 |
-| docs/ folder (user + contributor docs) | HIGH — LLM-first readability; distills existing monolithic docs | MEDIUM | P1 |
-| llms.txt | HIGH — directly aligned with product mission; emerging standard | LOW | P1 |
-| AGENTS.md optimization | HIGH — 60k+ repos; LLM tools send it every call | LOW | P1 |
-| Dependabot | MEDIUM — security hygiene, low maintenance | LOW | P2 |
-| Automated npm publish workflow | MEDIUM — reduces release friction | MEDIUM | P2 |
-| CodeQL scanning | MEDIUM — security credibility | LOW | P2 |
-| OpenSSF Scorecard badge + workflow | LOW-MEDIUM — enterprise trust signal | MEDIUM | P2 |
-| Conventional commits enforcement in CI | LOW-MEDIUM — future CHANGELOG automation | MEDIUM | P3 |
-| GitHub Discussions | LOW — community building | LOW | P3 |
+| Feature                              | User Value                                            | Implementation Cost                                                                               | Priority |
+| ------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------- |
+| Content-hash cache invalidation      | HIGH — makes fast re-runs reliable                    | MEDIUM — extend `computeAnalysisFingerprint()` to hash file contents; thread through `RoundCache` | P1       |
+| Round-level incremental invalidation | HIGH — 50%+ token reduction on incremental; core goal | HIGH — cascading hash design for per-round cache keys                                             | P1       |
+| Cache hit/miss summary               | MEDIUM — makes the benefit visible                    | LOW — extend `displayState` and `TerminalRenderer.onComplete()`                                   | P1       |
+| Live token counter in round block    | HIGH — eliminates "is it hung?" anxiety               | LOW-MEDIUM — update `DisplayState.rounds` with elapsed timer; already has spinner                 | P2       |
+| Streaming token output               | HIGH — transforms perceived responsiveness            | HIGH — provider interface + 2 provider implementations + renderer update                          | P2       |
+| Large repo coverage indicator        | MEDIUM — transparency for large repos                 | MEDIUM — expose `PackedContext` coverage stats; add renderer line                                 | P2       |
+| Changed-files context packing        | HIGH — reduces input tokens on re-runs                | HIGH — `AnalysisCache` diff API + `packFiles()` parameter                                         | P3       |
+| Parallel document rendering          | LOW — rendering is already fast (~1-2s)               | LOW — replace `for...of` with `Promise.all` + ordered results                                     | P3       |
+| Token savings reporting              | MEDIUM — confirms efficiency gains                    | MEDIUM — baseline estimation logic                                                                | P3       |
 
 **Priority key:**
-- P1: Must have — project is not credibly OSS without these
-- P2: Should have — meaningful quality and trust improvements
-- P3: Nice to have — premature at v0.x, worthwhile at v1+
+
+- P1: Must have — enables the "fast re-runs" goal
+- P2: Should have — delivers "responsive UX" goal
+- P3: Nice to have — extends efficiency gains; worth delivering if phases 1+2 complete
 
 ---
 
 ## Competitor Feature Analysis
 
-Examining feature patterns from comparable TypeScript/Node.js CLI tools with strong OSS infrastructure: `eslint`, `prettier`, `tsx`, `zx`, `tldr`, and smaller tools like `degit`.
+Examining how comparable tools handle these performance challenges:
 
-| Feature | eslint/prettier (mature) | tsx/zx (modern, smaller) | Our Approach |
-|---------|--------------------------|--------------------------|--------------|
-| CONTRIBUTING.md | Detailed, multi-section | Concise, practical | Concise + practical. Link to detailed docs/ pages. |
-| Issue templates | YAML form syntax | YAML form syntax | YAML form syntax (.yml). Three templates. |
-| CI workflow | Complex matrix, many jobs | Simple: lint, typecheck, test | Simple first. Node 20 + 22. Expand later. |
-| Changelog | Automated (semantic-release) | Manual or semi-auto | Manual to start. Seed with history. |
-| Docs site | Full docusaurus/vitepress | In-repo markdown | In-repo markdown. Handover's output can document itself later. |
-| Security policy | Yes | Sometimes | Yes — required for community health checklist. |
-| llms.txt | Not yet (too large/mature) | No | Yes — differentiating given handover's domain. |
-| AGENTS.md | Not applicable (not LLM-first) | Rarely | Yes — handover already has one; optimize it. |
-| Funding | GitHub Sponsors + OpenCollective | GitHub Sponsors | GitHub Sponsors via FUNDING.yml. |
-| Dependabot | Yes | Sometimes | Yes — low effort, high trust signal. |
-| OpenSSF Scorecard | Yes (eslint) | No | Aspire to it in Phase 2. |
-| Code of conduct | Contributor Covenant | Contributor Covenant | Contributor Covenant v2.1. |
+| Feature            | ESLint (`--cache`)                      | TypeScript (`--incremental`)                     | Jest (`--watch`)               | Our Approach                                                                   |
+| ------------------ | --------------------------------------- | ------------------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------ |
+| Cache invalidation | Content-hash per file; version-keyed    | Content-hash + dependency graph                  | File watcher + jest-haste-map  | Content-hash via existing `AnalysisCache` (extend to drive round invalidation) |
+| Cache key design   | `{filePath}:{contentHash}:{ruleHashes}` | Per-file `.tsbuildinfo` with dependency tracking | Module hash map                | `{roundNumber}:{model}:{contentFingerprint}:{priorRoundHash}`                  |
+| Incremental scope  | Skip unchanged files entirely           | Skip unchanged source files in compilation       | Re-run tests for changed files | Skip unchanged rounds; reduce context to changed files                         |
+| Live progress      | None (batch output)                     | `--diagnostics` for verbose timing               | `--verbose` per-test streaming | Streaming token display during each AI round                                   |
+| Large scale        | Sampling via `--ext` glob               | `--maxNodeModuleJsDepth`                         | `--testPathPattern`            | File importance scoring + coverage indicator                                   |
+| Cache transparency | `--cache-location` + printed stats      | `.tsbuildinfo` file                              | Cache managed transparently    | Hit/miss summary in completion screen                                          |
+
+**Key insight from ESLint's cache design:** ESLint's `--cache` stores a hash of the file content plus the ESLint version plus the rule configuration — not just file content. Changing the rules invalidates the cache without changing files. Handover's equivalent: the `model` is already in the cache key (changing models invalidates rounds), but the round-specific prompt/schema version is not. Consider adding a `roundSchemaVersion` constant to each round (bumped when prompts change) as part of the cache key.
 
 ---
 
 ## Sources
 
-- [GitHub: About community profiles for public repositories](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/about-community-profiles-for-public-repositories) — MEDIUM confidence (official GitHub docs)
-- [GitHub: About issue and pull request templates](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/about-issue-and-pull-request-templates) — HIGH confidence (official GitHub docs)
-- [GitHub: Setting guidelines for repository contributors](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/setting-guidelines-for-repository-contributors) — HIGH confidence (official GitHub docs)
-- [GitHub: Displaying a sponsor button in your repository](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository) — HIGH confidence (official GitHub docs)
-- [GitHub: Building and testing Node.js](https://docs.github.com/en/actions/use-cases-and-examples/building-and-testing/building-and-testing-nodejs) — HIGH confidence (official GitHub docs)
-- [OpenSSF Scorecard checks documentation](https://github.com/ossf/scorecard/blob/main/docs/checks.md) — HIGH confidence (official OSSF repo)
-- [llms.txt specification](https://llmstxt.org/) — MEDIUM confidence (proposed standard, not IETF/W3C; adoption real but limited)
-- [AGENTS.md open format](https://github.com/agentsmd/agents.md) — MEDIUM confidence (emerging convention, 60k+ repos, adopted by major coding tools)
-- [semantic-release documentation](https://semantic-release.gitbook.io/) — HIGH confidence (official docs)
-- [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/) — HIGH confidence (official specification)
-- [Shields.io](https://shields.io/) — HIGH confidence (official service)
-- [InfoQ: AGENTS.md Emerges as Open Standard](https://www.infoq.com/news/2025/08/agents-md/) — MEDIUM confidence (industry news)
-- [Bluehost: What Is llms.txt? (2026 Guide)](https://www.bluehost.com/blog/what-is-llms-txt/) — LOW-MEDIUM confidence (secondary source for adoption data)
+- Codebase audit: `src/cache/round-cache.ts`, `src/analyzers/cache.ts`, `src/orchestrator/dag.ts`, `src/analyzers/coordinator.ts`, `src/ui/renderer.ts`, `src/context/compressor.ts`, `src/cli/generate.ts`, `src/providers/anthropic.ts`, `src/providers/base.ts` — HIGH confidence (direct source)
+- [Anthropic SDK streaming documentation](https://docs.anthropic.com/en/api/messages-streaming) — streaming `tool_use` with `input_json_delta` events — MEDIUM confidence (official docs; streaming + tool_use support verified in SDK)
+- [LangChain JS streaming](https://js.langchain.com/docs/how_to/streaming_llm/) — streaming pattern with `handleLLMNewToken` callback — MEDIUM confidence (official docs)
+- [ESLint incremental caching issue #20186](https://github.com/eslint/eslint/issues/20186) — ESLint's approach to content-hash caching and cache key design — HIGH confidence (official GitHub repo discussion)
+- [Prompt compression techniques — Medium](https://medium.com/@kuldeep.paul08/prompt-compression-techniques-reducing-context-window-costs-while-improving-llm-performance-afec1e8f1003) — 40-60% token reduction via extractive compression — LOW confidence (secondary source; consistent with existing `compressRoundOutput()` approach which is already extractive)
+- [Context window management strategies](https://www.getmaxim.ai/articles/context-window-management-strategies-for-long-context-ai-agents-and-chatbots/) — summarization vs extractive compression tradeoffs — MEDIUM confidence (verified against existing implementation)
+- [LLM streaming via Vellum](https://www.vellum.ai/llm-parameters/llm-streaming) — streaming token delivery patterns — MEDIUM confidence (secondary source)
+- [Monorepo AI code review tools](https://monorepo.tools/ai) — large-scale codebase analysis challenges — MEDIUM confidence (industry survey)
 
 ---
 
-*Feature research for: Handover CLI — OSS infrastructure and developer experience*
-*Researched: 2026-02-18*
+_Feature research for: Handover CLI — performance improvements milestone_
+_Researched: 2026-02-18_

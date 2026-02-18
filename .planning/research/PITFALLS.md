@@ -1,340 +1,321 @@
 # Pitfalls Research
 
-**Domain:** OSS documentation and infrastructure for a TypeScript CLI tool
+**Domain:** Performance features for an LLM-based sequential analysis pipeline (TypeScript CLI)
 **Researched:** 2026-02-18
-**Confidence:** HIGH (documentation pitfalls well-established; CI/CD patterns verified against official GitHub docs; LLM accessibility from multiple sources)
+**Confidence:** HIGH — caching/incremental analysis and parallelism pitfalls are well-documented; streaming and token optimization pitfalls verified across multiple sources
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Over-Engineering Docs for an Early-Stage Project
+### Pitfall 1: Cache Invalidation Based on File Size Alone
 
 **What goes wrong:**
-The project adds elaborate documentation structures — a docs/ site, multiple nested docs/ folders, detailed governance docs, an RFC process, a contributor ladder, a Discord server — before it has any contributors. The result is a maintenance burden with zero audience. Every new file is a liability unless someone reads it.
+The existing `RoundCache.computeAnalysisFingerprint()` keys cache entries on `path + size` — not file content. A file edited and saved back to the same byte count (e.g., fixing a typo, changing a comment) returns the identical fingerprint. The stale cache is served. Handover produces documentation that doesn't reflect the change.
 
 **Why it happens:**
-Mimicking "industry-leading" projects (React, Rust, Go) without accounting for the fact those projects had thousands of contributors before their elaborate infrastructure existed. The documentation aspiration front-runs the community reality.
+Content hashing requires reading every file, which feels expensive during cache key computation. Size is fast to compute from a directory listing. The trade-off seems reasonable until a same-size edit occurs in practice.
 
 **How to avoid:**
-Build documentation in proportion to the audience. For handover at v0.1.0 with zero known contributors, the correct set is: CONTRIBUTING.md, issue templates, CI/CD, CHANGELOG, and SECURITY.md. Stop there. Do not add a docs/ site, GOVERNANCE.md, RFC templates, or a contributor ladder until contributor pressure demands them. Ask: "Would a real contributor be blocked without this?" If no, defer.
+Hash file content (SHA-256 of the first 8KB or full file for small files) rather than size. For large files where a full hash is expensive, combine `mtime + size` — mtime changes on any write, even same-size edits. Add a `--validate-cache` mode that re-hashes and compares. Document that `--no-cache` is the escape hatch for suspected staleness.
 
 **Warning signs:**
-- Writing documentation for "future contributors" that don't exist yet
-- Creating more than 3 community health files before the first external PR
-- GOVERNANCE.md on a solo project
-- docs/ folder with more than 5 files before 100 npm downloads/month
-- Any file whose primary audience is hypothetical ("when we have a steering committee...")
+
+- `round-N.json` exists in `.handover/cache/rounds/` but the output documents feel outdated
+- Users report "my comment change wasn't picked up" or "I renamed a variable but the docs still say the old name"
+- Integration tests that edit a file and re-run don't detect the stale cache
 
 **Phase to address:**
-Documentation phase (all phases). Every phase should ask "is this necessary at our current scale?" before adding a new file.
+Caching and incremental analysis phase. Fix the fingerprint algorithm before building any incremental file-diff logic on top of it.
 
 ---
 
-### Pitfall 2: Monolithic Internal Docs That Never Get Distilled
+### Pitfall 2: Parallelizing Rounds That Have Implicit Sequential Dependencies
 
 **What goes wrong:**
-AGENTS.md and PRD.md stay as 90KB+ monolithic files. They contain excellent content but require reading 10,000 words to extract one relevant fact. New contributors don't read them, LLMs can't chunk them efficiently, and they accumulate drift as the code evolves. The project has rich internal knowledge that is practically inaccessible.
+Rounds 1-6 are ordered for a reason: Round 2 reads Round 1's compressed context, Round 3 reads Round 2's, etc. Attempting to parallelize these rounds — even partially — causes later rounds to execute against incomplete prior context, producing documentation with contradictions or gaps. The DAG orchestrator correctly prevents this today, but adding "smart" parallelism inside the AI rounds layer (e.g., fetching Rounds 2 and 3 concurrently) bypasses this guarantee.
 
 **Why it happens:**
-The original authors know the content and don't notice the navigation problem. Distillation requires effort with no immediate visible payoff. The monoliths grow because it's easier to append than to restructure.
+The sequential dependency is logical, not structural. There's no compile-time enforcement preventing a developer from launching multiple round promises simultaneously. The temptation to parallelize all 6 LLM calls at once is natural when chasing latency reduction.
 
 **How to avoid:**
-Distill, don't just link. The content in AGENTS.md and PRD.md must be broken into purpose-specific documents: CONTRIBUTING.md gets the "how to work on this" content, docs/architecture.md gets the system design content, docs/ai-rounds.md gets the pipeline design content. The monoliths then become deprecated or redirects. Explicitly retire the originals or they'll accumulate new content and the distilled docs will drift.
+Keep the sequential constraint at the orchestrator level. The correct parallelism target for this pipeline is not between dependent rounds — it is between independent work units: static analysis analyzers (already concurrent), rendering of unrelated documents (already concurrent in principle), and per-file parsing. Do not add Promise.all() across sequential rounds. Add a DAG validation assertion that rounds always have the prior round as a dependency.
 
 **Warning signs:**
-- CONTRIBUTING.md that says "see AGENTS.md for details" (redirect, not distillation)
-- AGENTS.md still growing after new docs are added
-- New contributor opens AGENTS.md, closes it after 2 minutes
-- Any "comprehensive" single-file documentation over 500 lines
+
+- Round 4 (architecture) references modules not yet detected by Round 2 (module detection)
+- Round 3 output duplicates Round 2 content (both ran with identical context)
+- Adding `await Promise.all([round2, round3])` to the runner produces outputs that feel less specific than the sequential version
 
 **Phase to address:**
-CONTRIBUTING.md / contributor docs phase. Must happen before the docs/ structure is finalized so the distilled content lands in the right place.
+Parallelism phase. Define explicitly which work units are actually parallel-safe (static analysis, document rendering, file I/O) and which are not (dependent AI rounds).
 
 ---
 
-### Pitfall 3: CI That Breaks on API Key Requirements
+### Pitfall 3: Streaming Structured JSON Output Before the Schema Is Complete
 
 **What goes wrong:**
-The test suite requires `HANDOVER_INTEGRATION=1` plus a live API key. CI runs fail because external contributors have no access to secrets. The result is either: (a) CI always shows red, destroying the badge signal, or (b) integration tests are excluded from CI with no documentation explaining why, confusing contributors who see incomplete coverage.
+Anthropic and OpenAI streaming APIs emit tokens incrementally. If streaming is wired to display progress while rounds execute, the partial JSON output is not a valid response — `JSON.parse()` fails on any intermediate chunk. Attempting to display round progress by parsing mid-stream JSON throws, breaking the progress display and potentially terminating the round.
 
 **Why it happens:**
-Integration tests are written locally where API keys are available. CI is added after the fact without accounting for the gating requirement.
+Streaming looks straightforward for text responses ("print each chunk as it arrives"), but the AI round runner uses structured output with Zod schemas. The response is only a valid structure when the final closing brace arrives. Developers copy streaming patterns designed for chat interfaces and apply them to structured-output pipelines without accounting for this.
 
 **How to avoid:**
-Split tests into two categories from the start: unit/smoke tests (no API keys, always run) and integration tests (gated by `HANDOVER_INTEGRATION=1`, skipped in CI unless secrets are configured). The CI workflow must explicitly skip the integration gate and run the unit layer. Document this split in CONTRIBUTING.md so contributors understand the two test tiers. For forks and external PRs, unit tests pass; integration tests are not expected to pass.
+Distinguish between streaming for UX feedback and streaming for structured output. For UX: use provider-level streaming to show a spinner, elapsed time, and token count as they increment — without attempting to parse the partial response. Only parse the complete response after the stream closes. For progress UX, use `onRetry` callbacks and elapsed timers rather than partial-chunk display. If displaying partial output is required, use streaming with accumulation and only display after complete JSON can be parsed.
 
 **Warning signs:**
-- CI badge showing failing state in README
-- `.github/workflows/ci.yml` that unconditionally runs `npm test` with no secret guard
-- Test output saying "0 tests ran" in CI logs
-- CONTRIBUTING.md that says "tests require an API key" with no guidance on running unit tests independently
+
+- `JSON.parse` errors in round execution logs
+- Terminal spinner disappears mid-round and process hangs
+- Streaming output shows partial JSON fragments in the terminal
 
 **Phase to address:**
-CI/CD phase. Must be resolved before any CI workflow goes live.
+Streaming output phase. Define the streaming contract (UX feedback only vs. partial content display) before implementation begins.
 
 ---
 
-### Pitfall 4: Stale README Badges Before CI Exists
+### Pitfall 4: Aggressive Context Compression Causing Quality Degradation in Later Rounds
 
 **What goes wrong:**
-The README already references CI badge URLs (the handover README currently has a CI status badge pointing to a workflow that may not exist yet). These badges show "unknown" or "failing" state, which signals project abandonment or dysfunction to every new visitor — the opposite of the intended social proof effect.
+Each AI round compresses its output to 2000 tokens before passing to the next round. By Round 5 and 6, the compressed context from Rounds 1-4 is present — 4 × 2000 = 8000 tokens of accumulated compressed context. When the compression algorithm strips nuanced relationships, method signatures, or module boundaries to hit the 2000-token target, later rounds lose the precise details they need. Round 5 (edge cases) produces generic warnings; Round 6 (deployment) misses infrastructure specifics. The documentation looks complete but is shallower than a full-context run.
 
 **Why it happens:**
-Badges are added optimistically before the underlying workflow exists, or the workflow name/branch referenced in the badge URL doesn't match the actual workflow file.
+Context compression is implemented once (in `src/context/compressor.ts`) and applied uniformly across all rounds. The 2000-token budget is a constant, not adaptive to what information the next round actually requires. Compression is validated by token count, not by information preservation.
 
 **How to avoid:**
-Add badges only after the underlying system is working. The CI badge should be added in the same commit as the working CI workflow. The npm version and downloads badges are safe to add immediately (they're dynamic and always accurate). Coverage badges require a coverage reporter to be configured first (Codecov, Coveralls) — don't add them until that's done.
+Test output quality — not just token counts — after adding any compression optimization. Run the current pipeline on a test codebase, capture ground-truth Round 5/6 outputs, then verify that optimized compression produces qualitatively equivalent output. Treat information loss as a bug, not a trade-off. Compression should preserve: specific module names, file paths, function names, and identified edge cases — not just topical summaries. Consider per-round compression budgets (Round 1 may compress more aggressively than Round 3) rather than a global 2000-token constant.
 
 **Warning signs:**
-- Badge showing "no status" or grey/unknown state
-- README badge URL pointing to `ci.yml` but workflow file is named differently
-- Coverage badge with 0% or unknown reading
-- More than 10 badges (badge bloat correlates with decreased project trust)
+
+- Round 5 edge cases say "validate user input" and "handle errors" without naming specific functions or files
+- Round 6 deployment notes are generic ("uses environment variables") rather than specific ("DATABASE_URL required for PostgreSQL connection")
+- Users report the optimized version produces "worse" docs than the slow original
+- Quality metrics (existing `checkRoundQuality`) pass but human review shows shallower specificity
 
 **Phase to address:**
-CI/CD phase. Audit all badge URLs against actual workflow names before merging.
+Token optimization phase. Establish a quality regression test suite before touching any compression parameters.
 
 ---
 
-### Pitfall 5: CONTRIBUTING.md as a Wall of Text
+### Pitfall 5: File Content Caching That Ignores Config Changes
 
 **What goes wrong:**
-CONTRIBUTING.md is written as a comprehensive guide covering everything: code style, commit format, PR process, architecture overview, testing, CI, local setup. It reads like a policy document rather than a guide for someone who wants to make their first contribution. Contributors open it, find no clear "start here," and close it.
+Incremental analysis caches per-file parse results keyed on file content hash. When the user changes their `.handover.yml` — adding a provider, changing the model, adjusting context window settings — the file-level cache is still valid but the analysis parameters have changed. The cached results are used with the new config, producing output calibrated to the wrong context window, model, or token budget. Worse: the displayed token cost reflects the cached run, not the actual model being used.
 
 **Why it happens:**
-Maintainers know everything and try to document everything. The document grows by accretion — each section is individually reasonable but the whole is unusable. There's no prioritization of what a first-time contributor actually needs in their first 15 minutes.
+Incremental caching is designed to answer "did this file change?" — it does not account for "did the configuration that processes these files change?" The two invalidation concerns are conflated when they should be composed: cache key = file hash AND config hash.
 
 **How to avoid:**
-Structure CONTRIBUTING.md around the contributor journey, not completeness. Lead with: (1) local setup in 3 commands, (2) where to find good first issues, (3) how to submit a PR. Put architecture details in a separate docs/ file linked from CONTRIBUTING.md. Use the "inverted pyramid" — the most critical information first, details last or linked out.
+Compose the cache key from both the file content fingerprint and a hash of the relevant config fields (model, provider, contextWindow, outputReserve, safetyMargin). When any config field that affects analysis changes, all file-level caches are invalidated. Store the config hash alongside cached results so the invalidation reason can be logged: "Config changed: cache invalidated."
 
 **Warning signs:**
-- CONTRIBUTING.md over 300 lines with no table of contents
-- First section is "Philosophy" or "Project Goals" (delays actionable content)
-- Setup instructions buried after multiple sections of guidelines
-- No "good first issue" label or mention of where to find starter tasks
-- Architecture explanation duplicating what's in AGENTS.md without distillation
+
+- Switching from Claude 3.5 Sonnet to Claude 3.5 Haiku produces the same output without any API calls
+- Token usage display shows 0 tokens for a fresh run on a different model
+- Round outputs differ between manual full-run and cached run on the same files
 
 **Phase to address:**
-CONTRIBUTING.md phase. Apply the "15-minute test" — can a new contributor clone, install, run tests, and identify their first issue in 15 minutes using only CONTRIBUTING.md?
+Caching and incremental analysis phase. Define the cache key schema before implementation — retrofitting config-hash invalidation into an already-shipped cache is a rewrite.
 
 ---
 
-### Pitfall 6: Issue Templates That Are Too Long or Too Rigid
+### Pitfall 6: Correctness Regression from Parallelizing Static Analyzers That Share State
 
 **What goes wrong:**
-Issue templates with 15 required fields scare away bug reporters. The project ends up with no bug reports rather than imperfect bug reports. Alternatively, templates with no required fields produce unactionable "it doesn't work" reports that maintainers have to triage back-and-forth.
+The 8 static analyzers already run concurrently. Adding more parallelism (e.g., parallelizing file reads within an analyzer, or running multiple analysis passes concurrently) introduces shared-state races if any analyzer mutates a shared data structure. The WASM tree-sitter parser is the most dangerous target: `parser-service.ts` uses a single WASM instance. Concurrent parses against the same instance corrupt AST output silently — the parse appears to succeed but returns incorrect node trees.
 
 **Why it happens:**
-Templates are written to solve the maintainer's triage problem, not the reporter's friction problem. The template designer imagines a complex production bug, not a simple "I couldn't install this" report.
+The AST analyzer already batches (30 files per batch, sequential batches). Developers adding parallelism inside the batch see no obvious shared state, but the `web-tree-sitter` WASM runtime is not thread-safe. Node.js is single-threaded but async parallelism can interleave WASM calls if not serialized.
 
 **How to avoid:**
-Bug report template: 4-5 fields maximum. Required: (1) what you expected to happen, (2) what actually happened, (3) handover version, (4) node version, (5) reproduction steps. Optional: everything else. Feature request template: 2 fields — what problem it solves, what you'd like to see. Keep templates to one screenful without scrolling.
+Treat the WASM parser as a mutex-guarded resource. All concurrent file parsing must go through a serialization layer (a queue or semaphore) rather than direct concurrent calls. Use `p-limit` with a concurrency of 1 for WASM parser access, or run parsers in Worker threads with one instance per thread. Test with a codebase where parallel parsing would exercise multiple languages simultaneously.
 
 **Warning signs:**
-- Issue template over 40 lines of markdown
-- More than 3 "required" fields
-- Template fields that require running commands to fill in ("output of `handover --version --debug --verbose`")
-- Zero issues filed in the first month after adding templates (over-friction signal)
+
+- AST extraction returns different symbol counts on repeated runs of the same codebase
+- TypeScript extractor reports 0 methods for a file that clearly has methods
+- `parser-service.ts dispose()` is called before all concurrent parses complete
 
 **Phase to address:**
-Issue templates phase. Review after first 5 real issues are filed and prune aggressively.
+Parallelism phase. Map all shared resources before expanding concurrency. The WASM parser is not the only risk — also audit the dependency graph analyzer for shared Map mutations.
 
 ---
 
 ## Moderate Pitfalls
 
-### Pitfall 7: llms.txt Without an Actual Content Strategy
+### Pitfall 7: Streaming Progress That Races with the Terminal Renderer
 
 **What goes wrong:**
-An llms.txt file is created as a marketing/signal move, but the underlying docs it references are not structured for machine consumption. The file lists URLs that return HTML, not markdown. The project gets a checkmark for "AI-accessible" while providing no actual value to LLM consumers.
+The existing `TerminalRenderer` in `src/ui/` uses in-place cursor updates (`sisteransi`) to draw a live progress board. Adding streaming output (token counts updating per-chunk) that writes to stdout concurrently with the terminal renderer causes interleaving. Characters from the progress board and the streaming update appear on the same line, producing garbage output on any TTY that doesn't use the raw cursor-control approach exclusively.
 
 **Why it happens:**
-llms.txt is an emerging standard with low adoption verification. Projects add it because it looks good in a "OSS infrastructure" checklist without understanding what makes it useful.
+Streaming token display seems like a simple `process.stdout.write(count)` addition. But the terminal renderer has already moved the cursor to a specific row. A write from a different code path resets the cursor position or interleaves characters.
 
 **How to avoid:**
-llms.txt should reference the actual markdown files that exist in the repo, not the GitHub HTML rendering. The content those files contain must be self-contained — each section should make sense without cross-file context. For handover, the right llms.txt references are: README.md (install and usage), CONTRIBUTING.md (contributor workflow), docs/architecture.md (system design). Add llms.txt after the referenced docs exist and are structured for chunk-level consumption.
+Funnel all terminal writes through the `TerminalRenderer`. The renderer must be the single owner of stdout in TTY mode. Token count updates from streaming should be passed as events to the renderer, not written directly. In CI mode (non-TTY), streaming updates can write lines freely. Gate all streaming writes on `process.stdout.isTTY` being false, or route through the renderer's event interface.
 
 **Warning signs:**
-- llms.txt referencing docs/ pages that don't exist yet
-- Referenced docs contain heavy cross-references ("see AGENTS.md section 4.2")
-- llms.txt added before other docs are written (premature optimization)
-- File lists more than 10 entries (likely padding rather than curating)
+
+- Terminal output shows overlapping text during a round execution
+- Cursor jumps to wrong position after a streaming update
+- CI output looks fine but interactive terminal output is garbled
 
 **Phase to address:**
-LLM accessibility phase, which should come after core docs are written and structured.
+Streaming output phase. Do not add any direct `process.stdout.write` calls outside the `TerminalRenderer` abstraction.
 
 ---
 
-### Pitfall 8: CHANGELOG Retroactive Backfill Gone Wrong
+### Pitfall 8: Round Cache That Doesn't Invalidate When Prior Rounds Change
 
 **What goes wrong:**
-The project tries to retroactively reconstruct a CHANGELOG from git history after release. The backfill is inaccurate (git commits don't map cleanly to user-facing changes), inconsistent (mix of terse and verbose entries), and time-consuming. Alternatively, the project adopts automated conventional commit tooling (semantic-release, standard-version) mid-project which requires retroactive commit history compliance that doesn't exist.
+Round N's cached result was generated using Round (N-1)'s output as context. If Round (N-1) is invalidated and re-runs (producing different output), Round N's cache is stale — it was built on a context that no longer exists. The current `computeHash` for Round N includes `roundNumber + model + analysisFingerprint` but does not include a hash of Round (N-1)'s output. Round N is served from cache with an incorrect prior context.
 
 **Why it happens:**
-CHANGELOG is an afterthought. The project didn't start with a change documentation habit, then tries to establish one from scratch.
+The dependency is logical (rounds depend on prior rounds' output) but the cache key only captures static inputs (files + model). The dynamic input — prior round output — is not included in the key.
 
 **How to avoid:**
-For handover at v0.1.0: write a single entry for v0.1.0 covering the initial release features in prose. Don't try to reconstruct what changed from git log. Going forward, maintain CHANGELOG.md manually as part of every release — add a new section as changes accumulate, update it as a required step in the release process. Do NOT adopt automated tooling (semantic-release, changesets) until you've had the manual habit for 3+ releases. Automation amplifies process, it doesn't replace process.
+Cascade-invalidate: when Round N's cache is invalidated or re-computed, invalidate all rounds > N. Alternatively, include a hash of Round (N-1)'s result in Round N's cache key. The second approach is more precise but requires storing and loading prior-round output hashes. The cascade approach is simpler and correct: `clear rounds N, N+1, ..., 6` whenever any round upstream of N changes.
 
 **Warning signs:**
-- CHANGELOG with 50+ entries all dated the same day (mass backfill)
-- Using semantic-release on first setup attempt
-- Entries that read like git commit messages rather than user-facing descriptions
-- CHANGELOG that references internal refactors as user-facing changes
+
+- Round 3 output contradicts Round 2 output even though Round 2 was re-run
+- Adding a new file causes Round 1 to re-run but Rounds 2-6 still serve cached results that reference the old codebase
+- `--no-cache` produces substantively different output than a cached run on the same codebase
 
 **Phase to address:**
-CHANGELOG phase. Establish the manual habit first.
+Caching and incremental analysis phase. Implement cascade invalidation before the cache goes into production use.
 
 ---
 
-### Pitfall 9: Security Disclosure Process That Doesn't Work
+### Pitfall 9: Token Optimization That Degrades Prompts Consistently Across Models
 
 **What goes wrong:**
-SECURITY.md exists but the disclosed email address is wrong, not monitored, or the response SLA is aspirational rather than realistic ("we respond within 24 hours" when the project is maintained by one person with a day job). Alternatively, SECURITY.md tells reporters to file a GitHub issue — exposing the vulnerability publicly before a fix exists.
+Token optimization (removing verbose context, truncating file content, compressing prior round output) is tuned against one model (e.g., Claude 3.5 Sonnet) and produces acceptable quality on that model. The same optimization produces significantly worse output on a different model (e.g., Groq Llama, Ollama) that has a smaller effective context window or different sensitivity to compressed context. The quality regression is invisible to the developer who tested only on the primary model.
 
 **Why it happens:**
-SECURITY.md is a checklist item. It gets written without thinking through the actual workflow: who monitors the inbox, what's a realistic response time, how is the advisory published.
+Quality is tested on the developer's default model. The LLM provider abstraction makes it easy to forget that different models behave differently at token limits, with compressed context, and with dense prompts. Groq's Llama models and Ollama local models may have lower tolerance for compressed system prompts.
 
 **How to avoid:**
-Use GitHub's private security advisory workflow — it's built into GitHub, doesn't require a separate email, and provides a private space for coordinated disclosure. SECURITY.md should say: "Use GitHub's private security advisory feature at [link]. We'll respond within [realistic SLA]." For a solo maintainer: 7 days for initial response is reasonable. Do not promise 24-hour response. Do not list an email that isn't actively monitored.
+Run quality regression tests across at least 2 providers (Anthropic + one alternative) before shipping any token optimization. Define measurable quality metrics — not just "it produced output" but "Round 5 named at least N specific files and functions." Use the existing `checkRoundQuality` as the baseline and add per-provider assertions.
 
 **Warning signs:**
-- SECURITY.md with a Gmail address for disclosure
-- Response SLA of 24 hours for a solo-maintained project
-- SECURITY.md telling reporters to file a GitHub issue
-- No mention of the GitHub private advisory workflow
+
+- Users on Groq report generic documentation after an optimization ships
+- Quality metrics pass on Anthropic but fail on OpenAI-compatible providers
+- `--model ollama/mistral` produces empty arrays where Claude produces specific results
 
 **Phase to address:**
-SECURITY.md phase.
+Token optimization phase. Test matrix must include at least Anthropic Claude and one alternative before any optimization is considered complete.
 
 ---
 
-### Pitfall 10: CODE_OF_CONDUCT Without Enforcement Mechanism
+### Pitfall 10: Incremental Analysis That Skips Re-Parsing Deleted Files
 
 **What goes wrong:**
-CODE_OF_CONDUCT.md is added as a boilerplate paste of the Contributor Covenant. It lists an enforcement email that isn't monitored, or the enforcement section says "contact the maintainers at [email]" but there's no guidance on what "contact" means or what happens next. The document signals community safety without providing it.
+Incremental analysis re-parses only files that changed or were added since the last run. Deleted files are not re-parsed — they are simply absent from the new file list. But if the prior cache still contains round results that referenced those deleted files (module names, function references, dependency edges), the stale references remain in the documentation. The documentation says a module exists that has been deleted.
 
 **Why it happens:**
-CODE_OF_CONDUCT is a checklist item in "OSS infrastructure" checklists. It's copy-pasted with minimal customization.
+Deletion detection requires comparing the current file list against the cached file list. This comparison is easy to omit — the common path is "hash new file, compare to cached hash" — without a step that checks "which cached files are no longer on disk."
 
 **How to avoid:**
-Customize the enforcement section with: (1) a working contact method, (2) a realistic response timeline, (3) what happens after a report (private reply within N days, then...). For a solo project, this is simple: "Report via [private GitHub advisory or email]. I'll respond within 7 days." The key is specificity — vague enforcement is the same as no enforcement for potential reporters.
+During incremental analysis, compute the diff: `(cached files) - (current files) = deleted files`. If deleted files are non-empty, invalidate all rounds that referenced those files (typically all rounds, since static analysis and context packing run globally). Document that deletion always triggers a full re-analysis — this is correct behavior, not a gap to optimize away.
 
 **Warning signs:**
-- Enforcement contact is a generic "maintainers@..." email
-- Enforcement section copied verbatim from the Contributor Covenant template with placeholder text
-- No mention of what a reporter should expect as a response
-- CoC added 3 years after project starts (late additions signal it was a checkbox, not a commitment)
+
+- Documentation references functions or modules from files that were deleted
+- `handover generate` after deleting a module still shows that module in the feature list
+- Round 2 module detection names deleted packages
 
 **Phase to address:**
-CODE_OF_CONDUCT phase. Customize before publishing.
-
----
-
-## Minor Pitfalls
-
-### Pitfall 11: PR Template Checklist Bloat
-
-**What goes wrong:**
-PR template contains 15 checklist items that don't apply to most contributions ("I have updated the changelog," "I have added tests," "I have updated the docs," "I have run the benchmarks," "I have reviewed the security implications"). Contributors either ignore the checklist entirely or spend 10 minutes checking boxes that don't apply to their typo fix.
-
-**How to avoid:**
-5-7 checklist items maximum. Only items that genuinely apply to most PRs. Use `<!-- optional -->` HTML comments next to items that only apply sometimes. Link to CONTRIBUTING.md for detailed guidelines rather than embedding them in the template.
-
-**Phase to address:**
-Issue/PR templates phase.
-
----
-
-### Pitfall 12: Duplicate Docs Creating Drift
-
-**What goes wrong:**
-The same information appears in multiple places: AGENTS.md documents the provider architecture, CONTRIBUTING.md also documents the provider architecture, and docs/providers.md documents it a third time. Within 6 months, all three diverge from the actual code and from each other.
-
-**How to avoid:**
-Single source of truth. Each piece of information lives in exactly one place. Other docs link to it, not duplicate it. When distilling AGENTS.md, decide where each concept lives permanently — then delete it from AGENTS.md, not copy it. The monolith becomes empty and gets retired.
-
-**Phase to address:**
-CONTRIBUTING.md / docs/ distillation phase. Map every major concept to exactly one file before writing.
-
----
-
-### Pitfall 13: GitHub Actions Workflow Permissions Too Broad
-
-**What goes wrong:**
-Workflow uses `permissions: write-all` or doesn't explicitly set permissions, giving every step write access to the repository. For a public repo accepting PRs from external contributors, this creates supply chain risk — a compromised action in the workflow could write to the repo.
-
-**How to avoid:**
-Follow principle of least privilege. Set `permissions: read-all` at the top level, then elevate specific jobs only as needed. For a CI-only workflow (lint, typecheck, test, build), no write permissions are needed. If release automation is added later, scope write permissions to that job only.
-
-**Warning signs:**
-- `permissions: write-all` anywhere in the workflow
-- No `permissions` key in workflow YAML (defaults to write for most events)
-- Using `actions/checkout` with `persist-credentials: true` when not needed
-
-**Phase to address:**
-CI/CD phase. Set permissions explicitly from the start.
+Caching and incremental analysis phase. Deletion detection is a required correctness property, not a stretch goal.
 
 ---
 
 ## Technical Debt Patterns
 
-Shortcuts that seem reasonable but create long-term problems specific to OSS documentation.
+Shortcuts that seem reasonable but create long-term correctness or quality problems in a performance-optimized pipeline.
 
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Link to AGENTS.md instead of distilling | Saves time now | New contributors don't read AGENTS.md; LLMs can't parse it efficiently | Never: do the distillation |
-| Copy-paste Contributor Covenant without customizing enforcement | Quick CoC checkbox | No real enforcement mechanism; reporters feel unsafe | Never: customize enforcement section |
-| Add llms.txt before docs are structured | Early adopter signal | References docs that don't exist or aren't LLM-readable | Never at v0.1.0: write the docs first |
-| Skip unit/integration test split | Simpler test config | CI breaks on external PRs; badge shows red permanently | Never: split at the start |
-| Add all badges before CI exists | Looks polished | Broken/unknown badge signals project dysfunction | Never: add badges when their source is live |
-| Automated CHANGELOG on day one | Appears professional | Requires conventional commits discipline not yet established | Only after 3+ manual release cycles |
-| 15-item PR template | Comprehensive | Contributors ignore it entirely | Only for complex contributions; use conditional items |
-| Monolithic CONTRIBUTING.md | Thorough | Wall of text; contributors find no entry point | Only if structured with a clear TL;DR section at top |
+| Shortcut                                                  | Immediate Benefit                  | Long-term Cost                                                               | When Acceptable                                                               |
+| --------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Key cache on `path + size` instead of content hash        | Fast fingerprinting, no file reads | Same-size edits silently use stale cache; users get wrong docs               | Never for correctness-critical cache; use `mtime + size` as minimum           |
+| Hardcode 2000-token compression budget for all rounds     | Simple implementation              | Uniform compression loses late-round specificity; quality degrades invisibly | Only acceptable if a quality regression test suite validates it               |
+| Parallelize rounds inside the runner                      | Reduces wall-clock time            | Breaks sequential context dependency; later rounds produce generic output    | Never — parallel work units are analyzers and renderers, not dependent rounds |
+| Skip cascade invalidation for dependent rounds            | Simpler cache logic                | Round N+1 served with stale context from a re-run Round N                    | Never — cascade invalidation is required for correctness                      |
+| Test token optimization on one model only                 | Fast iteration                     | Quality regressions on other providers go undetected until user reports      | Only acceptable for initial prototype; two-provider tests before shipping     |
+| Write streaming token counts to stdout directly           | Easy to implement                  | Interleaves with `TerminalRenderer` cursor control; corrupts TTY output      | Never in TTY mode; only in non-TTY/CI mode                                    |
+| Cache rounds without including prior-round output in hash | Simpler key computation            | Stale round N when round N-1 changes                                         | Never — either cascade-invalidate or include prior hash in key                |
 
 ---
 
 ## Integration Gotchas
 
-Common mistakes when connecting OSS infrastructure to external services.
+Common mistakes when connecting performance features to the existing pipeline components.
 
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| CI badge in README | Pointing to wrong workflow name or branch | Match badge URL exactly to `workflow_name` in `.github/workflows/filename.yml` |
-| npm version badge | Using package name that doesn't match npm publish name | Verify `handover-cli` (not `handover`) is the published name |
-| GitHub Actions secrets | Hardcoding API keys in workflow YAML | Store as GitHub repo secrets; access via `${{ secrets.KEY_NAME }}` |
-| Codecov/coverage badge | Adding badge before reporter is configured | Set up reporter first, verify it uploads, then add badge |
-| Private security advisory | Not enabling GitHub private advisory feature | Enable in repo Settings > Security > Private vulnerability reporting |
-| GitHub Sponsors (FUNDING.yml) | Creating before GitHub Sponsors is approved | Apply for Sponsors first; FUNDING.yml with unapproved handle shows broken page |
+| Integration                                  | Common Mistake                                                                                       | Correct Approach                                                                       |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `RoundCache` + `DAGOrchestrator`             | Cache hit skips the DAG step entirely, losing event emission (`onStepComplete`)                      | Cache hits must still emit orchestrator events so UI progress updates correctly        |
+| Streaming + `TerminalRenderer`               | Calling `process.stdout.write()` directly from a streaming callback                                  | Pass streaming events through `TerminalRenderer`'s event interface; it owns stdout     |
+| Incremental analysis + `compressRoundOutput` | Serving cached compressed context from a prior run without verifying it matches current round output | Compression is derived from round output — if round re-runs, recompute compression     |
+| `p-limit` concurrency + WASM parser          | Setting concurrency > 1 for `ParserService.parse()`                                                  | WASM runtime is not safe for concurrent calls; concurrency must be 1 for parser access |
+| File-level cache + config changes            | File hash unchanged when model changes from Claude to Groq                                           | Include a hash of analysis-affecting config fields in the file cache key               |
+| Streaming structured output + Zod validation | Attempting Zod parse on partial stream chunks                                                        | Buffer full response, then validate; streaming is only for UX feedback                 |
+| Incremental analysis + `TokenUsageTracker`   | Reporting 0 tokens for cache-hit rounds, skewing cost estimates                                      | Distinguish "from cache (0 API cost)" from "not run" in usage tracking                 |
 
 ---
 
 ## Performance Traps
 
-Not directly applicable to a documentation/infrastructure project, but documentation maintenance has scale concerns.
+Patterns that work at the current scale but break as codebase size grows — or that optimize the wrong bottleneck.
 
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Monolithic docs | Increasing time to find specific info; duplicate content appearing | Single-source-of-truth rule | At 5+ contributing docs authors |
-| Manual CHANGELOG | Releases delayed because CHANGELOG takes too long to write | Use structured release notes in PRs | At 10+ releases/year |
-| No automated CI enforcement | Style drift, typecheck failures merged undetected | Required CI checks before merge | First PR from an external contributor |
-| LLM-unfriendly cross-references | AI assistants cannot answer questions about the codebase | Self-contained section headers; explicit path references | When AI tools become primary contributor discovery mechanism |
+| Trap                                                                   | Symptoms                                                                               | Prevention                                                                          | When It Breaks                                                          |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Optimizing round wall-clock time when context packing dominates        | Parallelizing rounds saves seconds; context packing still takes minutes on large repos | Profile before optimizing; measure which phase actually dominates                   | At codebases > 500 files where packing is the bottleneck, not LLM calls |
+| Full re-parse on every incremental run to "verify" cache               | Defeats the purpose of incremental analysis; `mtime` check is as fast as re-hashing    | Use `mtime + size` for fast staleness check; full hash only on mtime change         | Immediately — defeats the entire purpose of incremental analysis        |
+| Streaming that buffers the entire response before displaying           | No perceived UX improvement; users still wait for full round completion                | Stream token count increments in real time; display time-elapsed, not chunk content | At slow API response times (>30s per round) where users need feedback   |
+| Token optimization that targets input tokens but ignores output tokens | Optimizing system prompt size; output token count (and cost) unchanged                 | Track and optimize both input and output token budgets                              | Cost reduction is partial; bill doesn't decrease proportionally         |
+| Parallel document rendering without output directory locking           | Two renderers write to same file path; output is truncated or corrupted                | Ensure each document has a unique output path; no two renderers write the same file | When `--only` filter is removed and all 14 documents render in parallel |
+
+---
+
+## Security Mistakes
+
+Performance feature-specific security issues in an LLM analysis pipeline.
+
+| Mistake                                                              | Risk                                                                                                                                      | Prevention                                                                                                            |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Persisting LLM round outputs to `.handover/cache/` without filtering | Round outputs contain analysis of code, which may include extracted secrets from comments or env var names that were in the analyzed code | Never cache raw source excerpts; cache only LLM-generated analysis results (already the pattern in `RoundCacheEntry`) |
+| Cache directory world-readable on shared systems                     | Other users on a multi-user system can read `.handover/cache/rounds/`                                                                     | Set directory permissions to `0o700` on creation; add to docs that cache contains analysis of proprietary code        |
+| Using file path in cache key without normalization                   | Symlinks, relative paths, and absolute paths for the same file produce different keys; partial cache misses                               | Normalize all file paths to repo-root-relative canonical paths before hashing                                         |
+| Streaming API responses logged at DEBUG level                        | API responses in logs expose the LLM-generated analysis, which may surface extracted code content                                         | Gate verbose logging behind `--verbose`; never log raw LLM response bodies at INFO or WARN level                      |
+
+---
+
+## UX Pitfalls
+
+User experience mistakes specific to adding performance features to a CLI tool.
+
+| Pitfall                                                          | User Impact                                                               | Better Approach                                                                                        |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Showing "Using cached results" with no indication of cache age   | Users don't know if cache is minutes or months old; trust in output drops | Show cache timestamp: "Using cached results from 2h ago. Run with --no-cache to refresh."              |
+| No progress during streaming rounds (spinner only)               | 45-second LLM call with no feedback feels like a hang                     | Show elapsed time and token count as stream progresses: "Round 3: 12.4s, ~3,200 tokens..."             |
+| Cache hit silently produces same output as prior run             | Users can't tell if their recent changes were analyzed                    | Log which rounds were cache hits vs. fresh: "Round 1: cached (8h ago). Round 2: fresh (file changed)." |
+| Incremental analysis re-running all rounds when any file changes | Users with large repos who change one file wait for full re-analysis      | Only invalidate rounds whose inputs include the changed file; unchanged rounds serve from cache        |
+| `--no-cache` with no confirmation on large repos                 | Users accidentally re-run a 5-minute full analysis                        | Print estimated time when cache is cleared: "Cache cleared. Full re-analysis will take ~4 minutes."    |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-Things that appear complete but are missing critical pieces specific to this project.
+Things that appear complete but are missing critical correctness properties specific to performance retrofitting.
 
-- [ ] **CONTRIBUTING.md:** Often missing the local test setup that explains the `HANDOVER_INTEGRATION=1` split — verify a new contributor can run at least some tests without an API key
-- [ ] **CI workflow:** Often marked done but not actually gating PRs — verify "Require status checks to pass before merging" is enabled in branch protection settings
-- [ ] **Issue templates:** Often added but `.github/ISSUE_TEMPLATE/config.yml` is missing, so users still see the blank issue option — verify the chooser appears with the right template descriptions
-- [ ] **SECURITY.md:** Often lists an email but GitHub private advisory reporting is not enabled — verify both paths work
-- [ ] **README badges:** Often pointing to correct workflow name but wrong branch (`main` vs `master`) — verify each badge URL loads correctly, not just 200 OK
-- [ ] **llms.txt:** Often references files that exist but aren't self-contained — verify each linked file reads coherently in isolation (no dangling "see section X" references)
-- [ ] **CHANGELOG.md:** Often has a "Unreleased" section with no release date — verify v0.1.0 entry has an actual date and describes user-facing changes, not internal refactors
-- [ ] **AGENTS.md:** Often "updated" without actually removing distilled content — verify monolith shrinks as content moves to structured docs, not just grows with new links
+- [ ] **Cache invalidation:** Cache key verified to change on same-size file edits — test by editing a comment, verifying the round re-runs
+- [ ] **Cascade invalidation:** Verified that changing Round 1 output invalidates Rounds 2-6 cached results — test by clearing only Round 1 and confirming Rounds 2-6 also re-run
+- [ ] **Config-hash invalidation:** Verified that changing model in `.handover.yml` forces full re-analysis — test by switching provider and confirming 0 cache hits
+- [ ] **Deletion detection:** Verified that deleting a source file triggers full re-analysis — test by removing a module and confirming documentation no longer references it
+- [ ] **Streaming + TTY:** Verified that streaming token display does not corrupt terminal output on an actual TTY — test by running with `--verbose` in an interactive terminal, not just in CI
+- [ ] **WASM parser concurrency:** Verified that parallel file reads do not corrupt parse results — test by running on a mixed-language codebase with concurrency > 1 and comparing output to sequential run
+- [ ] **Quality regression baseline:** Round 5 and Round 6 output on a known codebase captured before any compression optimization — verified that post-optimization output names the same specific files and functions
+- [ ] **Multi-provider quality check:** Token optimization validated on at least Anthropic + one alternative provider — not just the default model
 
 ---
 
@@ -342,15 +323,15 @@ Things that appear complete but are missing critical pieces specific to this pro
 
 When pitfalls occur despite prevention, how to recover.
 
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| Over-documented too early | LOW | Archive unused files, add "not actively maintained" notice, remove from CONTRIBUTING.md links |
-| Monolith not distilled | HIGH | Full content audit; map each section to target file; move in batches; add redirects from old file |
-| CI broken due to API keys | LOW | Add `if: secrets.HANDOVER_INTEGRATION` guard to integration test step; rerun workflow |
-| Broken badges | LOW | Fix badge URL to match actual workflow name; check branch reference matches default branch |
-| Stale CONTRIBUTING.md drift | MEDIUM | Quarterly "docs audit" issue; assign to next milestone; verify against actual repo state |
-| llms.txt pointing to non-existent docs | LOW | Remove entries for files that don't exist; add back when files are written |
-| CHANGELOG backfill | MEDIUM | Write a single v0.1.0 entry for initial release; don't reconstruct every commit; start fresh from current version |
+| Pitfall                                               | Recovery Cost | Recovery Steps                                                                                                                                                |
+| ----------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stale cache from size-only fingerprinting             | LOW           | Add `--no-cache` flag (already exists); document as escape hatch; fix hash algorithm in same release                                                          |
+| Cascade invalidation not implemented, stale round N+1 | MEDIUM        | Clear entire `.handover/cache/` directory; implement cascade invalidation; ship as a correctness fix with a major cache-version bump                          |
+| Quality regression from compression optimization      | MEDIUM        | Revert the compression parameter change; ship a corrected version; add quality regression tests before re-attempting                                          |
+| Streaming / TTY corruption                            | LOW           | Gate streaming on `process.stdout.isTTY === false`; route all writes through `TerminalRenderer`; regression is immediately visible in manual testing          |
+| WASM parser race condition under parallelism          | HIGH          | Revert parallelism change; add serialization (p-limit with concurrency 1 for parser); re-test on mixed-language codebase before re-shipping                   |
+| Config change not invalidating cache                  | LOW           | `--no-cache` (already exists) resolves immediately; fix in next release by including config hash in cache key                                                 |
+| Deleted files still referenced in cached round output | MEDIUM        | Full cache clear resolves immediately; implement deletion detection in incremental analysis; add integration test that verifies deletion triggers re-analysis |
 
 ---
 
@@ -358,41 +339,35 @@ When pitfalls occur despite prevention, how to recover.
 
 How roadmap phases should address these pitfalls.
 
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| Over-engineering docs for early stage | Every phase | "Would a real contributor be blocked without this?" check before adding any file |
-| Monolithic docs not distilled | CONTRIBUTING.md / docs/ structure phase | AGENTS.md shrinks as content moves; no sections in CONTRIBUTING.md say "see AGENTS.md" |
-| CI broken on API key requirements | CI/CD phase | External contributor test: run CI on a fork with no secrets configured; unit tests pass |
-| Stale badges before CI exists | CI/CD phase | All badge URLs verified to render correct state before README is merged |
-| CONTRIBUTING.md as wall of text | CONTRIBUTING.md phase | 15-minute test: new contributor can clone, install, find an issue without reading more than CONTRIBUTING.md |
-| Issue templates too rigid | Issue templates phase | 5 real issues filed without maintainer needing to ask for more info |
-| llms.txt without content strategy | LLM accessibility phase | Each linked file reads coherently in isolation; no dangling cross-references |
-| CHANGELOG retroactive backfill | CHANGELOG phase | v0.1.0 entry written in prose; subsequent releases add entries as changes land |
-| Security disclosure that doesn't work | SECURITY.md phase | Test the disclosure path end-to-end before publishing |
-| CoC without enforcement mechanism | CODE_OF_CONDUCT phase | Enforcement section customized with working contact and realistic SLA |
-| PR template checklist bloat | Issue/PR templates phase | Count checklist items; max 7; verify all apply to most PRs |
-| Duplicate docs creating drift | Distillation phase | Each concept appears in exactly one file; all others link |
-| GitHub Actions permissions too broad | CI/CD phase | `permissions` explicitly set in every workflow; least privilege verified |
+| Pitfall                                                  | Prevention Phase                 | Verification                                                                                                   |
+| -------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Cache invalidation based on file size alone              | Caching and incremental analysis | Edit a file comment (same size); confirm round re-runs                                                         |
+| Parallelizing rounds with sequential dependencies        | Parallelism                      | Add DAG assertion that rounds N+1 always list round N as dep; confirm no `Promise.all` across dependent rounds |
+| Streaming structured JSON before schema is complete      | Streaming output                 | Attempt to parse a mid-stream chunk; confirm `JSON.parse` is never called on partial output                    |
+| Context compression degrading later round quality        | Token optimization               | Capture Round 5/6 ground truth before optimization; compare specificity after                                  |
+| File cache ignoring config changes                       | Caching and incremental analysis | Change model in config; confirm 0 cache hits on next run                                                       |
+| Shared WASM parser state under parallelism               | Parallelism                      | Run with concurrency > 1 on mixed-language codebase; diff output against sequential run                        |
+| Streaming races with TerminalRenderer                    | Streaming output                 | Run interactively in TTY; verify no line corruption during a round                                             |
+| Round N cache not invalidated when Round N-1 changes     | Caching and incremental analysis | Manually clear only round 1 cache; confirm rounds 2-6 also clear                                               |
+| Token optimization quality regression on other providers | Token optimization               | Run quality test on Anthropic + at least one alternative provider                                              |
+| Incremental analysis not detecting deleted files         | Caching and incremental analysis | Delete a source file; run again; verify deleted module is absent from output                                   |
 
 ---
 
 ## Sources
 
-- [GitHub Open Source Guides: Best Practices for Maintainers](https://opensource.guide/best-practices/) — MEDIUM confidence (official GitHub guidance)
-- [GitHub Docs: Community Health Files](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/creating-a-default-community-health-file) — HIGH confidence (official GitHub documentation)
-- [contributing.md: How to Build a CONTRIBUTING.md](https://contributing.md/how-to-build-contributing-md/) — MEDIUM confidence (community resource, multiple sources agree)
-- [GitHub Actions Secrets Security (NeoVa Solutions, 2025)](https://www.neovasolutions.com/2025/02/06/github-actions-how-to-secure-secrets-and-credentials-in-ci-cd/) — MEDIUM confidence (verified against GitHub official docs pattern)
-- [llms.txt in 2026: What It Does and Doesn't Do](https://searchsignal.online/blog/llms-txt-2026) — LOW confidence (single source; confirms adoption signals but not impact)
-- [The Complete Guide to llms.txt (GetPublii)](https://getpublii.com/blog/llms-txt-complete-guide.html) — LOW confidence (single source)
-- [Software Antifragility: 5 Open Source Projects That Learned from Failure](https://www.softwareantifragility.com/p/5-open-source-projects-that-learned) — MEDIUM confidence (post-mortem analysis, multiple project examples)
-- [Changesets vs Semantic Release (Brian Schiller)](https://brianschiller.com/blog/2023/09/18/changesets-vs-semantic-release/) — MEDIUM confidence (practitioner analysis, well-regarded)
-- [Handsontable: Common Causes of Failed Open Source Projects](https://handsontable.com/blog/the-most-common-causes-of-failed-open-source-software-projects) — MEDIUM confidence (industry blog, corroborated by research)
-- [OpenSSF Open Source Project Security Baseline, 2025](https://openssf.org/press-release/2025/02/25/openssf-announces-initial-release-of-the-open-source-project-security-baseline/) — HIGH confidence (official security foundation release)
-- [Open Source Maintainer Burnout (The Register, 2025)](https://www.theregister.com/2025/02/16/open_source_maintainers_state_of_open/) — MEDIUM confidence (current reporting, corroborated by multiple sources)
-- [Why Modern Open Source Projects Fail (Coelho & Valente, 2017)](https://arxiv.org/abs/1707.02327) — MEDIUM confidence (academic; patterns remain relevant)
-- [dwyl/repo-badges: README badge best practices](https://github.com/dwyl/repo-badges) — MEDIUM confidence (practitioner resource, widely referenced)
+- [Cache the prompt, not the response — why most LLM caching fails (Amit Kothari)](https://amitkoth.com/llm-caching-strategies/) — MEDIUM confidence (practitioner analysis; core architectural distinction between response caching vs. prompt caching)
+- [Context Rot: How Increasing Input Tokens Impacts LLM Performance (Chroma Research)](https://research.trychroma.com/context-rot) — HIGH confidence (primary research; demonstrates U-shaped performance curve and distractor sensitivity)
+- [When Less is More: The LLM Scaling Paradox in Context Compression (arXiv 2602.09789)](https://arxiv.org/html/2602.09789) — HIGH confidence (2026 preprint; semantic drift failure mode in compression)
+- [Context Discipline and Performance Correlation (arXiv 2601.11564)](https://arxiv.org/html/2601.11564v1) — HIGH confidence (2026 preprint; 15-47% performance drop from context length increase)
+- [Best practices to render streamed LLM responses (Chrome for Developers)](https://developer.chrome.com/docs/ai/render-llm-responses) — HIGH confidence (official guidance; chunk-isolation sanitization pitfall)
+- [Cache Invalidation: What You're Likely Doing Wrong (Trio Tech Systems)](https://triotechsystems.com/the-cache-invalidation-nightmare-what-youre-likely-doing-wrong/) — MEDIUM confidence (practitioners; thundering herd and stale data patterns)
+- [LLM Cache Invalidation Patterns in Java — Token-Aware Caching (GoPenAI, Dec 2025)](https://blog.gopenai.com/llm-cache-invalidation-patterns-in-java-token-aware-caching-bccaa10ff7c0) — MEDIUM confidence (domain-specific; config-hash invalidation pattern)
+- [Reduce LLM Costs: Token Optimization Strategies (Rost Glukhov, 2025)](https://www.glukhov.org/post/2025/11/cost-effective-llm-applications/) — MEDIUM confidence (practitioner; input vs. output token asymmetry)
+- [Structured Output Streaming for LLMs (Preston Blackburn, Medium 2025)](https://medium.com/@prestonblckbrn/structured-output-streaming-for-llms-a836fc0d35a2) — MEDIUM confidence (practitioner; streaming vs. Zod validation ordering)
+- Codebase direct analysis: `src/cache/round-cache.ts`, `src/orchestrator/dag.ts`, `src/ai-rounds/runner.ts`, `src/context/token-counter.ts`, `src/ui/`, `.planning/codebase/CONCERNS.md` — HIGH confidence (first-party source)
 
 ---
 
-*Pitfalls research for: OSS infrastructure and documentation for handover CLI*
-*Researched: 2026-02-18*
+_Pitfalls research for: performance features (caching, parallelism, streaming, token optimization) in handover CLI_
+_Researched: 2026-02-18_
