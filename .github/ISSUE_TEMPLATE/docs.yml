@@ -1,0 +1,36 @@
+name: Documentation Improvement
+description: Report missing, incorrect, or unclear documentation
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve our documentation!
+  - type: input
+    id: location
+    attributes:
+      label: Documentation Location
+      description: Which file or page needs improvement?
+      placeholder: "e.g. README.md, CONTRIBUTING.md, --help output"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's Wrong or Missing
+      description: What is incorrect, unclear, or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Improvement
+      description: What should it say instead?
+  - type: checkboxes
+    id: existing-issues
+    attributes:
+      label: Checks
+      options:
+        - label: I have searched existing issues and this is not a duplicate
+          required: true
