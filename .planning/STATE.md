@@ -70,5 +70,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Roadmap created for v2.0 (phases 4-6); ready to plan Phase 4
-Resume file: None
+Stopped at: Phase 4 context gathered
+Resume file: .planning/phases/04-cache-correctness/04-CONTEXT.md
