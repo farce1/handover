@@ -37,12 +37,12 @@
 2. Re-running handover after Round 1 output changes causes Rounds 2-6 to re-execute rather than serve cached results built on the old context
 3. A re-run on a completely unchanged codebase completes with all 6 rounds served from cache, producing identical output to the prior run
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 
-- [ ] 04-01: Content-hash cache fingerprint — replace size-only fingerprint in RoundCache with mtime+size or SHA-256 content hash
-- [ ] 04-02: Cascade invalidation — include prior round output hash in each round's cache key so upstream changes propagate downstream
+- [ ] 04-01-PLAN.md — Content-hash fingerprint, cascade invalidation, --no-cache fix, auto-gitignore
+- [ ] 04-02-PLAN.md — Cache UX feedback: all-cached fast path, migration warning, verbose mode
 
 ### Phase 5: UX Responsiveness
 
