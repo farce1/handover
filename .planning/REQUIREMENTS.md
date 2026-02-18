@@ -63,51 +63,53 @@ Deferred to future release. Tracked but not in current roadmap.
 
 Explicitly excluded. Documented to prevent scope creep.
 
-| Feature | Reason |
-|---------|--------|
-| Discord/Slack server | Moderation overhead; GitHub Discussions achieves 80% of the value |
-| Docs site (Docusaurus, etc.) | Maintenance overhead; in-repo markdown serves LLMs better at this stage |
-| New CLI features | This milestone is purely OSS infrastructure |
-| Major code refactoring | Only touch code for clarity, not architecture changes |
-| Monorepo tooling (Nx, Turborepo) | Not a monorepo, irrelevant complexity |
-| Label management tooling | GitHub defaults sufficient for single maintainer |
+| Feature                          | Reason                                                                  |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| Discord/Slack server             | Moderation overhead; GitHub Discussions achieves 80% of the value       |
+| Docs site (Docusaurus, etc.)     | Maintenance overhead; in-repo markdown serves LLMs better at this stage |
+| New CLI features                 | This milestone is purely OSS infrastructure                             |
+| Major code refactoring           | Only touch code for clarity, not architecture changes                   |
+| Monorepo tooling (Nx, Turborepo) | Not a monorepo, irrelevant complexity                                   |
+| Label management tooling         | GitHub defaults sufficient for single maintainer                        |
 
 ## Traceability
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| COMM-01 | Phase 1 | Pending |
-| COMM-02 | Phase 1 | Pending |
-| COMM-03 | Phase 1 | Pending |
-| COMM-04 | Phase 1 | Pending |
-| COMM-05 | Phase 1 | Pending |
-| COMM-06 | Phase 1 | Pending |
-| COMM-07 | Phase 1 | Pending |
-| COMM-08 | Phase 1 | Pending |
-| COMM-09 | Phase 1 | Pending |
-| CICD-01 | Phase 2 | Pending |
-| CICD-02 | Phase 2 | Pending |
-| CICD-03 | Phase 2 | Pending |
-| CICD-04 | Phase 2 | Pending |
-| CICD-05 | Phase 2 | Pending |
-| CICD-06 | Phase 2 | Pending |
-| CICD-07 | Phase 2 | Pending |
-| CICD-08 | Phase 2 | Pending |
-| CICD-09 | Phase 2 | Pending |
-| DOCS-01 | Phase 3 | Pending |
-| DOCS-02 | Phase 3 | Pending |
-| DOCS-03 | Phase 3 | Pending |
-| DOCS-04 | Phase 3 | Pending |
-| DOCS-05 | Phase 3 | Pending |
-| DOCS-06 | Phase 3 | Pending |
+| Requirement | Phase   | Status  |
+| ----------- | ------- | ------- |
+| COMM-01     | Phase 1 | Pending |
+| COMM-02     | Phase 1 | Pending |
+| COMM-03     | Phase 1 | Pending |
+| COMM-04     | Phase 1 | Pending |
+| COMM-05     | Phase 1 | Pending |
+| COMM-06     | Phase 1 | Pending |
+| COMM-07     | Phase 1 | Pending |
+| COMM-08     | Phase 1 | Pending |
+| COMM-09     | Phase 1 | Pending |
+| CICD-01     | Phase 2 | Pending |
+| CICD-02     | Phase 2 | Pending |
+| CICD-03     | Phase 2 | Pending |
+| CICD-04     | Phase 2 | Pending |
+| CICD-05     | Phase 2 | Pending |
+| CICD-06     | Phase 2 | Pending |
+| CICD-07     | Phase 2 | Pending |
+| CICD-08     | Phase 2 | Pending |
+| CICD-09     | Phase 2 | Pending |
+| DOCS-01     | Phase 3 | Pending |
+| DOCS-02     | Phase 3 | Pending |
+| DOCS-03     | Phase 3 | Pending |
+| DOCS-04     | Phase 3 | Pending |
+| DOCS-05     | Phase 3 | Pending |
+| DOCS-06     | Phase 3 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 24 total
 - Mapped to phases: 24
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-02-18*
-*Last updated: 2026-02-18 after roadmap creation*
+
+_Requirements defined: 2026-02-18_
+_Last updated: 2026-02-18 after roadmap creation_
