@@ -58,27 +58,27 @@ Explicitly excluded. Documented to prevent scope creep.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase | Status  |
-| ----------- | ----- | ------- |
-| CACHE-01    | —     | Pending |
-| CACHE-02    | —     | Pending |
-| UX-01       | —     | Pending |
-| UX-02       | —     | Pending |
-| UX-03       | —     | Pending |
-| UX-04       | —     | Pending |
-| EFF-01      | —     | Pending |
-| EFF-02      | —     | Pending |
-| EFF-03      | —     | Pending |
-| EFF-04      | —     | Pending |
-| EFF-05      | —     | Pending |
+| Requirement | Phase   | Status  |
+| ----------- | ------- | ------- |
+| CACHE-01    | Phase 4 | Pending |
+| CACHE-02    | Phase 4 | Pending |
+| UX-01       | Phase 5 | Pending |
+| UX-02       | Phase 5 | Pending |
+| UX-03       | Phase 5 | Pending |
+| UX-04       | Phase 5 | Pending |
+| EFF-01      | Phase 6 | Pending |
+| EFF-02      | Phase 6 | Pending |
+| EFF-03      | Phase 6 | Pending |
+| EFF-04      | Phase 6 | Pending |
+| EFF-05      | Phase 6 | Pending |
 
 **Coverage:**
 
 - v2.0 requirements: 11 total
-- Mapped to phases: 0
-- Unmapped: 11
+- Mapped to phases: 11
+- Unmapped: 0
 
 ---
 
 _Requirements defined: 2026-02-18_
-_Last updated: 2026-02-18 after initial definition_
+_Last updated: 2026-02-18 — traceability complete after roadmap creation_

@@ -5,23 +5,35 @@
 See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** Defining requirements for v2.0 Performance
+**Current focus:** v2.0 Performance — Phase 4: Cache Correctness
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-18 — Milestone v2.0 started
+Phase: 4 of 6 (Cache Correctness)
+Plan: 0 of 2 in current phase
+Status: Ready to plan
+Last activity: 2026-02-18 — v2.0 roadmap created (phases 4-6 defined)
+
+Progress: [░░░░░░░░░░] 0% (0/8 plans complete across v2.0)
 
 ## Performance Metrics
 
 **v1.0 Velocity:**
 
 - Total plans completed: 9
-- Total execution time: ~0.7 hours
 - Average duration: ~5 min/plan
-- Timeline: 3 days (2026-02-16 → 2026-02-18)
+- Total execution time: ~0.7 hours
+- Timeline: 3 days (2026-02-16 to 2026-02-18)
+
+**By Phase (v1.0):**
+
+| Phase                         | Plans | Avg/Plan |
+| ----------------------------- | ----- | -------- |
+| 1. Community Health           | 2     | ~5 min   |
+| 2. CI/CD Automation           | 4     | ~5 min   |
+| 3. Docs and LLM Accessibility | 3     | ~5 min   |
+
+**v2.0:** No plans completed yet.
 
 ## Accumulated Context
 
@@ -29,13 +41,26 @@ Last activity: 2026-02-18 — Milestone v2.0 started
 
 All v1.0 decisions archived in PROJECT.md Key Decisions table.
 
+v2.0 key constraints from research:
+
+- Phase 4 (cache correctness) must ship before Phase 5 (streaming) — streaming on a broken cache delivers fast stale results
+- SDK upgrades (@anthropic-ai/sdk 0.39.0 to 0.76.0, openai 5.23.2 to 6.22.0) happen in Phase 5, not Phase 6 — prompt caching (Phase 6) uses the already-upgraded SDK
+- Streaming accumulates full response before Zod validation — never parse partial JSON mid-stream
+
 ### Pending Todos
 
 None.
 
 ### Blockers/Concerns
 
-External setup still required for v1.0 features to be fully operational:
+Research flags requiring investigation before planning:
+
+- Phase 5: Read @anthropic-ai/sdk and openai SDK changelogs; diff against src/providers/anthropic.ts and src/providers/openai-compat.ts before finalizing scope
+- Phase 5: Verify round-5-edge-cases.ts and round-6-deployment.ts dep declarations (zero to 2-hour investigation)
+- Phase 6: Read src/analyzers/cache.ts before finalizing scope of getChangedFiles() API change
+- Phase 6: Capture Round 5 and Round 6 output baseline before any compression parameter changes
+
+External setup still required from v1.0:
 
 - GitHub Sponsors enrollment (FUNDING.yml ready, account enrollment needed)
 - npm trusted publishing OIDC config on npmjs.com
@@ -45,5 +70,5 @@ External setup still required for v1.0 features to be fully operational:
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Defining v2.0 requirements
+Stopped at: Roadmap created for v2.0 (phases 4-6); ready to plan Phase 4
 Resume file: None
