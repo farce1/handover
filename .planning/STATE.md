@@ -5,35 +5,35 @@
 See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** Phase 2 — CI/CD Automation
+**Current focus:** Phase 3 — Documentation
 
 ## Current Position
 
-Phase: 2 of 3 (CI/CD Automation)
-Plan: 4 of 4 in current phase
-Status: In progress
-Last activity: 2026-02-18 — Completed 02-03 (ESLint, Prettier, husky hooks, commitlint, Dependabot)
+Phase: 3 of 3 (Documentation)
+Plan: 1 of N in current phase
+Status: Ready to start
+Last activity: 2026-02-18 — Completed 02-04 (commitlint CI, CodeQL, Scorecard, README badges)
 
-Progress: [####░░░░░░] 44%
+Progress: [######░░░░] 60%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: 3 min
-- Total execution time: 0.20 hours
+- Total execution time: 0.22 hours
 
 **By Phase:**
 
 | Phase               | Plans | Total  | Avg/Plan |
 | ------------------- | ----- | ------ | -------- |
 | 01-community-health | 1     | 1 min  | 1 min    |
-| 02-ci-cd-automation | 3     | 12 min | 4 min    |
+| 02-ci-cd-automation | 4     | 14 min | 4 min    |
 
 **Recent Trend:**
 
-- Last 5 plans: 01-02 (1 min), 02-01 (3 min), 02-02 (3 min), 02-03 (6 min)
+- Last 5 plans: 02-01 (3 min), 02-02 (3 min), 02-03 (6 min), 02-04 (2 min)
 - Trend: stable
 
 _Updated after each plan completion_
@@ -65,6 +65,10 @@ Recent decisions affecting current work:
 - [Phase 02-ci-cd-automation]: ESLint flat config with no-unused-vars argsIgnorePattern:^\_ to honor TypeScript underscore convention
 - [Phase 02-ci-cd-automation]: Prettier as single formatting source of truth (eslint-config-prettier disables conflicting rules)
 - [Phase 02-ci-cd-automation]: Dependabot groups npm PRs by production vs dev type to reduce maintainer noise
+- [Phase 02-ci-cd-automation]: CodeQL scans javascript-typescript only — TS/JS code is the security surface area
+- [Phase 02-ci-cd-automation]: Scorecard job-level permissions only (no top-level keys) — scorecard-action v2 strict isolation
+- [Phase 02-ci-cd-automation]: publish_results: true enables Scorecard badge; persist-credentials: false required by action
+- [Phase 02-ci-cd-automation]: All README badges use shields.io for-the-badge style for visual consistency
 
 ### Pending Todos
 
@@ -80,5 +84,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 02-03-PLAN.md
-Resume file: .planning/phases/02-ci-cd-automation/02-04-PLAN.md
+Stopped at: Completed 02-04-PLAN.md (Phase 2 complete)
+Resume file: .planning/phases/03-documentation/ (Phase 3 plans)
