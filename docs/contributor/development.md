@@ -95,7 +95,7 @@ Coverage reports are written to `coverage/` (which is gitignored). The CI pipeli
 npm run lint
 ```
 
-Uses ESLint with flat config (`eslint.config.mjs`). The `--max-warnings 0` flag means any warning fails the check. Fix auto-fixable issues with:
+Uses ESLint with flat config (`eslint.config.js`). The `--max-warnings 0` flag means any warning fails the check. Fix auto-fixable issues with:
 
 ```bash
 npm run lint:fix

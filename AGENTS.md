@@ -19,7 +19,7 @@ npm run format:check       # Check formatting without writing
 
 - Source files: `kebab-case.ts` | Renderers: `render-NN-name.ts` | AI rounds: `round-N-name.ts` | Tests: `*.test.ts`
 - Imports: always `.js` extension (ESM); use `import type` for type-only imports
-- No semicolons; single quotes; 2-space indent; trailing commas; section separators `// ─── Name ───...`
+- Semicolons required; single quotes; 2-space indent; trailing commas; section separators `// ─── Name ───...`
 
 ## Where things live
 
