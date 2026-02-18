@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 ## Current Position
 
 Phase: 4 of 6 (Cache Correctness)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-02-18 — v2.0 roadmap created (phases 4-6 defined)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-18 — 04-01 cache correctness core fixes complete
 
-Progress: [░░░░░░░░░░] 0% (0/8 plans complete across v2.0)
+Progress: [█░░░░░░░░░] 12% (1/8 plans complete across v2.0)
 
 ## Performance Metrics
 
@@ -33,7 +33,11 @@ Progress: [░░░░░░░░░░] 0% (0/8 plans complete across v2.0)
 | 2. CI/CD Automation           | 4     | ~5 min   |
 | 3. Docs and LLM Accessibility | 3     | ~5 min   |
 
-**v2.0:** No plans completed yet.
+**v2.0:**
+
+| Plan                           | Duration | Tasks   | Files   |
+| ------------------------------ | -------- | ------- | ------- |
+| Phase 04-cache-correctness P01 | 3 min    | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -46,6 +50,8 @@ v2.0 key constraints from research:
 - Phase 4 (cache correctness) must ship before Phase 5 (streaming) — streaming on a broken cache delivers fast stale results
 - SDK upgrades (@anthropic-ai/sdk 0.39.0 to 0.76.0, openai 5.23.2 to 6.22.0) happen in Phase 5, not Phase 6 — prompt caching (Phase 6) uses the already-upgraded SDK
 - Streaming accumulates full response before Zod validation — never parse partial JSON mid-stream
+- [Phase 04-cache-correctness]: hashContent imported at generate.ts call site, not in round-cache.ts — keeps cache module decoupled from file I/O
+- [Phase 04-cache-correctness]: RoundCache.clear() preserved as public method for migration; --no-cache uses noCacheMode flag to skip reads only, always writes
 
 ### Pending Todos
 
@@ -70,5 +76,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-cache-correctness/04-CONTEXT.md
+Stopped at: Completed 04-cache-correctness plan 1 (04-01-PLAN.md)
+Resume file: .planning/phases/04-cache-correctness/04-01-SUMMARY.md
