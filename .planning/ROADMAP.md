@@ -28,12 +28,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Filing a bug report, feature request, or docs improvement issue presents a structured YAML form — blank issues are disabled
   4. Submitting a PR surfaces a checklist (tests pass, changelog updated, docs updated) automatically via PR template
   5. The repo has a Sponsors button linked to GitHub Sponsors via FUNDING.yml
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 01-01: CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md
-- [ ] 01-02: Issue templates (bug, feature, docs, config.yml) and PR template
-- [ ] 01-03: FUNDING.yml
+- [ ] 01-01-PLAN.md — CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, FUNDING.yml
+- [ ] 01-02-PLAN.md — Issue templates (bug, feature, docs, config.yml) and PR template
 
 ### Phase 2: CI/CD Automation
 **Goal**: Every push and PR runs automated quality checks; releases generate changelogs and publish to npm automatically; the README displays live trust signals via badges
@@ -77,6 +76,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Community Health | 0/3 | Not started | - |
+| 1. Community Health | 0/2 | Not started | - |
 | 2. CI/CD Automation | 0/4 | Not started | - |
 | 3. Docs and LLM Accessibility | 0/3 | Not started | - |
