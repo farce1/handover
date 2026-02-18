@@ -5,15 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** Planning next milestone
+**Current focus:** Defining requirements for v2.0 Performance
 
 ## Current Position
 
-Milestone: v1.0 complete (shipped 2026-02-18)
-Status: Between milestones
-Last activity: 2026-02-18 — v1.0 OSS Excellence milestone completed and archived
-
-Progress: [##########] 100% (v1.0)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-18 — Milestone v2.0 started
 
 ## Performance Metrics
 
@@ -46,5 +45,5 @@ External setup still required for v1.0 features to be fully operational:
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: v1.0 milestone complete and archived
-Resume file: None — start next milestone with /gsd:new-milestone
+Stopped at: Defining v2.0 requirements
+Resume file: None

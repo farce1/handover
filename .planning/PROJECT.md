@@ -37,7 +37,27 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ### Active
 
-(No active requirements — next milestone not yet planned)
+- [ ] Caching and incremental analysis — skip re-analysis for unchanged files
+- [ ] Parallel analyzer execution — run analyzers concurrently
+- [ ] Streaming output with live progress — no blank terminal staring
+- [ ] Smarter LLM usage — fewer round trips, less redundant context, lower token costs
+- [ ] Faster CLI startup — reduce initialization overhead
+- [ ] Large repo scaling — handle big codebases without choking
+- [ ] Output quality preserved — smarter, not degraded
+
+## Current Milestone: v2.0 Performance
+
+**Goal:** Full performance overhaul — make handover fast, responsive, and cost-efficient at any repo size.
+
+**Target features:**
+
+- Caching & incremental analysis (unchanged files skip re-analysis)
+- Parallel analyzer execution
+- Streaming output with live progress
+- Smarter LLM usage (fewer rounds, reduced token costs)
+- Faster startup time
+- Large repo scaling
+- Measurable benchmarks (2-5x faster, 50%+ fewer tokens on incremental runs)
 
 ### Out of Scope
 
@@ -81,4 +101,4 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ---
 
-_Last updated: 2026-02-18 after v1.0 milestone_
+_Last updated: 2026-02-18 after v2.0 milestone started_
