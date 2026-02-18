@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { loadConfig, resolveApiKey } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
-import { HandoverError } from '../utils/errors.js';
+import { HandoverError, handleCliError } from '../utils/errors.js';
 import { DAGOrchestrator } from '../orchestrator/dag.js';
 import { createStep } from '../orchestrator/step.js';
 import { runStaticAnalysis } from '../analyzers/coordinator.js';
@@ -760,18 +760,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     displayState.totalCost = tracker.getTotalCost();
     renderer.onComplete(displayState);
   } catch (err) {
-    if (err instanceof HandoverError) {
-      logger.error(err);
-      process.exit(1);
-    }
-    // Wrap unknown errors
-    const wrapped = new HandoverError(
-      err instanceof Error ? err.message : String(err),
-      'An unexpected error occurred',
-      'Check the error above and try again',
-    );
-    logger.error(wrapped);
-    process.exit(1);
+    handleCliError(err, 'An unexpected error occurred during handover generation');
   } finally {
     renderer.destroy();
     logger.setSuppressed(false);

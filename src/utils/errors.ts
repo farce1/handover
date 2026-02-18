@@ -1,4 +1,5 @@
 import pc from 'picocolors';
+import { logger } from './logger.js';
 
 /**
  * Base error class with Rust-compiler-inspired formatting.
@@ -133,7 +134,22 @@ export class ProviderError extends HandoverError {
       'PROVIDER_REQUEST_FAILED',
     );
   }
+}
 
+/**
+ * Handle a CLI-level error by logging it and exiting the process.
+ * Wraps unknown errors in HandoverError for consistent formatting.
+ */
+export function handleCliError(err: unknown, context?: string): never {
+  const toLog = err instanceof HandoverError
+    ? err
+    : new HandoverError(
+        err instanceof Error ? err.message : String(err),
+        context ?? 'An unexpected error occurred',
+        'Check the error above and try again',
+      );
+  logger.error(toLog);
+  process.exit(1);
 }
 
 /**

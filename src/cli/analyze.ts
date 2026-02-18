@@ -9,7 +9,7 @@ import {
 } from '../analyzers/report.js';
 import { loadConfig } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
-import { HandoverError } from '../utils/errors.js';
+import { handleCliError } from '../utils/errors.js';
 
 export interface AnalyzeOptions {
   provider?: string;
@@ -88,17 +88,6 @@ export async function runAnalyze(options: AnalyzeOptions): Promise<void> {
       logger.info(`Report written to: ${pc.cyan(outputPath)}`);
     }
   } catch (err) {
-    if (err instanceof HandoverError) {
-      logger.error(err);
-      process.exit(1);
-    }
-    // Wrap unknown errors
-    const wrapped = new HandoverError(
-      err instanceof Error ? err.message : String(err),
-      'An unexpected error occurred during static analysis',
-      'Check the error above and try again',
-    );
-    logger.error(wrapped);
-    process.exit(1);
+    handleCliError(err, 'An unexpected error occurred during static analysis');
   }
 }

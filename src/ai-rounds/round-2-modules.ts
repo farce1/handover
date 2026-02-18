@@ -7,12 +7,26 @@ import type { TokenUsageTracker } from '../context/tracker.js';
 import type { StepDefinition } from '../orchestrator/types.js';
 import type { RoundExecutionResult } from './types.js';
 import type { Round1Output, Round2Output } from './schemas.js';
+import type { StandardRoundConfig } from './round-factory.js';
 import { Round2OutputSchema } from './schemas.js';
-import { createStep } from '../orchestrator/step.js';
-import { buildRoundPrompt, buildRetrySystemPrompt, ROUND_SYSTEM_PROMPTS } from './prompts.js';
-import { validateRoundClaims } from './validator.js';
 import { buildRound2Fallback } from './fallbacks.js';
-import { executeRound } from './runner.js';
+import { createStandardRoundStep } from './round-factory.js';
+
+// ─── Round 2 Config ─────────────────────────────────────────────────────────
+
+export const ROUND_2_CONFIG: StandardRoundConfig<Round2Output> = {
+  roundNumber: 2,
+  name: 'Module Detection',
+  deps: ['ai-round-1'],
+  maxTokens: 8192,
+  schema: Round2OutputSchema as z.ZodType<Round2Output>,
+  buildData: (analysis, _config, _getter) => buildRound2Data(analysis),
+  buildFallback: buildRound2Fallback,
+  getPriorContexts: (getter) => {
+    const r1 = getter<Round1Output>(1);
+    return r1 ? [r1.context] : [];
+  },
+};
 
 // ─── Round 2: Module Detection ─────────────────────────────────────────────
 
@@ -36,53 +50,23 @@ export function createRound2Step(
   getRound1Result: () => RoundExecutionResult<Round1Output> | undefined,
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): StepDefinition {
-  return createStep({
-    id: 'ai-round-2',
-    name: 'AI Round 2: Module Detection',
-    deps: ['ai-round-1'],
-    execute: async (_ctx): Promise<RoundExecutionResult<Round2Output>> => {
-      // 1. Get Round 1 compressed context for prior analysis
-      const round1Result = getRound1Result();
-      const priorRounds = round1Result ? [round1Result.context] : [];
+  // Map the single-round getter to the factory's generic round getter
+  const roundGetter = <U>(n: number) => {
+    if (n === 1) return getRound1Result() as RoundExecutionResult<U> | undefined;
+    return undefined;
+  };
 
-      // 2. Build round-specific data from static analysis
-      const roundData = buildRound2Data(staticAnalysis);
-
-      // 3. Execute the round via the shared engine
-      return executeRound<Round2Output>({
-        roundNumber: 2,
-        provider,
-        schema: Round2OutputSchema as z.ZodType<Round2Output>,
-        buildPrompt: (isRetry: boolean) => {
-          const systemPrompt = isRetry
-            ? buildRetrySystemPrompt(ROUND_SYSTEM_PROMPTS[2])
-            : ROUND_SYSTEM_PROMPTS[2];
-
-          const request = buildRoundPrompt(
-            2,
-            systemPrompt,
-            packedContext,
-            priorRounds,
-            roundData,
-            estimateTokensFn,
-          );
-
-          return {
-            ...request,
-            temperature: isRetry ? 0.1 : 0.3,
-            maxTokens: 8192, // Module detection may need more output for complex projects
-          };
-        },
-        validate: (data: Round2Output) =>
-          validateRoundClaims(2, data as unknown as Record<string, unknown>, staticAnalysis),
-        buildFallback: () => buildRound2Fallback(staticAnalysis),
-        tracker,
-        estimateTokensFn,
-        onRetry,
-      });
-    },
-    onSkip: () => buildRound2Fallback(staticAnalysis),
-  });
+  return createStandardRoundStep(
+    ROUND_2_CONFIG,
+    provider,
+    staticAnalysis,
+    packedContext,
+    config,
+    tracker,
+    estimateTokensFn,
+    roundGetter,
+    onRetry,
+  );
 }
 
 // ─── Round 2 Data Builder ──────────────────────────────────────────────────

@@ -12,16 +12,39 @@ import type {
   Round3Output,
   Round4Output,
 } from './schemas.js';
+import type { StandardRoundConfig } from './round-factory.js';
 import { Round4OutputSchema } from './schemas.js';
-import { createStep } from '../orchestrator/step.js';
-import {
-  buildRoundPrompt,
-  buildRetrySystemPrompt,
-  ROUND_SYSTEM_PROMPTS,
-} from './prompts.js';
-import { validateRoundClaims } from './validator.js';
 import { buildRound4Fallback } from './fallbacks.js';
-import { executeRound } from './runner.js';
+import { createStandardRoundStep } from './round-factory.js';
+
+// ─── Round 4 Config ─────────────────────────────────────────────────────────
+
+export const ROUND_4_CONFIG: StandardRoundConfig<Round4Output> = {
+  roundNumber: 4,
+  name: 'Architecture Detection',
+  deps: ['ai-round-3'],
+  maxTokens: 4096,
+  schema: Round4OutputSchema as z.ZodType<Round4Output>,
+  buildData: (analysis, _config, getter) => {
+    const priorResults = {
+      round1: getter<Round1Output>(1),
+      round2: getter<Round2Output>(2),
+      round3: getter<Round3Output>(3),
+    };
+    return buildRound4Data(analysis, priorResults);
+  },
+  buildFallback: buildRound4Fallback,
+  getPriorContexts: (getter) => {
+    const contexts = [
+      getter<Round1Output>(1)?.context,
+      getter<Round2Output>(2)?.context,
+      getter<Round3Output>(3)?.context,
+    ];
+    return contexts.filter(
+      (ctx): ctx is NonNullable<typeof ctx> => ctx !== undefined,
+    );
+  },
+};
 
 // ─── Round 4: Architecture Detection ────────────────────────────────────────
 
@@ -49,63 +72,26 @@ export function createRound4Step(
   },
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): StepDefinition {
-  return createStep({
-    id: 'ai-round-4',
-    name: 'AI Round 4: Architecture Detection',
-    deps: ['ai-round-3'], // Sequential after R3 (needs feature context), parallel with R5 and R6
-    execute: async (_ctx): Promise<RoundExecutionResult<Round4Output>> => {
-      // 1. Gather prior round compressed contexts
-      const priorResults = getPriorResults();
-      const priorRounds = [
-        priorResults.round1?.context,
-        priorResults.round2?.context,
-        priorResults.round3?.context,
-      ].filter(
-        (ctx): ctx is NonNullable<typeof ctx> => ctx !== undefined,
-      );
+  // Map the prior-results getter to the factory's generic round getter
+  const roundGetter = <U>(n: number) => {
+    const results = getPriorResults();
+    if (n === 1) return results.round1 as RoundExecutionResult<U> | undefined;
+    if (n === 2) return results.round2 as RoundExecutionResult<U> | undefined;
+    if (n === 3) return results.round3 as RoundExecutionResult<U> | undefined;
+    return undefined;
+  };
 
-      // 2. Build round-specific data from static analysis + prior results
-      const roundData = buildRound4Data(staticAnalysis, priorResults);
-
-      // 3. Execute the round via the shared engine
-      return executeRound<Round4Output>({
-        roundNumber: 4,
-        provider,
-        schema: Round4OutputSchema as z.ZodType<Round4Output>,
-        buildPrompt: (isRetry: boolean) => {
-          const systemPrompt = isRetry
-            ? buildRetrySystemPrompt(ROUND_SYSTEM_PROMPTS[4])
-            : ROUND_SYSTEM_PROMPTS[4];
-
-          const request = buildRoundPrompt(
-            4,
-            systemPrompt,
-            packedContext,
-            priorRounds,
-            roundData,
-            estimateTokensFn,
-          );
-
-          return {
-            ...request,
-            temperature: isRetry ? 0.1 : 0.3,
-            maxTokens: 4096,
-          };
-        },
-        validate: (data: Round4Output) =>
-          validateRoundClaims(
-            4,
-            data as unknown as Record<string, unknown>,
-            staticAnalysis,
-          ),
-        buildFallback: () => buildRound4Fallback(staticAnalysis),
-        tracker,
-        estimateTokensFn,
-        onRetry,
-      });
-    },
-    onSkip: () => buildRound4Fallback(staticAnalysis),
-  });
+  return createStandardRoundStep(
+    ROUND_4_CONFIG,
+    provider,
+    staticAnalysis,
+    packedContext,
+    config,
+    tracker,
+    estimateTokensFn,
+    roundGetter,
+    onRetry,
+  );
 }
 
 // ─── Round 4 Data Builder ───────────────────────────────────────────────────

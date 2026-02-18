@@ -7,16 +7,10 @@ import type { TokenUsageTracker } from '../context/tracker.js';
 import type { StepDefinition } from '../orchestrator/types.js';
 import type { RoundExecutionResult } from './types.js';
 import type { Round1Output, Round2Output, Round6Output } from './schemas.js';
+import type { StandardRoundConfig } from './round-factory.js';
 import { Round6OutputSchema } from './schemas.js';
-import { createStep } from '../orchestrator/step.js';
-import {
-  buildRoundPrompt,
-  buildRetrySystemPrompt,
-  ROUND_SYSTEM_PROMPTS,
-} from './prompts.js';
-import { validateRoundClaims } from './validator.js';
 import { buildRound6Fallback } from './fallbacks.js';
-import { executeRound } from './runner.js';
+import { createStandardRoundStep } from './round-factory.js';
 
 // ─── Round 6: Deployment Inference ──────────────────────────────────────────
 
@@ -42,62 +36,47 @@ export function createRound6Step(
   },
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): StepDefinition {
-  return createStep({
-    id: 'ai-round-6',
-    name: 'AI Round 6: Deployment Inference',
-    deps: ['ai-round-2'], // Parallel with R3/R4/R5
-    execute: async (_ctx): Promise<RoundExecutionResult<Round6Output>> => {
-      // 1. Gather prior round compressed contexts
-      const priorResults = getPriorResults();
-      const priorRounds = [
-        priorResults.round1?.context,
-        priorResults.round2?.context,
-      ].filter(
+  // Round 6's buildData needs packedContext, so we create the config inside
+  // this function to capture packedContext in the closure.
+  const round6Config: StandardRoundConfig<Round6Output> = {
+    roundNumber: 6,
+    name: 'Deployment Inference',
+    deps: ['ai-round-2'],
+    maxTokens: 4096,
+    schema: Round6OutputSchema as z.ZodType<Round6Output>,
+    buildData: (analysis, _config, _getter) =>
+      buildRound6Data(analysis, packedContext),
+    buildFallback: buildRound6Fallback,
+    getPriorContexts: (getter) => {
+      const contexts = [
+        getter<Round1Output>(1)?.context,
+        getter<Round2Output>(2)?.context,
+      ];
+      return contexts.filter(
         (ctx): ctx is NonNullable<typeof ctx> => ctx !== undefined,
       );
-
-      // 2. Build round-specific data from static analysis
-      const roundData = buildRound6Data(staticAnalysis, packedContext);
-
-      // 3. Execute the round via the shared engine
-      return executeRound<Round6Output>({
-        roundNumber: 6,
-        provider,
-        schema: Round6OutputSchema as z.ZodType<Round6Output>,
-        buildPrompt: (isRetry: boolean) => {
-          const systemPrompt = isRetry
-            ? buildRetrySystemPrompt(ROUND_SYSTEM_PROMPTS[6])
-            : ROUND_SYSTEM_PROMPTS[6];
-
-          const request = buildRoundPrompt(
-            6,
-            systemPrompt,
-            packedContext,
-            priorRounds,
-            roundData,
-            estimateTokensFn,
-          );
-
-          return {
-            ...request,
-            temperature: isRetry ? 0.1 : 0.3,
-            maxTokens: 4096, // Deployment can be shorter
-          };
-        },
-        validate: (data: Round6Output) =>
-          validateRoundClaims(
-            6,
-            data as unknown as Record<string, unknown>,
-            staticAnalysis,
-          ),
-        buildFallback: () => buildRound6Fallback(staticAnalysis),
-        tracker,
-        estimateTokensFn,
-        onRetry,
-      });
     },
-    onSkip: () => buildRound6Fallback(staticAnalysis),
-  });
+  };
+
+  // Map the prior-results getter to the factory's generic round getter
+  const roundGetter = <U>(n: number) => {
+    const results = getPriorResults();
+    if (n === 1) return results.round1 as RoundExecutionResult<U> | undefined;
+    if (n === 2) return results.round2 as RoundExecutionResult<U> | undefined;
+    return undefined;
+  };
+
+  return createStandardRoundStep(
+    round6Config,
+    provider,
+    staticAnalysis,
+    packedContext,
+    config,
+    tracker,
+    estimateTokensFn,
+    roundGetter,
+    onRetry,
+  );
 }
 
 // ─── Round 6 Data Builder ───────────────────────────────────────────────────

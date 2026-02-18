@@ -5,14 +5,24 @@ import type { PackedContext } from '../context/types.js';
 import type { HandoverConfig } from '../config/schema.js';
 import type { TokenUsageTracker } from '../context/tracker.js';
 import type { StepDefinition } from '../orchestrator/types.js';
-import type { RoundExecutionResult } from './types.js';
 import type { Round1Output } from './schemas.js';
+import type { StandardRoundConfig } from './round-factory.js';
 import { Round1OutputSchema } from './schemas.js';
-import { createStep } from '../orchestrator/step.js';
-import { buildRoundPrompt, buildRetrySystemPrompt, ROUND_SYSTEM_PROMPTS } from './prompts.js';
-import { validateRoundClaims } from './validator.js';
 import { buildRound1Fallback } from './fallbacks.js';
-import { executeRound } from './runner.js';
+import { createStandardRoundStep } from './round-factory.js';
+
+// ─── Round 1 Config ─────────────────────────────────────────────────────────
+
+export const ROUND_1_CONFIG: StandardRoundConfig<Round1Output> = {
+  roundNumber: 1,
+  name: 'Project Overview',
+  deps: ['static-analysis'],
+  maxTokens: 4096,
+  schema: Round1OutputSchema as z.ZodType<Round1Output>,
+  buildData: (analysis, config, _getter) => buildRound1Data(analysis, config),
+  buildFallback: buildRound1Fallback,
+  getPriorContexts: (_getter) => [], // No prior rounds -- this is Round 1
+};
 
 // ─── Round 1: Project Overview ─────────────────────────────────────────────
 
@@ -32,49 +42,20 @@ export function createRound1Step(
   estimateTokensFn: (text: string) => number,
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
 ): StepDefinition {
-  return createStep({
-    id: 'ai-round-1',
-    name: 'AI Round 1: Project Overview',
-    deps: ['static-analysis'],
-    execute: async (_ctx): Promise<RoundExecutionResult<Round1Output>> => {
-      // 1. Build round-specific data from static analysis
-      const roundData = buildRound1Data(staticAnalysis, config);
+  // Round 1 has no prior results, so the getter always returns undefined
+  const roundGetter = <U>(_n: number) => undefined as (import('./types.js').RoundExecutionResult<U> | undefined);
 
-      // 2. Execute the round via the shared engine
-      return executeRound<Round1Output>({
-        roundNumber: 1,
-        provider,
-        schema: Round1OutputSchema as z.ZodType<Round1Output>,
-        buildPrompt: (isRetry: boolean) => {
-          const systemPrompt = isRetry
-            ? buildRetrySystemPrompt(ROUND_SYSTEM_PROMPTS[1])
-            : ROUND_SYSTEM_PROMPTS[1];
-
-          const request = buildRoundPrompt(
-            1,
-            systemPrompt,
-            packedContext,
-            [], // No prior rounds -- this is Round 1
-            roundData,
-            estimateTokensFn,
-          );
-
-          return {
-            ...request,
-            temperature: isRetry ? 0.1 : 0.3,
-            maxTokens: 4096,
-          };
-        },
-        validate: (data: Round1Output) =>
-          validateRoundClaims(1, data as unknown as Record<string, unknown>, staticAnalysis),
-        buildFallback: () => buildRound1Fallback(staticAnalysis),
-        tracker,
-        estimateTokensFn,
-        onRetry,
-      });
-    },
-    onSkip: () => buildRound1Fallback(staticAnalysis),
-  });
+  return createStandardRoundStep(
+    ROUND_1_CONFIG,
+    provider,
+    staticAnalysis,
+    packedContext,
+    config,
+    tracker,
+    estimateTokensFn,
+    roundGetter,
+    onRetry,
+  );
 }
 
 // ─── Round 1 Data Builder ──────────────────────────────────────────────────
