@@ -12,8 +12,12 @@ import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+/** Cache format version — bump when the entry shape changes. */
+const CACHE_VERSION = 2;
+
 /** Shape of a cached round entry on disk. */
 interface RoundCacheEntry {
+  version: number;
   hash: string;
   roundNumber: number;
   model: string;
@@ -29,32 +33,62 @@ interface RoundCacheEntry {
  * if the analysis input changed, the cache is treated as stale.
  */
 export class RoundCache {
-  constructor(private readonly cacheDir: string = '.handover/cache/rounds') {}
+  private migrationHandled = false;
+  private _gitignoreChecked = false;
+
+  constructor(
+    private readonly cacheDir: string = '.handover/cache/rounds',
+    private readonly projectRoot: string = process.cwd(),
+  ) {}
 
   /**
-   * Compute a fingerprint from discovered files (paths + sizes).
-   * Sorted by path for determinism. Fast — no file content reading.
+   * Compute a fingerprint from discovered files (paths + content hashes).
+   * Sorted by path for determinism. Uses SHA-256 of file content (CACHE-01).
    */
-  static computeAnalysisFingerprint(files: Array<{ path: string; size: number }>): string {
+  static computeAnalysisFingerprint(files: Array<{ path: string; contentHash: string }>): string {
     const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path));
-    const data = sorted.map((f) => `${f.path}:${f.size}`).join('\n');
+    const data = sorted.map((f) => `${f.path}:${f.contentHash}`).join('\n');
     return createHash('sha256').update(data).digest('hex');
   }
 
   /**
    * Compute a content hash for a specific round.
-   * Combines round number, model, and analysis fingerprint.
+   * Combines round number, model, analysis fingerprint, and prior round hashes (CACHE-02).
    */
-  computeHash(roundNumber: number, model: string, analysisFingerprint: string): string {
+  computeHash(
+    roundNumber: number,
+    model: string,
+    analysisFingerprint: string,
+    priorRoundHashes: string[] = [],
+  ): string {
     return createHash('sha256')
-      .update(JSON.stringify({ roundNumber, model, analysisFingerprint }))
+      .update(JSON.stringify({ roundNumber, model, analysisFingerprint, priorRoundHashes }))
       .digest('hex');
   }
 
   /**
+   * Compute a hash of a round's output result for use in cascade invalidation.
+   * Used by the caller to hash a completed round's output before threading it
+   * into downstream rounds via priorRoundHashes.
+   */
+  static computeResultHash(result: unknown): string {
+    return createHash('sha256').update(JSON.stringify(result)).digest('hex');
+  }
+
+  /**
+   * Whether a cache migration occurred during this session.
+   * Allows the caller to display a warning to the user.
+   */
+  get wasMigrated(): boolean {
+    return this.migrationHandled;
+  }
+
+  /**
    * Retrieve a cached round result if it exists and the hash matches.
+   * Handles version migration: if the entry is from an older cache version,
+   * the entire cache is cleared once and null is returned.
    *
-   * @returns The cached result, or null if missing/stale/corrupted.
+   * @returns The cached result, or null if missing/stale/corrupted/migrated.
    */
   async get(roundNumber: number, expectedHash: string): Promise<unknown | null> {
     const filePath = join(this.cacheDir, `round-${roundNumber}.json`);
@@ -66,6 +100,15 @@ export class RoundCache {
     try {
       const raw = await readFile(filePath, 'utf-8');
       const entry = JSON.parse(raw) as RoundCacheEntry;
+
+      // Version migration: clear cache once on first mismatch detected
+      if (entry.version !== CACHE_VERSION) {
+        if (!this.migrationHandled) {
+          this.migrationHandled = true;
+          await this.clear();
+        }
+        return null;
+      }
 
       // Stale cache — content changed since this was stored
       if (entry.hash !== expectedHash) {
@@ -82,12 +125,14 @@ export class RoundCache {
   /**
    * Store a round result to disk.
    * Creates the cache directory if it does not exist.
+   * Ensures .handover/cache is added to .gitignore.
    */
   async set(roundNumber: number, hash: string, result: unknown, model: string): Promise<void> {
     await mkdir(this.cacheDir, { recursive: true });
 
     const filePath = join(this.cacheDir, `round-${roundNumber}.json`);
     const entry: RoundCacheEntry = {
+      version: CACHE_VERSION,
       hash,
       roundNumber,
       model,
@@ -96,11 +141,12 @@ export class RoundCache {
     };
 
     await writeFile(filePath, JSON.stringify(entry, null, 2));
+    await this.ensureGitignored();
   }
 
   /**
    * Remove all cached round files.
-   * Called by --no-cache to force fresh execution.
+   * Called during version migration to force fresh execution.
    */
   async clear(): Promise<void> {
     if (existsSync(this.cacheDir)) {
@@ -131,6 +177,39 @@ export class RoundCache {
       return roundNumbers.sort((a, b) => a - b);
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Ensure `.handover/cache` is listed in the project's `.gitignore`.
+   * Runs at most once per RoundCache instance. Non-fatal if write fails.
+   */
+  private async ensureGitignored(): Promise<void> {
+    if (this._gitignoreChecked) return;
+    this._gitignoreChecked = true;
+
+    const gitignorePath = join(this.projectRoot, '.gitignore');
+
+    try {
+      let content = '';
+      try {
+        content = await readFile(gitignorePath, 'utf-8');
+      } catch {
+        // .gitignore may not exist — start with empty content
+      }
+
+      // Check if already covered
+      const lines = content.split('\n').map((l) => l.trim());
+      if (lines.includes('.handover/cache') || lines.includes('.handover/')) {
+        return;
+      }
+
+      // Append with proper newline handling
+      const needsLeadingNewline = content.length > 0 && !content.endsWith('\n');
+      const addition = `${needsLeadingNewline ? '\n' : ''}.handover/cache\n`;
+      await writeFile(gitignorePath, content + addition, 'utf-8');
+    } catch {
+      // Non-fatal — gitignore update failure should not block cache writes
     }
   }
 }
