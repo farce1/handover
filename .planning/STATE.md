@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v2.0 Performance — Phase 5: UX Responsiveness
+**Current focus:** v2.0 Performance — Phase 5: UX Responsiveness COMPLETE
 
 ## Current Position
 
-Phase: 5 of 6 (UX Responsiveness) — IN PROGRESS
-Plan: 1 of 1 in current phase (plan 01 complete)
-Status: Phase 5 plan 01 complete — streaming token counter and live timer shipped
-Last activity: 2026-02-19 — 05-01 streaming token counter and elapsed timer complete
+Phase: 5 of 6 (UX Responsiveness) — COMPLETE
+Plan: 2 of 2 in current phase (plan 02 complete)
+Status: Phase 5 complete — all UX responsiveness features shipped (streaming token counter, live timer, --stream flag, file coverage indicator, parallel savings)
+Last activity: 2026-02-19 — 05-02 --stream flag, file coverage, and parallel savings complete
 
-Progress: [███░░░░░░░] 37% (3/8 plans complete across v2.0)
+Progress: [████░░░░░░] 50% (4/8 plans complete across v2.0)
 
 ## Performance Metrics
 
@@ -40,6 +40,7 @@ Progress: [███░░░░░░░] 37% (3/8 plans complete across v2.0)
 | Phase 04-cache-correctness P01 | 3 min    | 2 tasks | 2 files  |
 | Phase 04-cache-correctness P02 | 2 min    | 1 tasks | 3 files  |
 | Phase 05-ux-responsiveness P01 | 6 min    | 2 tasks | 16 files |
+| Phase 05-ux-responsiveness P02 | 4 min    | 2 tasks | 6 files  |
 
 ## Accumulated Context
 
@@ -60,6 +61,9 @@ v2.0 key constraints from research:
 - [Phase 05-ux-responsiveness]: Lazy getter makeOnToken(n) resolves callback at step execute() time to handle timing between onStepStart registration and step execution
 - [Phase 05-ux-responsiveness]: Spinner tick (80ms) drives elapsed time updates; onToken callback does NOT trigger re-renders to avoid ~100 renders/sec flooding
 - [Phase 05-ux-responsiveness]: Round 5 fan-out accepts onToken for API consistency but does not wire it into parallel per-module calls (display noise)
+- [Phase 05-ux-responsiveness P02]: signatureFiles included in "analyzing" count alongside fullFiles — both sent to LLM so both represent analyzed scope
+- [Phase 05-ux-responsiveness P02]: parallel savings only shown when both r5 and r6 are done (not cached) and saved > 2s — avoids noise for cached runs
+- [Phase 05-ux-responsiveness P02]: streamVisible carried on DisplayState (not passed per-call) so 80ms spinner interval re-renders see the flag consistently
 
 ### Pending Todos
 
@@ -82,5 +86,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 05-ux-responsiveness plan 1 (05-01-PLAN.md) — streaming token counter and timer shipped
-Resume file: .planning/phases/05-ux-responsiveness/05-01-SUMMARY.md
+Stopped at: Completed 05-ux-responsiveness plan 2 (05-02-PLAN.md) — --stream flag, file coverage, and parallel savings shipped
+Resume file: .planning/phases/05-ux-responsiveness/05-02-SUMMARY.md
