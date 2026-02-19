@@ -16,3 +16,20 @@
 - Content distillation: AGENTS.md restructured to 60-line AI-ops, llms.txt (11 entries), CONTRIBUTING.md hub, PRD.md retired
 
 ---
+
+## v2.0 Performance (Shipped: 2026-02-19)
+
+**Phases completed:** 4 phases, 8 plans, 0 tasks
+
+**Key accomplishments:**
+
+- SHA-256 content-hash fingerprinting with cascade invalidation across rounds, replacing size-only cache detection
+- Live streaming token counter and elapsed timer via SDK streaming APIs (Anthropic messages.stream(), OpenAI completions.stream())
+- Incremental context packing — only changed files sent at full detail, unchanged files fall to signature tier
+- Anthropic prompt caching with cache_control ephemeral markers for 90% cost reduction on cached input tokens
+- BPE tokenization via gpt-tokenizer replacing chars/4 heuristic for accurate OpenAI-family token estimates
+- Parallel document rendering via Promise.allSettled with per-round cache savings display
+- Cache savings pipeline fixed end-to-end: Anthropic API → runner.ts → tracker → terminal/CI display
+- Dead code cleanup and CI renderer document count fix
+
+---

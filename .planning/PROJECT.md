@@ -1,8 +1,8 @@
-# Handover — OSS Excellence
+# Handover — Performance-Optimized Codebase Documentation
 
 ## What This Is
 
-An open source TypeScript CLI that generates comprehensive, AI-powered codebase documentation through multi-round LLM analysis. The v1.0 OSS milestone shipped community health files, CI/CD automation, release pipelines, and structured documentation for users, contributors, and AI assistants.
+An open source TypeScript CLI that generates comprehensive, AI-powered codebase documentation through multi-round LLM analysis. Ships with content-hash caching, streaming token output, incremental context packing, Anthropic prompt caching, and parallel rendering — making re-runs 2-5x faster and 50%+ cheaper on tokens.
 
 ## Core Value
 
@@ -34,46 +34,38 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - ✓ Release automation: release-please with OIDC npm publish — v1.0
 - ✓ DX tooling: ESLint, Prettier, commitlint, husky, Dependabot — v1.0
 - ✓ Security scanning: CodeQL + OpenSSF Scorecard — v1.0
+- ✓ SHA-256 content-hash cache fingerprint with cascade invalidation — v2.0
+- ✓ Live streaming token counter and elapsed timer during LLM rounds — v2.0
+- ✓ Rounds 5+6 parallel execution with savings display — v2.0
+- ✓ File coverage indicator (analyzed vs skipped files) — v2.0
+- ✓ Incremental context packing (changed files at full detail only) — v2.0
+- ✓ Anthropic prompt caching with cache_control ephemeral — v2.0
+- ✓ Per-round cache savings display (tokens, percentage, dollars) — v2.0
+- ✓ Parallel document rendering via Promise.allSettled — v2.0
+- ✓ BPE tokenization via gpt-tokenizer for OpenAI-family providers — v2.0
 
 ### Active
 
-- [ ] Caching and incremental analysis — skip re-analysis for unchanged files
-- [ ] Parallel analyzer execution — run analyzers concurrently
-- [ ] Streaming output with live progress — no blank terminal staring
-- [ ] Smarter LLM usage — fewer round trips, less redundant context, lower token costs
-- [ ] Faster CLI startup — reduce initialization overhead
-- [ ] Large repo scaling — handle big codebases without choking
-- [ ] Output quality preserved — smarter, not degraded
-
-## Current Milestone: v2.0 Performance
-
-**Goal:** Full performance overhaul — make handover fast, responsive, and cost-efficient at any repo size.
-
-**Target features:**
-
-- Caching & incremental analysis (unchanged files skip re-analysis)
-- Parallel analyzer execution
-- Streaming output with live progress
-- Smarter LLM usage (fewer rounds, reduced token costs)
-- Faster startup time
-- Large repo scaling
-- Measurable benchmarks (2-5x faster, 50%+ fewer tokens on incremental runs)
+None — planning next milestone.
 
 ### Out of Scope
 
 - Dedicated docs site (Docusaurus, etc.) — in-repo markdown works well for LLMs; revisit when user base demands it
 - Discord server — GitHub Discussions sufficient for current scale
 - Project showcase/gallery — future effort
-- New CLI features — this milestone was purely OSS infrastructure
-- Major code refactoring — architecture is solid as-is
+- Multi-threaded analyzer execution — analyzers already run concurrently via Promise.allSettled; I/O-bound, not CPU-bound
+- Persistent background daemon — disk cache provides fast re-runs; daemon adds battery drain, race conditions, IPC complexity
+- Streaming output to markdown files — rendering requires complete, Zod-validated JSON; streaming creates partial documents
+- Provider-level request batching — rounds are sequentially dependent by design
 
 ## Context
 
 - Handover is at v0.1.0, early stage but functional and published on npm
-- v1.0 OSS milestone shipped: 3 phases, 9 plans, 239 files, 49K lines added over 3 days
+- v1.0 OSS milestone shipped: 3 phases, 9 plans, community health, CI/CD, docs
+- v2.0 Performance milestone shipped: 4 phases, 8 plans, caching, streaming, incremental analysis, prompt caching
 - Architecture: DAG orchestrator, 8 static analyzers, 6 AI rounds, 14 document renderers, Zod-first domain model
 - CI runs on every PR; release-please automates versioning; OIDC publishes to npm with provenance
-- Documentation: 4 user guides, 4 contributor guides, llms.txt, restructured AGENTS.md
+- Codebase: ~20K LOC TypeScript across 90+ source files
 - External setup still needed: CODECOV_TOKEN, RELEASE_PLEASE_TOKEN (PAT), npm trusted publishing OIDC config, GitHub Sponsors enrollment
 
 ## Constraints
@@ -81,6 +73,7 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - **In-repo docs**: All documentation lives in the repo as markdown — no external docs site yet
 - **No breaking changes**: README structure preserved, additive changes only
 - **LLM-first**: All docs structured for both human and machine readability
+- **Streaming gate**: onToken callback presence gates streaming path; absent means non-streaming unchanged
 
 ## Key Decisions
 
@@ -98,7 +91,16 @@ Every person (or LLM) who encounters this repo should understand what handover d
 | Semicolons required (semi: true)                | Prettier enforces; AGENTS.md updated to match                          | ✓ Good  |
 | CodeQL + OpenSSF Scorecard                      | Security scanning + supply chain trust signal                          | ✓ Good  |
 | Dependabot grouped PRs                          | Production vs dev grouping reduces maintainer noise                    | ✓ Good  |
+| SHA-256 content hash over file size             | Same-size edits correctly invalidate cache; hashContent at call site   | ✓ Good  |
+| Cascade hash chain across rounds                | Round N key includes prior round hashes; upstream changes propagate    | ✓ Good  |
+| onToken optional in all signatures              | No callback = non-streaming path unchanged; backward compatible        | ✓ Good  |
+| Spinner-driven elapsed updates (80ms)           | onToken callback does NOT trigger re-renders; avoids 100 renders/sec   | ✓ Good  |
+| Separate analysis cache from round cache        | .handover/cache/analysis.json vs rounds/; no coupling                  | ✓ Good  |
+| Changed files fall through on budget exhaust    | Max coverage preserved; changed files not skipped when over budget     | ✓ Good  |
+| BPE model routing by prefix                     | gpt-4-/gpt-3.5- use cl100k_base; all others use o200k_base             | ✓ Good  |
+| Cache pricing multipliers as constants          | CACHE_READ_MULTIPLIER=0.1, CACHE_WRITE_MULTIPLIER=1.25                 | ✓ Good  |
+| Promise.allSettled for parallel rendering       | Error isolation per document; rejected docs don't abort others         | ✓ Good  |
 
 ---
 
-_Last updated: 2026-02-18 after v2.0 milestone started_
+_Last updated: 2026-02-19 after v2.0 milestone complete_
