@@ -11,7 +11,17 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/*.spec.ts',
+        'src/**/types.ts', // Type-only files (pure type exports)
+        'src/domain/schemas.ts', // Zod schema declarations
+        'src/cli/index.ts', // CLI entry point
+        'src/grammars/downloader.ts', // WASM grammar downloader
+        'src/parsing/**', // WASM-dependent parsing layer
+        'src/config/defaults.ts', // Configuration constants
+      ],
+      // Thresholds deliberately omitted — Phase 11 enforces 80%
     },
   },
 });
