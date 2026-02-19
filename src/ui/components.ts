@@ -95,21 +95,79 @@ export function computeCumulativeTokens(rounds: Map<number, RoundDisplayState>):
 }
 
 /**
+ * Render the incremental/full run label shown before AI rounds.
+ * Per locked decision: "Incremental run (3 files changed)" or "Full run".
+ */
+export function renderRunLabel(isIncremental: boolean, changedFileCount?: number): string {
+  if (isIncremental && changedFileCount !== undefined) {
+    return `Incremental run (${changedFileCount} file${changedFileCount !== 1 ? 's' : ''} changed)`;
+  }
+  return 'Full run';
+}
+
+/**
+ * Render a savings line for a round that had cache/packing savings.
+ * Format: "  Saved 12,400 tokens (62%, ~$0.03)" in green.
+ * Per locked decision: express in all three units.
+ */
+export function renderRoundSavings(
+  tokensSaved: number,
+  pctSaved: number,
+  dollarsSaved: number,
+): string {
+  const tokStr = tokensSaved.toLocaleString();
+  const pctStr = Math.round(pctSaved * 100);
+  const dolStr = dollarsSaved < 0.01 ? '<$0.01' : `~$${dollarsSaved.toFixed(2)}`;
+  return pc.green(`    Saved ${tokStr} tokens (${pctStr}%, ${dolStr})`);
+}
+
+/**
+ * Render the aggregate render start/done lines.
+ * Per locked decision: "Rendering N documents..." then done — no per-doc status.
+ */
+export function renderRenderProgress(docCount: number): string {
+  return `${pc.dim(SYMBOLS.running)} Rendering ${docCount} documents...`;
+}
+
+/**
  * Render the file coverage line shown before AI rounds begin.
  *
  * Format: `◆ 142 files · 104 analyzing · 10 ignored`
+ * With incremental metadata: `◆ Incremental run (3 files changed) · 142 files · ...`
  */
-export function renderFileCoverage(coverage: {
-  analyzing: number;
-  ignored: number;
-  total: number;
-}): string {
+export function renderFileCoverage(
+  coverage: {
+    analyzing: number;
+    ignored: number;
+    total: number;
+  },
+  incremental?: {
+    isIncremental: boolean;
+    changedFileCount?: number;
+    unchangedFileCount?: number;
+  },
+): string {
   const sep = pc.dim(' \u00B7 ');
   const bullet = pc.dim('\u25C6'); // ◆
-  const totalStr = `${coverage.total} files`;
-  const analyzingStr = `${pc.cyan(String(coverage.analyzing))} analyzing`;
-  const ignoredStr = `${pc.dim(String(coverage.ignored))} ignored`;
-  return `${bullet} ${totalStr}${sep}${analyzingStr}${sep}${ignoredStr}`;
+
+  const parts: string[] = [];
+
+  // Run label first (per locked decision)
+  if (incremental) {
+    parts.push(renderRunLabel(incremental.isIncremental, incremental.changedFileCount));
+  }
+
+  parts.push(`${coverage.total} files`);
+  parts.push(`${pc.cyan(String(coverage.analyzing))} analyzing`);
+
+  // Show unchanged count on incremental runs (per locked decision: "skipped N unchanged")
+  if (incremental?.isIncremental && incremental.unchangedFileCount !== undefined) {
+    parts.push(`${pc.dim(String(incremental.unchangedFileCount))} unchanged`);
+  }
+
+  parts.push(`${pc.dim(String(coverage.ignored))} ignored`);
+
+  return `${bullet} ${parts.join(sep)}`;
 }
 
 /**
@@ -161,6 +219,21 @@ export function renderRoundBlock(
           parts.push(pc.yellow(formatCost(rd.cost)));
         }
         lines.push(`  ${parts.filter(Boolean).join(sep)}`);
+        // Per-round savings line (per locked decision: show when savings exist)
+        if (
+          rd.cacheSavingsTokens &&
+          rd.cacheSavingsTokens > 0 &&
+          rd.cacheSavingsPercent !== undefined &&
+          rd.cacheSavingsDollars !== undefined
+        ) {
+          lines.push(
+            renderRoundSavings(
+              rd.cacheSavingsTokens,
+              rd.cacheSavingsPercent,
+              rd.cacheSavingsDollars,
+            ),
+          );
+        }
         break;
       }
 
@@ -269,6 +342,7 @@ export function renderParallelSavings(savedMs: number): string {
  *
  * Per CONTEXT.md: compact single line, NOT framed box.
  * Format: `✓ 14 documents · 48K tokens · $0.12 · 1m 23s`
+ * Includes per-round breakdown and render timing when available.
  */
 export function renderCompletionSummary(state: DisplayState): string[] {
   const sep = pc.dim(' \u00B7 ');
@@ -284,9 +358,45 @@ export function renderCompletionSummary(state: DisplayState): string[] {
   const completionLine = parts.join(sep);
 
   const lines: string[] = [completionLine];
+
+  // Per-round breakdown (per locked decision: each round shows tokens and cost)
+  if (state.roundSummaries && state.roundSummaries.length > 0) {
+    for (const rs of state.roundSummaries) {
+      const roundParts: string[] = [
+        `  Round ${rs.round}`,
+        formatTokens(rs.inputTokens + rs.outputTokens),
+      ];
+      if (!state.isLocal) {
+        roundParts.push(pc.yellow(formatCost(rs.cost)));
+      }
+      lines.push(pc.dim(roundParts.join(sep)));
+
+      // Savings line for this round (per locked decision: tokens, percentage, dollars)
+      if (rs.savings && rs.savings.tokens > 0) {
+        lines.push(renderRoundSavings(rs.savings.tokens, rs.savings.percent, rs.savings.dollars));
+      }
+    }
+  }
+
+  // parallelSavedMs is inherited from Phase 5 infrastructure (parallel round execution savings).
   if (state.parallelSavedMs !== undefined && state.parallelSavedMs > 0) {
     lines.push(renderParallelSavings(state.parallelSavedMs));
   }
+
+  // Render timing line (per locked decision: show time saved by parallel rendering)
+  if (state.renderTimingMs !== undefined && state.renderSequentialEstimateMs !== undefined) {
+    const savedMs = state.renderSequentialEstimateMs - state.renderTimingMs;
+    if (savedMs > 500) {
+      // Only show if meaningful
+      const docCount = state.completionDocs;
+      const actualSec = (state.renderTimingMs / 1000).toFixed(1);
+      const savedSec = formatDuration(savedMs);
+      lines.push(
+        pc.dim(`  Rendered ${docCount} docs in ${actualSec}s (saved ~${savedSec} vs sequential)`),
+      );
+    }
+  }
+
   return lines;
 }
 

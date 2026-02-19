@@ -26,6 +26,16 @@ export interface RoundDisplayState {
   streamingTokens?: number;
   /** Timestamp when round began executing, for live elapsed time computation. */
   roundStartMs?: number;
+  /** Cache read tokens from Anthropic prompt caching (undefined for non-Anthropic). */
+  cacheReadTokens?: number;
+  /** Cache creation tokens from Anthropic prompt caching (undefined for non-Anthropic). */
+  cacheCreationTokens?: number;
+  /** Dollar savings from caching for this round. */
+  cacheSavingsDollars?: number;
+  /** Token savings from caching for this round. */
+  cacheSavingsTokens?: number;
+  /** Percentage of tokens saved from caching for this round. */
+  cacheSavingsPercent?: number;
 }
 
 /** High-level phase of the pipeline display. */
@@ -77,6 +87,18 @@ export interface DisplayState {
   unchangedFileCount?: number;
   /** Milliseconds saved by parallel execution of rounds 5 and 6. */
   parallelSavedMs?: number;
+  /** Milliseconds taken by parallel document rendering. */
+  renderTimingMs?: number;
+  /** Estimated sequential render time for savings comparison. */
+  renderSequentialEstimateMs?: number;
+  /** Per-round token and cost data for the completion summary. Populated after all rounds complete. */
+  roundSummaries?: Array<{
+    round: number;
+    inputTokens: number;
+    outputTokens: number;
+    cost: number;
+    savings?: { tokens: number; percent: number; dollars: number };
+  }>;
 }
 
 /**
@@ -96,4 +118,6 @@ export interface Renderer {
   onComplete(state: DisplayState): void;
   onError(state: DisplayState): void;
   destroy(): void;
+  onRenderStart?(state: DisplayState): void;
+  onRenderDone?(state: DisplayState): void;
 }
