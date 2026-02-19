@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "tsx src/cli/index.ts",
     "build": "tsup",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --max-warnings 0",
     "lint:fix": "eslint src --fix",

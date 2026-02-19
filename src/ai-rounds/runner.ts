@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import type { LLMProvider } from '../providers/base.js';
 import type { CompletionRequest } from '../domain/types.js';
 import type { TokenUsageTracker } from '../context/tracker.js';
-import type { RoundExecutionResult } from './types.js';
+import type { RoundExecutionResult, ValidationResult } from './types.js';
 import type { RoundContext } from '../context/types.js';
 import { compressRoundOutput } from '../context/compressor.js';
 import { checkRoundQuality } from './quality.js';
