@@ -336,6 +336,17 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             rd.elapsedMs = result.duration;
             rd.retrying = false; // Clear any retry state from a preceding retry attempt
             rd.streamingTokens = undefined; // Clear live counter -- authoritative value now in rd.tokens
+
+            // Wire cache savings into round display state (from Plan 02's tracker extensions)
+            const cacheSavings = tracker.getRoundCacheSavings(roundNum);
+            if (cacheSavings) {
+              const roundUsage = tracker.getRoundUsage(roundNum);
+              rd.cacheReadTokens = roundUsage?.cacheReadTokens;
+              rd.cacheCreationTokens = roundUsage?.cacheCreationTokens;
+              rd.cacheSavingsTokens = cacheSavings.tokensSaved;
+              rd.cacheSavingsPercent = cacheSavings.percentSaved;
+              rd.cacheSavingsDollars = cacheSavings.dollarsSaved;
+            }
           }
 
           // If degraded, also record an error and affected docs
@@ -819,16 +830,51 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           const outputDir = resolve(config.output);
           await mkdir(outputDir, { recursive: true });
 
-          // Render each selected document (except INDEX, generated last)
+          // Parallel document rendering (EFF-04)
+          const renderStart = Date.now();
+          const docsToRender = selectedDocs.filter((doc) => doc.id !== '00-index');
+
+          // Emit render start (aggregate progress only — per locked decision)
+          if (renderer.onRenderStart) {
+            renderer.onRenderStart(displayState);
+          }
+
+          const renderResults = await Promise.allSettled(
+            docsToRender.map(async (doc) => {
+              const docStart = Date.now();
+              const content = doc.render(ctx);
+
+              if (content === '') {
+                return { doc, content: '', skipped: true, durationMs: Date.now() - docStart };
+              }
+
+              await writeFile(join(outputDir, doc.filename), content, 'utf-8');
+              return { doc, content, skipped: false, durationMs: Date.now() - docStart };
+            }),
+          );
+
+          const renderTimingMs = Date.now() - renderStart;
+
+          // Process results in input order (Promise.allSettled preserves order)
           const statuses: DocumentStatus[] = [];
+          let sequentialEstimateMs = 0;
+          const renderFailures: Array<{ doc: (typeof docsToRender)[0]; error: unknown }> = [];
 
-          for (const doc of selectedDocs) {
-            if (doc.id === '00-index') continue; // INDEX generated last
+          for (let i = 0; i < renderResults.length; i++) {
+            const result = renderResults[i];
+            const doc = docsToRender[i];
 
-            const content = doc.render(ctx);
-
-            // Renderer returned empty = document cannot be generated (missing AI data)
-            if (content === '') {
+            if (result.status === 'rejected') {
+              // Error isolation: record failure, continue (per locked decision)
+              renderFailures.push({ doc, error: result.reason });
+              statuses.push({
+                id: doc.id,
+                filename: doc.filename,
+                title: doc.title,
+                status: 'not-generated',
+                reason: `Render failed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+              });
+            } else if (result.value.skipped) {
               statuses.push({
                 id: doc.id,
                 filename: doc.filename,
@@ -836,24 +882,35 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
                 status: 'not-generated',
                 reason: 'Required AI analysis unavailable',
               });
-              continue;
+              sequentialEstimateMs += result.value.durationMs;
+            } else {
+              displayState.renderedDocs.push(doc.filename);
+              const roundStatus = determineDocStatus(doc.requiredRounds, roundResults, true);
+              statuses.push({
+                id: doc.id,
+                filename: doc.filename,
+                title: doc.title,
+                status: roundStatus,
+              });
+              sequentialEstimateMs += result.value.durationMs;
             }
+          }
 
-            // Write document to disk
-            await writeFile(join(outputDir, doc.filename), content, 'utf-8');
-
-            // Update display state and notify renderer
-            displayState.renderedDocs.push(doc.filename);
-            renderer.onDocRendered(displayState);
-
-            // Determine status based on round availability
-            const roundStatus = determineDocStatus(doc.requiredRounds, roundResults, true);
-            statuses.push({
-              id: doc.id,
-              filename: doc.filename,
-              title: doc.title,
-              status: roundStatus,
+          // Report render failures as errors (per locked decision: report at the end)
+          for (const failure of renderFailures) {
+            displayState.errors.push({
+              source: `Render: ${failure.doc.filename}`,
+              message:
+                failure.error instanceof Error ? failure.error.message : String(failure.error),
             });
+          }
+
+          // Store render timing for completion summary
+          displayState.renderTimingMs = renderTimingMs;
+          displayState.renderSequentialEstimateMs = sequentialEstimateMs;
+
+          if (renderer.onRenderDone) {
+            renderer.onRenderDone(displayState);
           }
 
           // Add statuses for non-selected documents (for INDEX completeness)
@@ -908,6 +965,38 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     const parallelSavedMs = computeParallelSavings(displayState.rounds);
     if (parallelSavedMs !== null) {
       displayState.parallelSavedMs = parallelSavedMs;
+    }
+
+    // Build per-round summaries for completion display (per locked decision: per-round breakdown)
+    const roundSummaries: DisplayState['roundSummaries'] = [];
+    for (const [roundNum, rd] of displayState.rounds) {
+      if (rd.status === 'cached') continue; // Skip cached rounds (no API call)
+      if (rd.status !== 'done' && rd.status !== 'failed') continue;
+
+      const usage = tracker.getRoundUsage(roundNum);
+      if (!usage) continue;
+
+      const cost = tracker.getRoundCost(roundNum);
+      const cacheSavings = tracker.getRoundCacheSavings(roundNum);
+
+      roundSummaries.push({
+        round: roundNum,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cost,
+        savings: cacheSavings
+          ? {
+              tokens: cacheSavings.tokensSaved,
+              percent: cacheSavings.percentSaved,
+              dollars: cacheSavings.dollarsSaved,
+            }
+          : undefined,
+      });
+    }
+
+    // Per locked decision: skip summary on all-cached runs (no API calls made)
+    if (roundSummaries.length > 0) {
+      displayState.roundSummaries = roundSummaries;
     }
 
     renderer.onComplete(displayState);

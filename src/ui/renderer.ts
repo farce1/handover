@@ -209,9 +209,23 @@ export class TerminalRenderer implements Renderer {
   onFileCoverage(state: DisplayState): void {
     this.currentState = state;
     if (state.fileCoverage) {
-      this.append([renderFileCoverage(state.fileCoverage)]);
+      this.append([
+        renderFileCoverage(state.fileCoverage, {
+          isIncremental: state.isIncremental ?? false,
+          changedFileCount: state.changedFileCount,
+          unchangedFileCount: state.unchangedFileCount,
+        }),
+      ]);
       this.append(['']); // blank line after file coverage
     }
+  }
+
+  onRenderStart(_state: DisplayState): void {
+    // No-op: parallel render progress shown in completion summary
+  }
+
+  onRenderDone(_state: DisplayState): void {
+    // No-op: render timing shown in completion summary
   }
 
   onRoundUpdate(state: DisplayState): void {

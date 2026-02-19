@@ -9,7 +9,7 @@
  */
 
 import type { AnalyzerStatus, DisplayState, Renderer } from './types.js';
-import { formatCost, formatTokens } from './formatters.js';
+import { formatCost, formatDuration, formatTokens } from './formatters.js';
 
 /**
  * CIRenderer - structured log output for non-TTY/CI environments.
@@ -60,9 +60,27 @@ export class CIRenderer implements Renderer {
   onFileCoverage(state: DisplayState): void {
     if (state.fileCoverage) {
       const { total, analyzing, ignored } = state.fileCoverage;
-      console.log(
-        `${this.timestamp()} [files] ${total} files: ${analyzing} analyzing, ${ignored} ignored`,
-      );
+      if (state.isIncremental) {
+        console.log(
+          `${this.timestamp()} [files] Incremental run (${state.changedFileCount} files changed) · ${total} files: ${analyzing} analyzing, ${state.unchangedFileCount} unchanged, ${ignored} ignored`,
+        );
+      } else {
+        console.log(
+          `${this.timestamp()} [files] Full run · ${total} files: ${analyzing} analyzing, ${ignored} ignored`,
+        );
+      }
+    }
+  }
+
+  onRenderStart(state: DisplayState): void {
+    console.log(
+      `${this.timestamp()} [render] Rendering ${state.completionDocs || state.renderedDocs.length} documents...`,
+    );
+  }
+
+  onRenderDone(state: DisplayState): void {
+    if (state.renderTimingMs !== undefined) {
+      console.log(`${this.timestamp()} [render] Done in ${formatDuration(state.renderTimingMs)}`);
     }
   }
 
