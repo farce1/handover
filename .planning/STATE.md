@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 
 ## Current Position
 
-Phase: 7 of 7 (Cache Savings Pipeline Fix) — NOT STARTED
-Plan: 0 of 1 in current phase
-Status: Gap closure phase added after milestone audit found cache fields dropped in runner.ts
-Last activity: 2026-02-19 — Milestone audit identified EFF-03 broken, Phase 7 created
+Phase: 7 of 7 (Cache Savings Pipeline Fix) — COMPLETE
+Plan: 1 of 1 in current phase
+Status: All v2.0 phases complete — cache savings pipeline fixed end-to-end
+Last activity: 2026-02-19 — Phase 7 Plan 01 executed, all 8/8 plans complete
 
-Progress: [████████░░] 88% (7/8 plans complete across v2.0)
+Progress: [██████████] 100% (8/8 plans complete across v2.0)
 
 ## Performance Metrics
 
@@ -44,6 +44,7 @@ Progress: [████████░░] 88% (7/8 plans complete across v2.0)
 | Phase 06-context-efficiency P01 | 3 min    | 2 tasks | 4 files  |
 | Phase 06-context-efficiency P02 | 4 min    | 2 tasks | 6 files  |
 | Phase 06-context-efficiency P03 | 4 min    | 2 tasks | 5 files  |
+| Phase 07-cache-savings-fix P01  | 3 min    | 2 tasks | 6 files  |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ v2.0 key constraints from research:
 - [Phase 06-context-efficiency P03]: All-cached runs skip roundSummaries entirely — no API calls means no token summary
 - [Phase 06-context-efficiency P03]: Render timing only shown when savings > 500ms to avoid noise on fast runs
 - [Phase 06-context-efficiency P03]: RoundExecutionResult has no usage field — cache tokens read from tracker.getRoundUsage()
+- [Phase 07-cache-savings-fix]: completionDocs set to docsToRender.length before onRenderStart so CI renderer logs correct count upfront
+- [Phase 07-cache-savings-fix]: CIRenderer.onRenderStart uses state.completionDocs directly — no || fallback needed after upstream fix
 
 ### Pending Todos
 
@@ -93,5 +96,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Phase 7 created for gap closure — needs plan then execution
-Resume file: .planning/v2.0-MILESTONE-AUDIT.md
+Stopped at: Completed 07-01-PLAN.md — v2.0 all phases done
+Resume file: .planning/phases/07-cache-savings-fix/07-01-SUMMARY.md
