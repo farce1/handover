@@ -76,13 +76,13 @@ Plans:
 4. Document renderers execute in parallel — the render phase does not block on each document finishing before starting the next
 5. Token counting for OpenAI-family providers uses BPE tokenization (gpt-tokenizer) rather than the chars/4 heuristic, eliminating the 15-25% counting error
 
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 
-- [ ] 06-01: Changed-files context packing — expose AnalysisCache.getChangedFiles(); extend packFiles() to accept changed-files set; force changed files to full tier
-- [ ] 06-02: Anthropic prompt caching — add cache_control blocks and betas header to AnthropicProvider.doComplete(); verify SDK upgrade from Phase 5
-- [ ] 06-03: Token summary, parallel rendering, accurate counting — completion screen token savings report; parallel Promise.all render phase; gpt-tokenizer for OpenAI providers
+- [ ] 06-01-PLAN.md — Changed-files context packing: getChangedFiles() on AnalysisCache, changedFiles tier forcing in packFiles(), incremental run label
+- [ ] 06-02-PLAN.md — Anthropic prompt caching and BPE tokenization: cache_control on system prompt, Usage schema cache fields, gpt-tokenizer for OpenAI providers
+- [ ] 06-03-PLAN.md — Token summary, parallel rendering, savings display: per-round breakdown with savings, Promise.allSettled render phase, render timing
 
 ## Progress
 
