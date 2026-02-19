@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v2.0 Performance — Phase 5: UX Responsiveness COMPLETE
+**Current focus:** v2.0 Performance — Phase 6: Context Efficiency (in progress)
 
 ## Current Position
 
-Phase: 5 of 6 (UX Responsiveness) — COMPLETE
-Plan: 2 of 2 in current phase (plan 02 complete)
-Status: Phase 5 complete — all UX responsiveness features shipped (streaming token counter, live timer, --stream flag, file coverage indicator, parallel savings)
-Last activity: 2026-02-19 — 05-02 --stream flag, file coverage, and parallel savings complete
+Phase: 6 of 6 (Context Efficiency) — IN PROGRESS
+Plan: 1 of 2 in current phase (plan 01 complete)
+Status: Phase 6 plan 01 complete — incremental context packing shipped (getChangedFiles, packFiles changedFiles param, DisplayState metadata)
+Last activity: 2026-02-19 — 06-01 incremental context packing complete
 
-Progress: [████░░░░░░] 50% (4/8 plans complete across v2.0)
+Progress: [█████░░░░░] 62% (5/8 plans complete across v2.0)
 
 ## Performance Metrics
 
@@ -35,12 +35,13 @@ Progress: [████░░░░░░] 50% (4/8 plans complete across v2.0)
 
 **v2.0:**
 
-| Plan                           | Duration | Tasks   | Files    |
-| ------------------------------ | -------- | ------- | -------- |
-| Phase 04-cache-correctness P01 | 3 min    | 2 tasks | 2 files  |
-| Phase 04-cache-correctness P02 | 2 min    | 1 tasks | 3 files  |
-| Phase 05-ux-responsiveness P01 | 6 min    | 2 tasks | 16 files |
-| Phase 05-ux-responsiveness P02 | 4 min    | 2 tasks | 6 files  |
+| Plan                            | Duration | Tasks   | Files    |
+| ------------------------------- | -------- | ------- | -------- |
+| Phase 04-cache-correctness P01  | 3 min    | 2 tasks | 2 files  |
+| Phase 04-cache-correctness P02  | 2 min    | 1 tasks | 3 files  |
+| Phase 05-ux-responsiveness P01  | 6 min    | 2 tasks | 16 files |
+| Phase 05-ux-responsiveness P02  | 4 min    | 2 tasks | 6 files  |
+| Phase 06-context-efficiency P01 | 3 min    | 2 tasks | 4 files  |
 
 ## Accumulated Context
 
@@ -64,6 +65,9 @@ v2.0 key constraints from research:
 - [Phase 05-ux-responsiveness P02]: signatureFiles included in "analyzing" count alongside fullFiles — both sent to LLM so both represent analyzed scope
 - [Phase 05-ux-responsiveness P02]: parallel savings only shown when both r5 and r6 are done (not cached) and saved > 2s — avoids noise for cached runs
 - [Phase 05-ux-responsiveness P02]: streamVisible carried on DisplayState (not passed per-call) so 80ms spinner interval re-renders see the flag consistently
+- [Phase 06-context-efficiency]: Changed files fall through to normal tier when budget exhausted — ensures max coverage
+- [Phase 06-context-efficiency]: isIncremental requires prior cache AND not all files changed — first runs unchanged
+- [Phase 06-context-efficiency]: Analysis cache path: .handover/cache/analysis.json separate from round cache to avoid coupling
 
 ### Pending Todos
 
@@ -73,7 +77,6 @@ None.
 
 Research flags requiring investigation before planning:
 
-- Phase 6: Read src/analyzers/cache.ts before finalizing scope of getChangedFiles() API change
 - Phase 6: Capture Round 5 and Round 6 output baseline before any compression parameter changes
 
 External setup still required from v1.0:
@@ -86,5 +89,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-context-efficiency/06-CONTEXT.md
+Stopped at: Completed 06-01-PLAN.md (incremental context packing)
+Resume file: .planning/phases/06-context-efficiency/06-01-SUMMARY.md
