@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { hashContent } from '../analyzers/cache.js';
+import { hashContent, AnalysisCache } from '../analyzers/cache.js';
 import { loadConfig, resolveApiKey } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
 import { HandoverError, handleCliError } from '../utils/errors.js';
@@ -461,6 +461,31 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             );
           }
 
+          // Detect changed files for incremental context packing (EFF-01)
+          const analysisCache = new AnalysisCache(
+            join(rootDir, '.handover', 'cache', 'analysis.json'),
+          );
+          await analysisCache.load();
+
+          const currentHashes = new Map<string, string>();
+          for (const entry of fileEntries) {
+            if (entry.contentHash) {
+              currentHashes.set(entry.path, entry.contentHash);
+            }
+          }
+
+          const changedFiles = analysisCache.getChangedFiles(currentHashes);
+          const isIncremental = analysisCache.size > 0 && changedFiles.size < currentHashes.size;
+
+          if (options.verbose && isIncremental) {
+            process.stderr.write(
+              `[verbose] Incremental run: ${changedFiles.size} changed, ${currentHashes.size - changedFiles.size} unchanged\n`,
+            );
+            for (const path of changedFiles) {
+              process.stderr.write(`[verbose]   changed: ${path}\n`);
+            }
+          }
+
           // Detect language from file extensions
           const exts = result.fileTree.filesByExtension;
           const topExt = Object.entries(exts).sort((a, b) => b[1] - a[1])[0];
@@ -480,7 +505,21 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             budget,
             estimateTokensFn,
             getFileContent,
+            isIncremental ? changedFiles : undefined, // Only pass on incremental runs
           );
+
+          // Update analysis cache for next run's change detection
+          for (const [path, hash] of currentHashes) {
+            analysisCache.update(path, hash);
+          }
+          await analysisCache.save();
+
+          // Set incremental run metadata for display
+          if (isIncremental) {
+            displayState.isIncremental = true;
+            displayState.changedFileCount = changedFiles.size;
+            displayState.unchangedFileCount = currentHashes.size - changedFiles.size;
+          }
 
           // Transition to AI rounds phase
           displayState.phase = 'ai-rounds';

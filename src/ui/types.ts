@@ -69,6 +69,12 @@ export interface DisplayState {
   fileCoverage?: { analyzing: number; ignored: number; total: number };
   /** Whether streaming token output indicator is visible (opt-in via --stream flag). */
   streamVisible?: boolean;
+  /** Whether this is an incremental run (some files changed, some unchanged). */
+  isIncremental?: boolean;
+  /** Number of files that changed since last run (only set on incremental runs). */
+  changedFileCount?: number;
+  /** Number of files skipped as unchanged (only set on incremental runs). */
+  unchangedFileCount?: number;
   /** Milliseconds saved by parallel execution of rounds 5 and 6. */
   parallelSavedMs?: number;
 }
