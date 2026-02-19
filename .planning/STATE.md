@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 ## Current Position
 
 Phase: 6 of 6 (Context Efficiency) — IN PROGRESS
-Plan: 1 of 2 in current phase (plan 01 complete)
-Status: Phase 6 plan 01 complete — incremental context packing shipped (getChangedFiles, packFiles changedFiles param, DisplayState metadata)
-Last activity: 2026-02-19 — 06-01 incremental context packing complete
+Plan: 2 of 2 in current phase (plan 02 complete)
+Status: Phase 6 plan 02 complete — prompt caching (cache_control on system prompt), cache-aware cost tracking, BPE tokenization for OpenAI providers
+Last activity: 2026-02-19 — 06-02 prompt caching and BPE tokenization complete
 
-Progress: [█████░░░░░] 62% (5/8 plans complete across v2.0)
+Progress: [██████░░░░] 75% (6/8 plans complete across v2.0)
 
 ## Performance Metrics
 
@@ -42,6 +42,7 @@ Progress: [█████░░░░░] 62% (5/8 plans complete across v2.0)
 | Phase 05-ux-responsiveness P01  | 6 min    | 2 tasks | 16 files |
 | Phase 05-ux-responsiveness P02  | 4 min    | 2 tasks | 6 files  |
 | Phase 06-context-efficiency P01 | 3 min    | 2 tasks | 4 files  |
+| Phase 06-context-efficiency P02 | 4 min    | 2 tasks | 6 files  |
 
 ## Accumulated Context
 
@@ -68,6 +69,8 @@ v2.0 key constraints from research:
 - [Phase 06-context-efficiency]: Changed files fall through to normal tier when budget exhausted — ensures max coverage
 - [Phase 06-context-efficiency]: isIncremental requires prior cache AND not all files changed — first runs unchanged
 - [Phase 06-context-efficiency]: Analysis cache path: .handover/cache/analysis.json separate from round cache to avoid coupling
+- [Phase 06-context-efficiency]: cache_read_input_tokens and cache_creation_input_tokens are directly accessible on SDK 0.39.0 Usage type — no cast needed; null coerced to undefined with ?? undefined
+- [Phase 06-context-efficiency]: BPE model routing in OpenAICompatibleProvider: gpt-4- and gpt-3.5- prefixes use cl100k_base; all others (gpt-4o, gpt-4.1, o-series) use o200k_base via gpt-tokenizer main export
 
 ### Pending Todos
 
@@ -89,5 +92,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 06-01-PLAN.md (incremental context packing)
-Resume file: .planning/phases/06-context-efficiency/06-01-SUMMARY.md
+Stopped at: Completed 06-02-PLAN.md (prompt caching and BPE tokenization)
+Resume file: .planning/phases/06-context-efficiency/06-02-SUMMARY.md
