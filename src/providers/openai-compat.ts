@@ -1,5 +1,7 @@
 import OpenAI from 'openai';
 import { AzureOpenAI } from 'openai';
+import { countTokens } from 'gpt-tokenizer';
+import { countTokens as countTokensCl100k } from 'gpt-tokenizer/encoding/cl100k_base';
 import type { z } from 'zod';
 import type { ProviderPreset } from './presets.js';
 import type { CompletionRequest, CompletionResult } from '../domain/types.js';
@@ -44,6 +46,19 @@ export class OpenAICompatibleProvider extends BaseProvider {
     }
 
     this.logInit(preset.displayName, concurrency);
+  }
+
+  /**
+   * BPE token estimation using gpt-tokenizer (EFF-05).
+   * Replaces the chars/4 heuristic with accurate encoding-aware counting.
+   * Uses o200k_base for modern models (gpt-4o, gpt-4.1, o-series),
+   * cl100k_base for legacy models (gpt-4, gpt-3.5-turbo).
+   */
+  override estimateTokens(text: string): number {
+    if (this.model.startsWith('gpt-4-') || this.model.startsWith('gpt-3.5-')) {
+      return countTokensCl100k(text);
+    }
+    return countTokens(text);
   }
 
   protected async doComplete<T>(
