@@ -111,6 +111,13 @@ export class CIRenderer implements Renderer {
     parts.push(duration);
     console.log(`${this.timestamp()} [done] ${parts.join(', ')}`);
 
+    // Log parallel savings if applicable
+    if (state.parallelSavedMs !== undefined && state.parallelSavedMs > 0) {
+      console.log(
+        `${this.timestamp()} [perf] Parallel execution saved ~${Math.round(state.parallelSavedMs / 1000)}s`,
+      );
+    }
+
     // Print errors if any
     if (state.errors.length > 0) {
       for (const err of state.errors) {

@@ -23,6 +23,7 @@ import { createProvider, validateProviderConfig } from '../providers/factory.js'
 import { PROVIDER_PRESETS } from '../providers/presets.js';
 import { RoundCache } from '../cache/round-cache.js';
 import { createRenderer } from '../ui/renderer.js';
+import { computeParallelSavings } from '../ui/components.js';
 import { ROUND_NAMES } from '../ai-rounds/types.js';
 import {
   DOCUMENT_REGISTRY,
@@ -863,6 +864,13 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     displayState.completionDocs = displayState.renderedDocs.length;
     displayState.totalTokens = tracker.getTotalUsage().input + tracker.getTotalUsage().output;
     displayState.totalCost = tracker.getTotalCost();
+
+    // Compute and store parallel savings (rounds 5 and 6 run concurrently)
+    const parallelSavedMs = computeParallelSavings(displayState.rounds);
+    if (parallelSavedMs !== null) {
+      displayState.parallelSavedMs = parallelSavedMs;
+    }
+
     renderer.onComplete(displayState);
   } catch (err) {
     handleCliError(err, 'An unexpected error occurred during handover generation');

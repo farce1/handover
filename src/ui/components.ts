@@ -235,6 +235,36 @@ export function renderDocLine(filename: string): string {
 }
 
 /**
+ * Compute milliseconds saved by parallel execution of rounds 5 and 6.
+ *
+ * Returns null if either round is missing, cached, or not done.
+ * Returns null if savings are <= 2 seconds (not worth reporting).
+ */
+export function computeParallelSavings(rounds: Map<number, RoundDisplayState>): number | null {
+  const r5 = rounds.get(5);
+  const r6 = rounds.get(6);
+
+  if (!r5 || !r6) return null;
+  if (r5.status === 'cached' || r6.status === 'cached') return null;
+  if (r5.status !== 'done' || r6.status !== 'done') return null;
+
+  const parallelWallTime = Math.max(r5.elapsedMs, r6.elapsedMs);
+  const sequentialTime = r5.elapsedMs + r6.elapsedMs;
+  const savedMs = sequentialTime - parallelWallTime;
+
+  return savedMs > 2000 ? savedMs : null;
+}
+
+/**
+ * Render the parallel savings line shown in the completion summary.
+ *
+ * Format: `  Parallel execution saved ~1m 23s`
+ */
+export function renderParallelSavings(savedMs: number): string {
+  return pc.dim('  Parallel execution saved ~') + formatDuration(savedMs);
+}
+
+/**
  * Render the completion summary line.
  *
  * Per CONTEXT.md: compact single line, NOT framed box.
@@ -251,7 +281,13 @@ export function renderCompletionSummary(state: DisplayState): string[] {
     parts.push(pc.yellow(formatCost(state.totalCost)));
   }
   parts.push(formatDuration(state.elapsedMs));
-  return [parts.join(sep)];
+  const completionLine = parts.join(sep);
+
+  const lines: string[] = [completionLine];
+  if (state.parallelSavedMs !== undefined && state.parallelSavedMs > 0) {
+    lines.push(renderParallelSavings(state.parallelSavedMs));
+  }
+  return lines;
 }
 
 /**
