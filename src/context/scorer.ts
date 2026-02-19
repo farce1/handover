@@ -33,6 +33,43 @@ const CONFIG_FILE_PATTERNS = [
 
 const TEST_PATTERNS = [/\.test\./, /\.spec\./, /__tests__\//, /__test__\//];
 
+// ─── File scoring weights (CTX-02) ──────────────────────────────────────────
+// These weights define the relative importance of each scoring factor.
+// They are internal constants — not user-configurable.
+
+/** Bonus for entry point files (index, main, app, server) */
+export const SCORE_ENTRY_POINT = 30 as const;
+
+/** Bonus per unique importer (each file that imports this one) */
+export const SCORE_IMPORT_PER_IMPORTER = 3 as const;
+
+/** Maximum bonus from import count factor */
+export const SCORE_IMPORT_CAP = 30 as const;
+
+/** Bonus per exported symbol */
+export const SCORE_EXPORT_PER_EXPORT = 2 as const;
+
+/** Maximum bonus from export count factor */
+export const SCORE_EXPORT_CAP = 20 as const;
+
+/** Maximum bonus from git activity (change count, 1 point per change) */
+export const SCORE_GIT_ACTIVITY_CAP = 10 as const;
+
+/** Bonus when file contains TODO/FIXME markers */
+export const SCORE_EDGE_CASES = 10 as const;
+
+/** Bonus for configuration files (package.json, Dockerfile, etc.) */
+export const SCORE_CONFIG_FILE = 15 as const;
+
+/** Penalty applied to test files (.test., .spec., __tests__/) */
+export const SCORE_TEST_PENALTY = 15 as const;
+
+/** Minimum possible score (floor) */
+export const SCORE_MIN = 0 as const;
+
+/** Maximum possible score (cap) */
+export const SCORE_MAX = 100 as const;
+
 // ─── Commonly tried extensions for import resolution ────────────────────────
 
 const EXTENSION_SUFFIXES = ['', '.ts', '.js', '.tsx', '.jsx', '/index.ts', '/index.js'];
@@ -120,14 +157,14 @@ function stripExtension(filePath: string): string {
  * Score all files from a StaticAnalysisResult using six CTX-02 weighted factors.
  *
  * Factors and caps:
- *   - Entry point:  +30 (boolean match)
- *   - Import count: +3 per importer, cap 30
- *   - Export count: +2 per export, cap 20
- *   - Git activity: +1 per change, cap 10
- *   - Edge cases:   +10 if any TODO/FIXME markers present
- *   - Config file:  +15 (boolean match)
+ *   - Entry point:  +SCORE_ENTRY_POINT (boolean match)
+ *   - Import count: +SCORE_IMPORT_PER_IMPORTER per importer, cap SCORE_IMPORT_CAP
+ *   - Export count: +SCORE_EXPORT_PER_EXPORT per export, cap SCORE_EXPORT_CAP
+ *   - Git activity: +1 per change, cap SCORE_GIT_ACTIVITY_CAP
+ *   - Edge cases:   +SCORE_EDGE_CASES if any TODO/FIXME markers present
+ *   - Config file:  +SCORE_CONFIG_FILE (boolean match)
  *
- * Test file penalty: -15 (floor at 0)
+ * Test file penalty: -SCORE_TEST_PENALTY (floor at SCORE_MIN)
  * Lock files: excluded entirely
  *
  * Returns FilePriority[] sorted by score descending, tiebroken alphabetically.
@@ -189,23 +226,23 @@ export function scoreFiles(analysis: StaticAnalysisResult): FilePriority[] {
     }
 
     const breakdown: ScoreBreakdown = {
-      entryPoint: ENTRY_POINT_PATTERNS.some((p) => p.test(path)) ? 30 : 0,
+      entryPoint: ENTRY_POINT_PATTERNS.some((p) => p.test(path)) ? SCORE_ENTRY_POINT : 0,
 
       importCount: Math.min(
         (importerCount.get(path) ??
           // Also try extensionless matching for files imported without extension
           importerCount.get(stripExtension(path)) ??
-          0) * 3,
-        30,
+          0) * SCORE_IMPORT_PER_IMPORTER,
+        SCORE_IMPORT_CAP,
       ),
 
-      exportCount: Math.min((exportMap.get(path) ?? 0) * 2, 20),
+      exportCount: Math.min((exportMap.get(path) ?? 0) * SCORE_EXPORT_PER_EXPORT, SCORE_EXPORT_CAP),
 
-      gitActivity: Math.min(gitChanges.get(path) ?? 0, 10),
+      gitActivity: Math.min(gitChanges.get(path) ?? 0, SCORE_GIT_ACTIVITY_CAP),
 
-      edgeCases: (edgeCaseMap.get(path) ?? 0) > 0 ? 10 : 0,
+      edgeCases: (edgeCaseMap.get(path) ?? 0) > 0 ? SCORE_EDGE_CASES : 0,
 
-      configFile: CONFIG_FILE_PATTERNS.some((p) => p.test(path)) ? 15 : 0,
+      configFile: CONFIG_FILE_PATTERNS.some((p) => p.test(path)) ? SCORE_CONFIG_FILE : 0,
     };
 
     // Sum breakdown
@@ -219,11 +256,11 @@ export function scoreFiles(analysis: StaticAnalysisResult): FilePriority[] {
 
     // Test file penalty
     if (TEST_PATTERNS.some((p) => p.test(path))) {
-      score -= 15;
+      score -= SCORE_TEST_PENALTY;
     }
 
-    // Cap at [0, 100]
-    score = Math.max(0, Math.min(100, score));
+    // Cap at [SCORE_MIN, SCORE_MAX]
+    score = Math.max(SCORE_MIN, Math.min(SCORE_MAX, score));
 
     results.push({ path, score, breakdown });
   }

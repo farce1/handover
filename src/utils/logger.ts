@@ -57,6 +57,19 @@ export class Logger {
   }
 
   /**
+   * Debug message — only shown when -v flag is active.
+   * Use in catch blocks for expected/recoverable errors:
+   * caught errors that are part of normal operation
+   * (e.g., file not found, optional feature unavailable).
+   */
+  debug(msg: string): void {
+    if (this.suppressed) return;
+    if (this.verbose) {
+      console.log(pc.dim('  [debug] ' + msg));
+    }
+  }
+
+  /**
    * Warning message — always shown.
    * Yellow colored.
    */
