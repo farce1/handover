@@ -86,5 +86,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 05-ux-responsiveness plan 2 (05-02-PLAN.md) — --stream flag, file coverage, and parallel savings shipped
-Resume file: .planning/phases/05-ux-responsiveness/05-02-SUMMARY.md
+Stopped at: Phase 6 context gathered
+Resume file: .planning/phases/06-context-efficiency/06-CONTEXT.md
