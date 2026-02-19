@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v3.0 Robustness — Phase 9 in progress (Plan 2 complete)
+**Current focus:** v3.0 Robustness — Phase 9 in progress (Plan 3 complete)
 
 ## Current Position
 
 Phase: 9 of 11 (Code Hardening and Pure Function Tests — In Progress)
-Plan: 3 of N (Phase 9 Plan 02 complete — scoreFiles() and token-counter unit tests)
+Plan: 4 of N (Phase 9 Plan 03 complete — schema, registry, and step unit tests)
 Status: In progress
-Last activity: 2026-02-19 — Phase 9 Plan 02 complete (33 unit tests for scoreFiles, computeTokenBudget, estimateTokens)
+Last activity: 2026-02-19 — Phase 9 Plan 03 complete (53 unit tests for HandoverConfigSchema, resolveSelectedDocs, computeRequiredRounds, createStep)
 
 Progress: [██████████░░░░░░░░░░] 58% (11/18 plans complete across all milestones)
 
@@ -49,6 +49,7 @@ Progress: [██████████░░░░░░░░░░] 58% (11
 | Phase 08-test-infrastructure P03 | 2 min    | 2 tasks | 4 files  |
 | Phase 09-code-hardening P01      | 3 min    | 2 tasks | 10 files |
 | Phase 09-pure-function-tests P02 | 3 min    | 2 tasks | 3 files  |
+| Phase 09-pure-function-tests P03 | 5 min    | 2 tasks | 3 files  |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ All v1.0 and v2.0 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 09]: buildMockAnalysis() factory kept local to scorer.test.ts (not shared)
 - [Phase 09-02]: LLMProvider mock cast via as unknown as LLMProvider to satisfy ESLint no-explicit-any
 - [Phase 09-02]: SCORE_TEST_PENALTY used in assertion via Math.max(SCORE_MIN, 0 - SCORE_TEST_PENALTY) to satisfy no-unused-vars
+- [Phase 09]: computeRequiredRounds expansion is one-level (ROUND_DEPS pre-expresses transitive deps)
+- [Phase 09]: HandoverError.fix field contains 'Valid aliases' text - tested via caught error inspection
 
 ### Pending Todos
 
@@ -100,5 +103,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 09-02-PLAN.md (scoreFiles and token-counter unit tests, 33 tests passing)
+Stopped at: Completed 09-03-PLAN.md (schema, registry, step unit tests — 53 tests passing)
 Resume file: .planning/phases/09-code-hardening-and-pure-function-tests/ (next plan in Phase 9)
