@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v2.0 Performance — Phase 4: Cache Correctness
+**Current focus:** v2.0 Performance — Phase 5: UX Responsiveness
 
 ## Current Position
 
-Phase: 4 of 6 (Cache Correctness) — COMPLETE
-Plan: 2 of 2 in current phase (phase complete)
-Status: Phase 4 complete, ready for Phase 5
-Last activity: 2026-02-18 — 04-02 cache UX feedback complete
+Phase: 5 of 6 (UX Responsiveness) — IN PROGRESS
+Plan: 1 of 1 in current phase (plan 01 complete)
+Status: Phase 5 plan 01 complete — streaming token counter and live timer shipped
+Last activity: 2026-02-19 — 05-01 streaming token counter and elapsed timer complete
 
-Progress: [██░░░░░░░░] 25% (2/8 plans complete across v2.0)
+Progress: [███░░░░░░░] 37% (3/8 plans complete across v2.0)
 
 ## Performance Metrics
 
@@ -35,10 +35,11 @@ Progress: [██░░░░░░░░] 25% (2/8 plans complete across v2.0)
 
 **v2.0:**
 
-| Plan                           | Duration | Tasks   | Files   |
-| ------------------------------ | -------- | ------- | ------- |
-| Phase 04-cache-correctness P01 | 3 min    | 2 tasks | 2 files |
-| Phase 04-cache-correctness P02 | 2 min    | 1 tasks | 3 files |
+| Plan                           | Duration | Tasks   | Files    |
+| ------------------------------ | -------- | ------- | -------- |
+| Phase 04-cache-correctness P01 | 3 min    | 2 tasks | 2 files  |
+| Phase 04-cache-correctness P02 | 2 min    | 1 tasks | 3 files  |
+| Phase 05-ux-responsiveness P01 | 6 min    | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -55,6 +56,10 @@ v2.0 key constraints from research:
 - [Phase 04-cache-correctness]: RoundCache.clear() preserved as public method for migration; --no-cache uses noCacheMode flag to skip reads only, always writes
 - [Phase 04-cache-correctness]: All-cached check in renderRoundBlock: early return with single summary line before per-round loop
 - [Phase 04-cache-correctness]: Migration warning uses process.stderr.write because logger is suppressed during renderer-managed output
+- [Phase 05-ux-responsiveness]: onToken is optional in all provider/round signatures — no callback means non-streaming path unchanged (backward compatible)
+- [Phase 05-ux-responsiveness]: Lazy getter makeOnToken(n) resolves callback at step execute() time to handle timing between onStepStart registration and step execution
+- [Phase 05-ux-responsiveness]: Spinner tick (80ms) drives elapsed time updates; onToken callback does NOT trigger re-renders to avoid ~100 renders/sec flooding
+- [Phase 05-ux-responsiveness]: Round 5 fan-out accepts onToken for API consistency but does not wire it into parallel per-module calls (display noise)
 
 ### Pending Todos
 
@@ -64,8 +69,6 @@ None.
 
 Research flags requiring investigation before planning:
 
-- Phase 5: Read @anthropic-ai/sdk and openai SDK changelogs; diff against src/providers/anthropic.ts and src/providers/openai-compat.ts before finalizing scope
-- Phase 5: Verify round-5-edge-cases.ts and round-6-deployment.ts dep declarations (zero to 2-hour investigation)
 - Phase 6: Read src/analyzers/cache.ts before finalizing scope of getChangedFiles() API change
 - Phase 6: Capture Round 5 and Round 6 output baseline before any compression parameter changes
 
@@ -78,6 +81,6 @@ External setup still required from v1.0:
 
 ## Session Continuity
 
-Last session: 2026-02-18
-Stopped at: Completed 04-cache-correctness plan 2 (04-02-PLAN.md) — Phase 4 complete
-Resume file: .planning/phases/04-cache-correctness/04-02-SUMMARY.md
+Last session: 2026-02-19
+Stopped at: Completed 05-ux-responsiveness plan 1 (05-01-PLAN.md) — streaming token counter and timer shipped
+Resume file: .planning/phases/05-ux-responsiveness/05-01-SUMMARY.md
