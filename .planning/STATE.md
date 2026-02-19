@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 
 ## Current Position
 
-Phase: 6 of 6 (Context Efficiency) — IN PROGRESS
-Plan: 2 of 2 in current phase (plan 02 complete)
-Status: Phase 6 plan 02 complete — prompt caching (cache_control on system prompt), cache-aware cost tracking, BPE tokenization for OpenAI providers
-Last activity: 2026-02-19 — 06-02 prompt caching and BPE tokenization complete
+Phase: 6 of 6 (Context Efficiency) — COMPLETE
+Plan: 3 of 3 in current phase (plan 03 complete)
+Status: Phase 6 complete — incremental packing, prompt caching + BPE tokenization, per-round savings display and parallel rendering
+Last activity: 2026-02-19 — 06-03 UX display complete (Phase 6 done)
 
-Progress: [██████░░░░] 75% (6/8 plans complete across v2.0)
+Progress: [█████████░] 90% (9/10 plans complete across v2.0)
 
 ## Performance Metrics
 
@@ -43,6 +43,7 @@ Progress: [██████░░░░] 75% (6/8 plans complete across v2.0)
 | Phase 05-ux-responsiveness P02  | 4 min    | 2 tasks | 6 files  |
 | Phase 06-context-efficiency P01 | 3 min    | 2 tasks | 4 files  |
 | Phase 06-context-efficiency P02 | 4 min    | 2 tasks | 6 files  |
+| Phase 06-context-efficiency P03 | 4 min    | 2 tasks | 5 files  |
 
 ## Accumulated Context
 
@@ -71,16 +72,16 @@ v2.0 key constraints from research:
 - [Phase 06-context-efficiency]: Analysis cache path: .handover/cache/analysis.json separate from round cache to avoid coupling
 - [Phase 06-context-efficiency]: cache_read_input_tokens and cache_creation_input_tokens are directly accessible on SDK 0.39.0 Usage type — no cast needed; null coerced to undefined with ?? undefined
 - [Phase 06-context-efficiency]: BPE model routing in OpenAICompatibleProvider: gpt-4- and gpt-3.5- prefixes use cl100k_base; all others (gpt-4o, gpt-4.1, o-series) use o200k_base via gpt-tokenizer main export
+- [Phase 06-context-efficiency P03]: Per-round savings expressed in all three units: tokens, percentage, dollars
+- [Phase 06-context-efficiency P03]: All-cached runs skip roundSummaries entirely — no API calls means no token summary
+- [Phase 06-context-efficiency P03]: Render timing only shown when savings > 500ms to avoid noise on fast runs
+- [Phase 06-context-efficiency P03]: RoundExecutionResult has no usage field — cache tokens read from tracker.getRoundUsage()
 
 ### Pending Todos
 
 None.
 
 ### Blockers/Concerns
-
-Research flags requiring investigation before planning:
-
-- Phase 6: Capture Round 5 and Round 6 output baseline before any compression parameter changes
 
 External setup still required from v1.0:
 
@@ -92,5 +93,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 06-02-PLAN.md (prompt caching and BPE tokenization)
-Resume file: .planning/phases/06-context-efficiency/06-02-SUMMARY.md
+Stopped at: Completed 06-03-PLAN.md (per-round savings display, parallel rendering — Phase 6 complete)
+Resume file: .planning/phases/06-context-efficiency/06-03-SUMMARY.md
