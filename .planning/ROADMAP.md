@@ -102,6 +102,10 @@ Plans:
 
 **Plans**: 1 plan
 
+Plans:
+
+- [ ] 07-01-PLAN.md — Forward cache fields through runner, remove dead code, fix CI renderer doc count
+
 ## Progress
 
 **Execution Order:**
