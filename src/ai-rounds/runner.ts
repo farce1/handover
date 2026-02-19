@@ -66,6 +66,8 @@ export async function executeRound<T>(
       round: roundNumber,
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,
+      cacheReadTokens: result.usage.cacheReadTokens,
+      cacheCreationTokens: result.usage.cacheCreationTokens,
       contextTokens: estimateTokensFn(promptText),
       fileContentTokens: 0, // tracked separately by context packer
       budgetTokens: provider.maxContextTokens(),

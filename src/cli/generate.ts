@@ -834,6 +834,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           const renderStart = Date.now();
           const docsToRender = selectedDocs.filter((doc) => doc.id !== '00-index');
 
+          // Set completionDocs to expected count before onRenderStart so CI renderer
+          // can log "Rendering N documents..." with the correct count.
+          displayState.completionDocs = docsToRender.length;
+
           // Emit render start (aggregate progress only — per locked decision)
           if (renderer.onRenderStart) {
             renderer.onRenderStart(displayState);

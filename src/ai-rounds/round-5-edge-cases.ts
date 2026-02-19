@@ -362,6 +362,8 @@ async function analyzeModule(
       round: 5,
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,
+      cacheReadTokens: result.usage.cacheReadTokens,
+      cacheCreationTokens: result.usage.cacheCreationTokens,
       contextTokens: estimateTokensFn(promptText),
       fileContentTokens: 0,
       budgetTokens: provider.maxContextTokens(),
