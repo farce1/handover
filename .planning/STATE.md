@@ -78,5 +78,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: v3.0 Robustness roadmap created — ready to plan Phase 8
-Resume file: .planning/ROADMAP.md
+Stopped at: Phase 8 context gathered
+Resume file: .planning/phases/08-ci-fix-scorecard-hardening-and-test-infrastructure/08-CONTEXT.md
