@@ -23,16 +23,17 @@ export class AnthropicProvider extends BaseProvider {
   protected async doComplete<T>(
     request: CompletionRequest,
     schema: z.ZodType<T>,
+    onToken?: (tokenCount: number) => void,
   ): Promise<CompletionResult & { data: T }> {
     const start = Date.now();
 
     const inputSchema = zodToToolSchema(schema) as Anthropic.Tool.InputSchema;
 
-    const response = await this.client.messages.create({
+    const params = {
       model: this.model,
       max_tokens: request.maxTokens ?? 4096,
       system: request.systemPrompt,
-      messages: [{ role: 'user', content: request.userPrompt }],
+      messages: [{ role: 'user' as const, content: request.userPrompt }],
       tools: [
         {
           name: 'structured_response',
@@ -45,36 +46,86 @@ export class AnthropicProvider extends BaseProvider {
         name: 'structured_response',
       },
       temperature: request.temperature ?? 0.7,
-    });
-
-    // Extract tool_use block
-    const toolBlock = response.content.find(
-      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
-    );
-
-    if (!toolBlock) {
-      throw new ProviderError(
-        'No structured response from model',
-        'The model did not return a tool_use block',
-        'This may be a model issue — try again or use a different model',
-        'PROVIDER_NO_TOOL_USE',
-      );
-    }
-
-    // Validate with Zod schema
-    const data = schema.parse(toolBlock.input);
-
-    const duration = Date.now() - start;
-
-    return {
-      data,
-      usage: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
-      },
-      model: response.model,
-      duration,
     };
+
+    if (onToken) {
+      // Streaming path: use messages.stream() for live token count updates
+      const stream = this.client.messages.stream(params);
+
+      let charCount = 0;
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'input_json_delta') {
+          charCount += event.delta.partial_json.length;
+          onToken(Math.ceil(charCount / 4));
+        }
+      }
+
+      const message = await stream.finalMessage();
+
+      // Extract tool_use block
+      const toolBlock = message.content.find(
+        (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
+      );
+
+      if (!toolBlock) {
+        throw new ProviderError(
+          'No structured response from model',
+          'The model did not return a tool_use block',
+          'This may be a model issue — try again or use a different model',
+          'PROVIDER_NO_TOOL_USE',
+        );
+      }
+
+      // Validate with Zod schema
+      const data = schema.parse(toolBlock.input);
+
+      // Snap to authoritative token count
+      onToken(message.usage.output_tokens);
+
+      const duration = Date.now() - start;
+
+      return {
+        data,
+        usage: {
+          inputTokens: message.usage.input_tokens,
+          outputTokens: message.usage.output_tokens,
+        },
+        model: message.model,
+        duration,
+      };
+    } else {
+      // Non-streaming path (original code, unchanged)
+      const response = await this.client.messages.create(params);
+
+      // Extract tool_use block
+      const toolBlock = response.content.find(
+        (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
+      );
+
+      if (!toolBlock) {
+        throw new ProviderError(
+          'No structured response from model',
+          'The model did not return a tool_use block',
+          'This may be a model issue — try again or use a different model',
+          'PROVIDER_NO_TOOL_USE',
+        );
+      }
+
+      // Validate with Zod schema
+      const data = schema.parse(toolBlock.input);
+
+      const duration = Date.now() - start;
+
+      return {
+        data,
+        usage: {
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+        },
+        model: response.model,
+        duration,
+      };
+    }
   }
 
   protected isRetryable(err: unknown): boolean {

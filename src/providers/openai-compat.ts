@@ -49,16 +49,17 @@ export class OpenAICompatibleProvider extends BaseProvider {
   protected async doComplete<T>(
     request: CompletionRequest,
     schema: z.ZodType<T>,
+    onToken?: (tokenCount: number) => void,
   ): Promise<CompletionResult & { data: T }> {
     const start = Date.now();
 
     const parameters = zodToToolSchema(schema);
 
-    const completion = await this.client.chat.completions.create({
+    const params = {
       model: this.model,
       messages: [
-        { role: 'system', content: request.systemPrompt },
-        { role: 'user', content: request.userPrompt },
+        { role: 'system' as const, content: request.systemPrompt },
+        { role: 'user' as const, content: request.userPrompt },
       ],
       tools: [
         {
@@ -76,34 +77,82 @@ export class OpenAICompatibleProvider extends BaseProvider {
       },
       temperature: request.temperature ?? 0.3,
       max_tokens: request.maxTokens ?? 4096,
-    });
-
-    // Extract tool call from response
-    const toolCall = completion.choices[0]?.message.tool_calls?.[0];
-
-    if (!toolCall || toolCall.type !== 'function') {
-      throw new ProviderError(
-        'No structured response from model',
-        'The model did not return a function tool call in its response',
-        'This may be a model issue -- try again or use a different model',
-        'PROVIDER_NO_TOOL_USE',
-      );
-    }
-
-    // OpenAI returns arguments as a JSON string
-    const data = schema.parse(JSON.parse(toolCall.function.arguments));
-
-    const duration = Date.now() - start;
-
-    return {
-      data,
-      usage: {
-        inputTokens: completion.usage?.prompt_tokens ?? 0,
-        outputTokens: completion.usage?.completion_tokens ?? 0,
-      },
-      model: completion.model ?? this.model,
-      duration,
     };
+
+    if (onToken) {
+      // Streaming path: use chat.completions.stream() for live token count updates
+      const runner = this.client.chat.completions.stream(params);
+
+      let charCount = 0;
+      runner.on('chunk', (chunk) => {
+        const delta = chunk.choices[0]?.delta?.tool_calls?.[0]?.function?.arguments ?? '';
+        charCount += delta.length;
+        onToken(Math.ceil(charCount / 4));
+      });
+
+      const completion = await runner.finalChatCompletion();
+
+      // Extract tool call from response
+      const toolCall = completion.choices[0]?.message.tool_calls?.[0];
+
+      if (!toolCall || toolCall.type !== 'function') {
+        throw new ProviderError(
+          'No structured response from model',
+          'The model did not return a function tool call in its response',
+          'This may be a model issue -- try again or use a different model',
+          'PROVIDER_NO_TOOL_USE',
+        );
+      }
+
+      // OpenAI returns arguments as a JSON string; parse full accumulated response
+      const data = schema.parse(JSON.parse(toolCall.function.arguments));
+
+      // Snap to authoritative token count
+      const completionTokens = completion.usage?.completion_tokens ?? Math.ceil(charCount / 4);
+      onToken(completionTokens);
+
+      const duration = Date.now() - start;
+
+      return {
+        data,
+        usage: {
+          inputTokens: completion.usage?.prompt_tokens ?? 0,
+          outputTokens: completionTokens,
+        },
+        model: completion.model ?? this.model,
+        duration,
+      };
+    } else {
+      // Non-streaming path (original code, unchanged)
+      const completion = await this.client.chat.completions.create(params);
+
+      // Extract tool call from response
+      const toolCall = completion.choices[0]?.message.tool_calls?.[0];
+
+      if (!toolCall || toolCall.type !== 'function') {
+        throw new ProviderError(
+          'No structured response from model',
+          'The model did not return a function tool call in its response',
+          'This may be a model issue -- try again or use a different model',
+          'PROVIDER_NO_TOOL_USE',
+        );
+      }
+
+      // OpenAI returns arguments as a JSON string
+      const data = schema.parse(JSON.parse(toolCall.function.arguments));
+
+      const duration = Date.now() - start;
+
+      return {
+        data,
+        usage: {
+          inputTokens: completion.usage?.prompt_tokens ?? 0,
+          outputTokens: completion.usage?.completion_tokens ?? 0,
+        },
+        model: completion.model ?? this.model,
+        duration,
+      };
+    }
   }
 
   protected isRetryable(err: unknown): boolean {

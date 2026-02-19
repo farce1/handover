@@ -24,6 +24,7 @@ export abstract class BaseProvider implements LLMProvider {
   protected abstract doComplete<T>(
     request: CompletionRequest,
     schema: z.ZodType<T>,
+    onToken?: (tokenCount: number) => void,
   ): Promise<CompletionResult & { data: T }>;
 
   /**
@@ -39,10 +40,13 @@ export abstract class BaseProvider implements LLMProvider {
   async complete<T>(
     request: CompletionRequest,
     schema: z.ZodType<T>,
-    options?: { onRetry?: (attempt: number, delayMs: number, reason: string) => void },
+    options?: {
+      onRetry?: (attempt: number, delayMs: number, reason: string) => void;
+      onToken?: (tokenCount: number) => void;
+    },
   ): Promise<CompletionResult & { data: T }> {
     return this.rateLimiter.withLimit(async () => {
-      return retryWithBackoff(() => this.doComplete(request, schema), {
+      return retryWithBackoff(() => this.doComplete(request, schema, options?.onToken), {
         maxRetries: 3,
         baseDelayMs: 30_000,
         isRetryable: (err: unknown) => this.isRetryable(err),
