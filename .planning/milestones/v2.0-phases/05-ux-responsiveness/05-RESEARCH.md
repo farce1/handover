@@ -273,7 +273,7 @@ if (r5 && r6 && r5.status !== 'cached' && r6.status !== 'cached') {
 | Token count formatting  | Custom formatter             | `formatTokens()` in `src/ui/formatters.ts`               | Already handles K/M suffixes                         |
 | Parallel execution      | Custom worker threads        | `DAGOrchestrator` via `Promise.race()`                   | Already executes rounds 5+6 in parallel              |
 
-**Key insight:** Streaming with tool_use returns JSON deltas, not human-readable text. The user-visible streaming feature is primarily about the _counter_, not raw text display.
+**Key insight:** Streaming with tool*use returns JSON deltas, not human-readable text. The user-visible streaming feature is primarily about the \_counter*, not raw text display.
 
 ---
 
