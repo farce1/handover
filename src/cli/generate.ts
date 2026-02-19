@@ -55,6 +55,7 @@ export interface GenerateOptions {
   staticOnly?: boolean;
   verbose?: boolean;
   cache?: boolean;
+  stream?: boolean;
 }
 
 /**
@@ -142,6 +143,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       renderedDocs: [],
       completionDocs: 0,
       errors: [],
+      streamVisible: options.stream === true,
     };
 
     // Suppress logger during renderer-managed output
@@ -481,6 +483,14 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
           // Transition to AI rounds phase
           displayState.phase = 'ai-rounds';
+
+          // Emit file coverage indicator before AI rounds begin
+          displayState.fileCoverage = {
+            analyzing: packedContext.metadata.fullFiles + packedContext.metadata.signatureFiles,
+            ignored: packedContext.metadata.skippedFiles,
+            total: packedContext.metadata.totalFiles,
+          };
+          renderer.onFileCoverage(displayState);
 
           return result;
         },

@@ -21,6 +21,7 @@ program
   .option('--audience <mode>', 'Audience mode: human (default) or ai')
   .option('--static-only', 'Run static analysis only (no AI cost)')
   .option('--no-cache', 'Discard cached results and run all rounds fresh')
+  .option('--stream', 'Show streaming token output during AI rounds')
   .option('-v, --verbose', 'Show detailed output')
   .action(runGenerate);
 

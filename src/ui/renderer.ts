@@ -20,6 +20,7 @@ import {
   renderCompletionSummary,
   renderDocLine,
   renderErrorSummary,
+  renderFileCoverage,
   renderRoundBlock,
 } from './components.js';
 import { formatDuration, SYMBOLS } from './formatters.js';
@@ -163,6 +164,7 @@ export class TerminalRenderer implements Renderer {
       state.costWarningThreshold,
       this.spinnerFrame,
       state.isLocal,
+      state.streamVisible,
     );
   }
 
@@ -202,6 +204,14 @@ export class TerminalRenderer implements Renderer {
     // Phase complete: stop overwriting
     this.prevLineCount = 0;
     this.append(['']); // blank line
+  }
+
+  onFileCoverage(state: DisplayState): void {
+    this.currentState = state;
+    if (state.fileCoverage) {
+      this.append([renderFileCoverage(state.fileCoverage)]);
+      this.append(['']); // blank line after file coverage
+    }
   }
 
   onRoundUpdate(state: DisplayState): void {

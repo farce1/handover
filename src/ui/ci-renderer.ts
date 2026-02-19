@@ -57,6 +57,15 @@ export class CIRenderer implements Renderer {
     console.log(`${this.timestamp()} [static] ${doneCount}/${total} analyzers complete`);
   }
 
+  onFileCoverage(state: DisplayState): void {
+    if (state.fileCoverage) {
+      const { total, analyzing, ignored } = state.fileCoverage;
+      console.log(
+        `${this.timestamp()} [files] ${total} files: ${analyzing} analyzing, ${ignored} ignored`,
+      );
+    }
+  }
+
   onRoundUpdate(state: DisplayState): void {
     // Only log on round completion (status === 'done', 'cached', or 'failed')
     for (const [, rd] of state.rounds) {

@@ -65,6 +65,12 @@ export interface DisplayState {
   errors: ErrorInfo[];
   /** Running total of tokens across all completed + current rounds (for "(X total)" display). */
   cumulativeTokens?: number;
+  /** File coverage breakdown from context packing, shown before AI rounds. */
+  fileCoverage?: { analyzing: number; ignored: number; total: number };
+  /** Whether streaming token output indicator is visible (opt-in via --stream flag). */
+  streamVisible?: boolean;
+  /** Milliseconds saved by parallel execution of rounds 5 and 6. */
+  parallelSavedMs?: number;
 }
 
 /**
@@ -77,6 +83,7 @@ export interface Renderer {
   onBanner(state: DisplayState): void;
   onAnalyzerUpdate(state: DisplayState): void;
   onAnalyzersDone(state: DisplayState): void;
+  onFileCoverage(state: DisplayState): void;
   onRoundUpdate(state: DisplayState): void;
   onRoundsDone(state: DisplayState): void;
   onDocRendered(state: DisplayState): void;

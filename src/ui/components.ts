@@ -95,6 +95,24 @@ export function computeCumulativeTokens(rounds: Map<number, RoundDisplayState>):
 }
 
 /**
+ * Render the file coverage line shown before AI rounds begin.
+ *
+ * Format: `◆ 142 files · 104 analyzing · 10 ignored`
+ */
+export function renderFileCoverage(coverage: {
+  analyzing: number;
+  ignored: number;
+  total: number;
+}): string {
+  const sep = pc.dim(' \u00B7 ');
+  const bullet = pc.dim('\u25C6'); // ◆
+  const totalStr = `${coverage.total} files`;
+  const analyzingStr = `${pc.cyan(String(coverage.analyzing))} analyzing`;
+  const ignoredStr = `${pc.dim(String(coverage.ignored))} ignored`;
+  return `${bullet} ${totalStr}${sep}${analyzingStr}${sep}${ignoredStr}`;
+}
+
+/**
  * Render the AI rounds block.
  *
  * Stacked lines per active/complete round:
@@ -111,6 +129,7 @@ export function renderRoundBlock(
   costWarningThreshold: number,
   spinnerFrame?: number,
   isLocal?: boolean,
+  streamVisible?: boolean,
 ): string[] {
   const lines: string[] = [];
   const sep = pc.dim(' \u00B7 ');
@@ -168,6 +187,10 @@ export function renderRoundBlock(
           lines.push(
             `  ${pc.magenta(frame)} ${roundLabel}/${totalRounds} ${pc.dim('\u00B7')} ${tokenCount} tokens ${pc.dim(`(${totalCount} total)`)} ${pc.dim('\u00B7')} ${pc.dim(`${elapsedSec}s`)}`,
           );
+          // Streaming indicator: shown when --stream flag is active
+          if (streamVisible) {
+            lines.push(pc.dim('  streaming...'));
+          }
         }
         break;
       }
