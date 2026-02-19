@@ -70,11 +70,12 @@ Plans:
 3. Running `handover generate --only unknown-doc` fails with an unknown-alias error before prompting for API key
 4. `vitest run` reports passing tests for `scoreFiles()`, `computeTokenBudget()`, `estimateTokens()`, `resolveSelectedDocs()`, `computeRequiredRounds()`, `HandoverConfigSchema`, and `createStep()`
 5. `HandoverConfigSchema.safeParse({})` returns expected defaults without throwing
-   **Plans**: TBD
+
+**Plans:** 3 plans in 2 waves
 
 Plans:
 
-- [ ] 09-01: Extract scoring constants, audit silent catches, reorder --only validation
+- [ ] 09-01: Extract scoring constants, add logger.debug(), audit silent catches, reorder --only validation
 - [ ] 09-02: Write scorer and token-counter tests (table-driven with test.each)
 - [ ] 09-03: Write config schema, registry, and DAG step definition tests
 
