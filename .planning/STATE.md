@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v3.0 Robustness — Phase 8 complete, ready for Phase 9
+**Current focus:** v3.0 Robustness — Phase 9 in progress (Plan 1 complete)
 
 ## Current Position
 
-Phase: 8 of 11 (CI Fix and Test Infrastructure — COMPLETE)
-Plan: 3 of 3 (Phase 8 complete — all plans done)
+Phase: 9 of 11 (Code Hardening and Pure Function Tests — In Progress)
+Plan: 2 of N (Phase 9 Plan 01 complete — scoring constants, logger.debug, catch audit)
 Status: In progress
-Last activity: 2026-02-19 — Phase 8 Plan 03 complete (memfs + vitest-mock-extended installed, coverage exclusions configured, createMockProvider() factory created)
+Last activity: 2026-02-19 — Phase 9 Plan 01 complete (11 SCORE\_\* constants extracted, logger.debug() added, catch blocks audited across 5 analyzers, CLI validation reordered)
 
-Progress: [██████████░░░░░░░░░░] 55% (10/18 plans complete across all milestones)
+Progress: [██████████░░░░░░░░░░] 58% (11/18 plans complete across all milestones)
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Progress: [██████████░░░░░░░░░░] 55% (10
 | Phase 08-ci-fix P01              | 9 min    | 2 tasks | 9 files  |
 | Phase 08-scorecard-hardening P02 | 7 min    | 2 tasks | 6 files  |
 | Phase 08-test-infrastructure P03 | 2 min    | 2 tasks | 4 files  |
+| Phase 09-code-hardening P01      | 3 min    | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,10 @@ All v1.0 and v2.0 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 08-03]: vi.fn() must be cast via `as unknown as TypedFn` to satisfy generic interface signatures (complete<T> cannot be directly assigned from Mock<Procedure>)
 - [Phase 08-03]: createMockProvider() complete() default return includes model and duration fields to satisfy CompletionResult schema (not just data + usage)
 - [Phase 08-03]: Coverage thresholds omitted from vitest.config.ts — Phase 11 enforces 80% after real test suite exists
+- [Phase 09-01]: SCORE\_\* constants exported (not private) so unit tests can import them without special access
+- [Phase 09-01]: logger.debug() in recoverable catch blocks — verbose-only, not shown in normal output
+- [Phase 09-01]: resolveSelectedDocs() moved before validateProviderConfig() in generate.ts — pure function, no env/API deps (HARD-03)
+- [Phase 09-01]: Stale plan 02-02 pending comments in parsing/index.ts replaced with accurate rationale about unsupported file type handling
 
 ### Pending Todos
 
@@ -91,5 +96,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 08-03-PLAN.md (memfs + vitest-mock-extended installed, coverage exclusions, createMockProvider() factory)
-Resume file: .planning/phases/09-scorecard-tests/09-01-PLAN.md (Phase 9 — Scorecard unit tests)
+Stopped at: Completed 09-01-PLAN.md (SCORE\_\* constants, logger.debug(), catch block audit, CLI validation reorder)
+Resume file: .planning/phases/09-code-hardening-and-pure-function-tests/09-02-PLAN.md (Phase 9 Plan 02 — pure function tests for scorer.ts)
