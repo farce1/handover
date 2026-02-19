@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v3.0 Robustness — Phase 10 in progress (Plan 2 complete)
+**Current focus:** v3.0 Robustness — Phase 10 in progress (Plans 01 and 02 complete)
 
 ## Current Position
 
 Phase: 10 of 11 (Algorithm and Validation Tests — In Progress)
-Plan: 2 of N (Phase 10 Plan 02 complete — DAGOrchestrator and TokenUsageTracker unit tests)
+Plan: 3 of N (Phase 10 Plans 01+02 complete — packer/provider/DAG/TokenUsageTracker unit tests)
 Status: In progress
-Last activity: 2026-02-19 — Phase 10 Plan 02 complete (45 unit tests: 21 DAGOrchestrator + 24 TokenUsageTracker)
+Last activity: 2026-02-20 — Phase 10 Plan 01 complete (33 unit tests: 25 packFiles/generateSignatureSummary + 8 validateProviderConfig)
 
-Progress: [███████████░░░░░░░░░] 61% (13/18 plans complete across all milestones)
+Progress: [████████████░░░░░░░░] 64% (14/18 plans complete across all milestones)
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Progress: [███████████░░░░░░░░░] 61% (13
 | Phase 09-code-hardening P01      | 3 min    | 2 tasks | 10 files |
 | Phase 09-pure-function-tests P02 | 3 min    | 2 tasks | 3 files  |
 | Phase 09-pure-function-tests P03 | 5 min    | 2 tasks | 3 files  |
+| Phase 10-algorithm-tests P01     | 6 min    | 2 tasks | 2 files  |
 | Phase 10-algorithm-tests P02     | 3 min    | 2 tasks | 2 files  |
 
 ## Accumulated Context
@@ -83,6 +84,9 @@ All v1.0 and v2.0 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 09-02]: SCORE_TEST_PENALTY used in assertion via Math.max(SCORE_MIN, 0 - SCORE_TEST_PENALTY) to satisfy no-unused-vars
 - [Phase 09]: computeRequiredRounds expansion is one-level (ROUND_DEPS pre-expresses transitive deps)
 - [Phase 09]: HandoverError.fix field contains 'Valid aliases' text - tested via caught error inspection
+- [Phase 10-01]: Force greedy packing path by making total content exceed budget; fast-path bypasses skip/signatures tier logic
+- [Phase 10-01]: File read failure only visible in greedy path — fast-path produces tier='full' with empty content via contentMap.get() ?? ''
+- [Phase 10-01]: Oversized full-tier test uses pad file to push total > budget while retaining budget for sig+sections
 - [Phase 10-02]: New DAGOrchestrator instance per test — stateful steps Map would pollute tests if reused
 - [Phase 10-02]: Diamond/fan-out parallel ordering not asserted — JS Promise resolution is non-deterministic
 - [Phase 10-02]: Large budgetTokens in cost tests suppress logger.warn stdout noise (acceptable)
@@ -106,6 +110,6 @@ External setup still required from v1.0:
 
 ## Session Continuity
 
-Last session: 2026-02-19
-Stopped at: Completed 10-02-PLAN.md (DAGOrchestrator + TokenUsageTracker unit tests — 45 tests, 131 total)
+Last session: 2026-02-20
+Stopped at: Completed 10-01-PLAN.md (packFiles, generateSignatureSummary, validateProviderConfig unit tests — 33 tests, 164 total)
 Resume file: .planning/phases/10-algorithm-and-validation-tests/ (next plan in Phase 10)
