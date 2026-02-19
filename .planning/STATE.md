@@ -5,14 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v3.0 Robustness — defining requirements
+**Current focus:** v3.0 Robustness — Phase 8: CI Fix and Test Infrastructure
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-19 — Milestone v3.0 started
+Phase: 8 of 11 (CI Fix and Test Infrastructure)
+Plan: — (ready to plan)
+Status: Ready to plan
+Last activity: 2026-02-19 — Roadmap created for v3.0 Robustness milestone
+
+Progress: [████████░░░░░░░░░░░░] 39% (7/18 plans complete across all milestones)
 
 ## Performance Metrics
 
@@ -49,11 +51,22 @@ Last activity: 2026-02-19 — Milestone v3.0 started
 
 All v1.0 and v2.0 decisions archived in PROJECT.md Key Decisions table.
 
+**v3.0 decisions:**
+
+- Mock at `LLMProvider` interface boundary — not at Anthropic/OpenAI SDK level. MSW/nock cannot intercept undici transport. (research SUMMARY.md)
+- Use `memfs` (not `mock-fs`) — mock-fs is unmaintained, breaks WASM loading. (research SUMMARY.md)
+- Tests colocated with source files (`src/**/*.test.ts`) — not in separate `tests/unit/` directory. (research SUMMARY.md)
+- Cover the 80% threshold only after Phase 11 has a real test suite — enforcing it in Phase 8 would fail every CI run. (research SUMMARY.md)
+
 ### Pending Todos
 
 None.
 
 ### Blockers/Concerns
+
+**Phase 8 flag:** Before finalizing `makeAnthropicToolResponse()` and `makeOpenAIToolResponse()` mock factories, read `src/providers/anthropic.ts` and `src/providers/openai-compat.ts` to verify which response fields are actually consumed. Mock shape must match actual consumption, not just the SDK type definition.
+
+**Phase 10 flag:** Confirm during execution whether `loadConfig()` uses `node:fs` or `node:fs/promises` for existence checks — determines correct `vi.spyOn` target.
 
 External setup still required from v1.0:
 
@@ -65,5 +78,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: v3.0 Robustness — defining requirements
-Resume file: .planning/PROJECT.md
+Stopped at: v3.0 Robustness roadmap created — ready to plan Phase 8
+Resume file: .planning/ROADMAP.md

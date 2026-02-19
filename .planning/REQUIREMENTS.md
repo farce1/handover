@@ -20,6 +20,15 @@ Requirements for robustness milestone. Each maps to roadmap phases.
 - [ ] **TINF-03**: Mock LLM provider factory created (`createMockProvider()` using `vi.fn()`)
 - [ ] **TINF-04**: `vi.hoisted()` pattern established as project test convention
 
+### OpenSSF Scorecard
+
+- [ ] **SCRD-01**: All 4 workflow files have `permissions: read-all` at top level with write permissions scoped to job level
+- [ ] **SCRD-02**: All 16 GitHub Action references pinned to SHA hashes (not mutable tags)
+- [ ] **SCRD-03**: Branch protection enabled on main with required reviews, dismiss stale reviews, code owner review
+- [ ] **SCRD-04**: CODEOWNERS file created at `.github/CODEOWNERS`
+- [ ] **SCRD-05**: Dependabot vulnerability alerts enabled and known CVE (`GHSA-2g4f-4pwh-qvx6`) resolved
+- [ ] **SCRD-06**: Private vulnerability reporting enabled on GitHub
+
 ### Code Hardening
 
 - [ ] **HARD-01**: Scoring weights extracted to named constants with `as const` in `scorer.ts`
@@ -77,6 +86,8 @@ Requirements for robustness milestone. Each maps to roadmap phases.
 | Testing `--help` CLI output          | Commander generates deterministically; zero bug prevention                        |
 | MSW/nock for HTTP interception       | Anthropic/OpenAI SDKs use undici which bypasses MSW's interception layer          |
 | mock-fs package                      | Unmaintained, breaks WASM loading; use memfs instead                              |
+| OSS-Fuzz / ClusterFuzzLite           | High effort for JS/TS projects with limited applicability; skip for now           |
+| CII Best Practices badge             | Requires manual questionnaire; defer to future milestone                          |
 
 ## Traceability
 
@@ -85,6 +96,12 @@ Requirements for robustness milestone. Each maps to roadmap phases.
 | CIDP-01     | Phase 8  | Pending |
 | CIDP-02     | Phase 8  | Pending |
 | CIDP-03     | Phase 8  | Pending |
+| SCRD-01     | Phase 8  | Pending |
+| SCRD-02     | Phase 8  | Pending |
+| SCRD-03     | Phase 8  | Pending |
+| SCRD-04     | Phase 8  | Pending |
+| SCRD-05     | Phase 8  | Pending |
+| SCRD-06     | Phase 8  | Pending |
 | TINF-01     | Phase 8  | Pending |
 | TINF-02     | Phase 8  | Pending |
 | TINF-03     | Phase 8  | Pending |
@@ -111,8 +128,8 @@ Requirements for robustness milestone. Each maps to roadmap phases.
 
 **Coverage:**
 
-- v3.0 requirements: 22 total
-- Mapped to phases: 22
+- v3.0 requirements: 28 total
+- Mapped to phases: 28
 - Unmapped: 0 ✓
 
 ---

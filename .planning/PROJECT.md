@@ -59,6 +59,7 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - Error handling cleanup (document intentional catches, protect grammar downloader)
 - Extract hardcoded values (model pricing, scoring weights, batch sizes) to config
 - Tighten 0.x dependency version constraints
+- OpenSSF Scorecard hardening: pin actions to SHA, workflow permissions, branch protection, CODEOWNERS
 
 ### Out of Scope
 
