@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 OSS Excellence** — Phases 1-3 (shipped 2026-02-18)
-- 🚧 **v2.0 Performance** — Phases 4-6 (in progress)
+- 🚧 **v2.0 Performance** — Phases 4-7 (in progress)
 
 ## Phases
 
@@ -20,9 +20,10 @@
 
 **Milestone Goal:** Full performance overhaul — make handover fast, responsive, and cost-efficient at any repo size. Measurable targets: 2-5x faster re-runs, 50%+ fewer tokens on incremental runs.
 
-- [ ] **Phase 4: Cache Correctness** - Fix fingerprint and cascade invalidation so fast re-runs produce correct, non-stale documentation
-- [ ] **Phase 5: UX Responsiveness** - Stream token output and show live progress so LLM waits feel interactive, not frozen
-- [ ] **Phase 6: Context Efficiency** - Reduce tokens sent on incremental runs, add Anthropic prompt caching, and replace the chars/4 heuristic with accurate counting
+- [x] **Phase 4: Cache Correctness** - Fix fingerprint and cascade invalidation so fast re-runs produce correct, non-stale documentation
+- [x] **Phase 5: UX Responsiveness** - Stream token output and show live progress so LLM waits feel interactive, not frozen
+- [x] **Phase 6: Context Efficiency** - Reduce tokens sent on incremental runs, add Anthropic prompt caching, and replace the chars/4 heuristic with accurate counting
+- [ ] **Phase 7: Cache Savings Pipeline Fix** - Forward cache token fields through runner to tracker, fix dead code and display bugs from milestone audit
 
 ## Phase Details
 
@@ -84,16 +85,34 @@ Plans:
 - [ ] 06-02-PLAN.md — Anthropic prompt caching and BPE tokenization: cache_control on system prompt, Usage schema cache fields, gpt-tokenizer for OpenAI providers
 - [ ] 06-03-PLAN.md — Token summary, parallel rendering, savings display: per-round breakdown with savings, Promise.allSettled render phase, render timing
 
+### Phase 7: Cache Savings Pipeline Fix
+
+**Goal**: Cache token savings data flows end-to-end from Anthropic API response through runner.ts to tracker to display — users see per-round savings for prompt cache hits, dead code removed, display bugs fixed
+**Depends on**: Phase 6
+**Requirements**: EFF-02 (complete), EFF-03 (fix)
+**Gap Closure**: Closes gaps from v2.0 milestone audit
+**Success Criteria** (what must be TRUE):
+
+1. `runner.ts` forwards `cacheReadTokens` and `cacheCreationTokens` from `CompletionResult.usage` to `tracker.recordRound()`
+2. `round-5-edge-cases.ts` forwards the same cache fields for Round 5's fan-out usage recording
+3. `tracker.getRoundCacheSavings()` returns non-null savings data when Anthropic cache hits occur
+4. Per-round savings lines render in terminal output on Anthropic runs with cache hits
+5. Dead code removed: `renderRenderProgress()`, `DisplayState.cumulativeTokens`
+6. `CIRenderer.onRenderStart` logs correct document count
+
+**Plans**: 1 plan
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 → 5 → 6
+Phases execute in numeric order: 4 → 5 → 6 → 7
 
 | Phase                         | Milestone | Plans Complete | Status      | Completed  |
 | ----------------------------- | --------- | -------------- | ----------- | ---------- |
 | 1. Community Health           | v1.0      | 2/2            | Complete    | 2026-02-18 |
 | 2. CI/CD Automation           | v1.0      | 4/4            | Complete    | 2026-02-18 |
 | 3. Docs and LLM Accessibility | v1.0      | 3/3            | Complete    | 2026-02-18 |
-| 4. Cache Correctness          | v2.0      | 0/2            | Not started | -          |
-| 5. UX Responsiveness          | v2.0      | 0/2            | Not started | -          |
-| 6. Context Efficiency         | v2.0      | 0/3            | Not started | -          |
+| 4. Cache Correctness          | v2.0      | 2/2            | Complete    | 2026-02-18 |
+| 5. UX Responsiveness          | v2.0      | 2/2            | Complete    | 2026-02-19 |
+| 6. Context Efficiency         | v2.0      | 3/3            | Complete    | 2026-02-19 |
+| 7. Cache Savings Pipeline Fix | v2.0      | 0/1            | Not started | -          |

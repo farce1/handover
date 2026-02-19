@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v2.0 Performance — Phase 6: Context Efficiency (in progress)
+**Current focus:** v2.0 Performance — Phase 7: Cache Savings Pipeline Fix (gap closure)
 
 ## Current Position
 
-Phase: 6 of 6 (Context Efficiency) — COMPLETE
-Plan: 3 of 3 in current phase (plan 03 complete)
-Status: Phase 6 complete — incremental packing, prompt caching + BPE tokenization, per-round savings display and parallel rendering
-Last activity: 2026-02-19 — 06-03 UX display complete (Phase 6 done)
+Phase: 7 of 7 (Cache Savings Pipeline Fix) — NOT STARTED
+Plan: 0 of 1 in current phase
+Status: Gap closure phase added after milestone audit found cache fields dropped in runner.ts
+Last activity: 2026-02-19 — Milestone audit identified EFF-03 broken, Phase 7 created
 
-Progress: [█████████░] 90% (9/10 plans complete across v2.0)
+Progress: [████████░░] 88% (7/8 plans complete across v2.0)
 
 ## Performance Metrics
 
@@ -93,5 +93,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 06-03-PLAN.md (per-round savings display, parallel rendering — Phase 6 complete)
-Resume file: .planning/phases/06-context-efficiency/06-03-SUMMARY.md
+Stopped at: Phase 7 created for gap closure — needs plan then execution
+Resume file: .planning/v2.0-MILESTONE-AUDIT.md
