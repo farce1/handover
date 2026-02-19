@@ -143,6 +143,8 @@ export const CompletionRequestSchema = z.object({
 export const UsageSchema = z.object({
   inputTokens: z.number().int().min(0),
   outputTokens: z.number().int().min(0),
+  cacheReadTokens: z.number().int().min(0).optional(),
+  cacheCreationTokens: z.number().int().min(0).optional(),
 });
 
 export const CompletionResultSchema = z.object({

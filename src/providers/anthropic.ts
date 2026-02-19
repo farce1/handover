@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { TextBlockParam } from '@anthropic-ai/sdk/resources/messages.js';
 import type { z } from 'zod';
 import type { CompletionRequest, CompletionResult } from '../domain/types.js';
 import { BaseProvider } from './base-provider.js';
@@ -29,10 +30,18 @@ export class AnthropicProvider extends BaseProvider {
 
     const inputSchema = zodToToolSchema(schema) as Anthropic.Tool.InputSchema;
 
+    const systemBlocks: TextBlockParam[] = [
+      {
+        type: 'text',
+        text: request.systemPrompt,
+        cache_control: { type: 'ephemeral' },
+      },
+    ];
+
     const params = {
       model: this.model,
       max_tokens: request.maxTokens ?? 4096,
-      system: request.systemPrompt,
+      system: systemBlocks,
       messages: [{ role: 'user' as const, content: request.userPrompt }],
       tools: [
         {
@@ -89,6 +98,8 @@ export class AnthropicProvider extends BaseProvider {
         usage: {
           inputTokens: message.usage.input_tokens,
           outputTokens: message.usage.output_tokens,
+          cacheReadTokens: message.usage.cache_read_input_tokens ?? undefined,
+          cacheCreationTokens: message.usage.cache_creation_input_tokens ?? undefined,
         },
         model: message.model,
         duration,
@@ -121,6 +132,8 @@ export class AnthropicProvider extends BaseProvider {
         usage: {
           inputTokens: response.usage.input_tokens,
           outputTokens: response.usage.output_tokens,
+          cacheReadTokens: response.usage.cache_read_input_tokens ?? undefined,
+          cacheCreationTokens: response.usage.cache_creation_input_tokens ?? undefined,
         },
         model: response.model,
         duration,

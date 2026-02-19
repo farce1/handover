@@ -11,6 +11,9 @@ export class TokenUsageTracker {
   private rounds: TokenUsage[] = [];
   private readonly warnThreshold: number;
 
+  private static readonly CACHE_READ_MULTIPLIER = 0.1;
+  private static readonly CACHE_WRITE_MULTIPLIER = 1.25;
+
   private static readonly MODEL_COSTS: Record<
     string,
     { inputPerMillion: number; outputPerMillion: number }
@@ -124,14 +127,65 @@ export class TokenUsageTracker {
   /**
    * Estimate the dollar cost for a given number of input and output tokens
    * based on the configured model's pricing.
+   * Optionally accounts for cache read (0.1x) and cache creation (1.25x) pricing.
    */
-  estimateCost(inputTokens: number, outputTokens: number): number {
+  estimateCost(
+    inputTokens: number,
+    outputTokens: number,
+    cacheReadTokens?: number,
+    cacheCreationTokens?: number,
+  ): number {
     const costs =
       TokenUsageTracker.MODEL_COSTS[this.model] ?? TokenUsageTracker.MODEL_COSTS['default'];
-    return (
+    let total =
       (inputTokens / 1_000_000) * costs.inputPerMillion +
-      (outputTokens / 1_000_000) * costs.outputPerMillion
-    );
+      (outputTokens / 1_000_000) * costs.outputPerMillion;
+
+    if (cacheReadTokens) {
+      total +=
+        (cacheReadTokens / 1_000_000) *
+        costs.inputPerMillion *
+        TokenUsageTracker.CACHE_READ_MULTIPLIER;
+    }
+    if (cacheCreationTokens) {
+      total +=
+        (cacheCreationTokens / 1_000_000) *
+        costs.inputPerMillion *
+        TokenUsageTracker.CACHE_WRITE_MULTIPLIER;
+    }
+
+    return total;
+  }
+
+  /**
+   * Compute cache savings for a specific round.
+   * Returns null if no cache data for this round.
+   */
+  getRoundCacheSavings(roundNumber: number): {
+    tokensSaved: number;
+    dollarsSaved: number;
+    percentSaved: number;
+  } | null {
+    const usage = this.rounds.find((r) => r.round === roundNumber);
+    if (!usage?.cacheReadTokens) return null;
+
+    const costs =
+      TokenUsageTracker.MODEL_COSTS[this.model] ?? TokenUsageTracker.MODEL_COSTS['default'];
+    const cacheRead = usage.cacheReadTokens;
+
+    // Tokens saved = cache reads (those weren't re-processed at full cost)
+    const tokensSaved = cacheRead;
+
+    // Dollar savings = cacheRead * (fullRate - cacheReadRate) / 1M
+    const fullCostPerToken = costs.inputPerMillion / 1_000_000;
+    const cacheReadCostPerToken = fullCostPerToken * TokenUsageTracker.CACHE_READ_MULTIPLIER;
+    const dollarsSaved = cacheRead * (fullCostPerToken - cacheReadCostPerToken);
+
+    // Percentage saved relative to total input (input + cacheRead + cacheCreation)
+    const totalInput = usage.inputTokens + cacheRead + (usage.cacheCreationTokens ?? 0);
+    const percentSaved = totalInput > 0 ? tokensSaved / totalInput : 0;
+
+    return { tokensSaved, dollarsSaved, percentSaved };
   }
 
   /**
@@ -141,7 +195,12 @@ export class TokenUsageTracker {
   getRoundCost(roundNumber: number): number {
     const usage = this.rounds.find((r) => r.round === roundNumber);
     if (!usage) return 0;
-    return this.estimateCost(usage.inputTokens, usage.outputTokens);
+    return this.estimateCost(
+      usage.inputTokens,
+      usage.outputTokens,
+      usage.cacheReadTokens,
+      usage.cacheCreationTokens,
+    );
   }
 
   /**
@@ -150,7 +209,12 @@ export class TokenUsageTracker {
   getTotalCost(): number {
     let total = 0;
     for (const r of this.rounds) {
-      total += this.estimateCost(r.inputTokens, r.outputTokens);
+      total += this.estimateCost(
+        r.inputTokens,
+        r.outputTokens,
+        r.cacheReadTokens,
+        r.cacheCreationTokens,
+      );
     }
     return total;
   }

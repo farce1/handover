@@ -92,6 +92,8 @@ export const TokenUsageSchema = z.object({
   contextTokens: z.number(),
   fileContentTokens: z.number(),
   budgetTokens: z.number(),
+  cacheReadTokens: z.number().optional(),
+  cacheCreationTokens: z.number().optional(),
 });
 
 export type TokenUsage = z.infer<typeof TokenUsageSchema>;
