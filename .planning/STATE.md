@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v3.0 Robustness — Phase 8: CI Fix and Test Infrastructure
+**Current focus:** v3.0 Robustness — Phase 8 complete, ready for Phase 9
 
 ## Current Position
 
-Phase: 8 of 11 (CI Fix and Test Infrastructure)
-Plan: 3 of 3 (ready for 08-03-test-infrastructure)
+Phase: 8 of 11 (CI Fix and Test Infrastructure — COMPLETE)
+Plan: 3 of 3 (Phase 8 complete — all plans done)
 Status: In progress
-Last activity: 2026-02-19 — Phase 8 Plan 02 complete (Scorecard hardened, branch protection enabled)
+Last activity: 2026-02-19 — Phase 8 Plan 03 complete (memfs + vitest-mock-extended installed, coverage exclusions configured, createMockProvider() factory created)
 
-Progress: [█████████░░░░░░░░░░░] 50% (9/18 plans complete across all milestones)
+Progress: [██████████░░░░░░░░░░] 55% (10/18 plans complete across all milestones)
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ Progress: [█████████░░░░░░░░░░░] 50% (9/
 | Phase 07-cache-savings-fix P01   | 3 min    | 2 tasks | 6 files  |
 | Phase 08-ci-fix P01              | 9 min    | 2 tasks | 9 files  |
 | Phase 08-scorecard-hardening P02 | 7 min    | 2 tasks | 6 files  |
+| Phase 08-test-infrastructure P03 | 2 min    | 2 tasks | 4 files  |
 
 ## Accumulated Context
 
@@ -66,6 +67,9 @@ All v1.0 and v2.0 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 08-02]: dependabot/fetch-metadata v2 tag = v2.5.0 SHA 21025c705c08248db411dc16f3619e6b5f9ea21a
 - [Phase 08-02]: Branch protection enforce_admins=false to prevent repo owner lockout
 - [Phase 08-02]: release-please publish job needs contents: read alongside id-token: write
+- [Phase 08-03]: vi.fn() must be cast via `as unknown as TypedFn` to satisfy generic interface signatures (complete<T> cannot be directly assigned from Mock<Procedure>)
+- [Phase 08-03]: createMockProvider() complete() default return includes model and duration fields to satisfy CompletionResult schema (not just data + usage)
+- [Phase 08-03]: Coverage thresholds omitted from vitest.config.ts — Phase 11 enforces 80% after real test suite exists
 
 ### Pending Todos
 
@@ -73,7 +77,7 @@ None.
 
 ### Blockers/Concerns
 
-**Phase 8 flag:** Before finalizing `makeAnthropicToolResponse()` and `makeOpenAIToolResponse()` mock factories, read `src/providers/anthropic.ts` and `src/providers/openai-compat.ts` to verify which response fields are actually consumed. Mock shape must match actual consumption, not just the SDK type definition.
+**Phase 8 flag (still open):** Before finalizing `makeAnthropicToolResponse()` and `makeOpenAIToolResponse()` mock factories, read `src/providers/anthropic.ts` and `src/providers/openai-compat.ts` to verify which response fields are actually consumed. Mock shape must match actual consumption, not just the SDK type definition.
 
 **Phase 10 flag:** Confirm during execution whether `loadConfig()` uses `node:fs` or `node:fs/promises` for existence checks — determines correct `vi.spyOn` target.
 
@@ -87,5 +91,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 08-02-PLAN.md (Scorecard hardened, SHA-pinned, branch protection enabled)
-Resume file: .planning/phases/08-ci-fix-scorecard-hardening-and-test-infrastructure/08-03-PLAN.md
+Stopped at: Completed 08-03-PLAN.md (memfs + vitest-mock-extended installed, coverage exclusions, createMockProvider() factory)
+Resume file: .planning/phases/09-scorecard-tests/09-01-PLAN.md (Phase 9 — Scorecard unit tests)
