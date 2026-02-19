@@ -208,6 +208,7 @@ export async function packFiles(
   budget: TokenBudget,
   estimateTokensFn: (text: string) => number,
   getFileContent: (path: string) => Promise<string>,
+  changedFiles?: Set<string>,
 ): Promise<PackedContext> {
   // ── Empty input guard ──────────────────────────────────────────────────
   if (scored.length === 0) {
@@ -311,6 +312,23 @@ export async function packFiles(
 
     const fullTokens = estimateTokensFn(content);
     const parsed = astMap.get(entry.path);
+
+    // ── Changed-file priority: force full tier for changed files (budget-enforced) ──
+    if (changedFiles && changedFiles.size > 0 && changedFiles.has(entry.path)) {
+      if (fullTokens <= remaining) {
+        packedFiles.push({
+          path: entry.path,
+          tier: 'full',
+          content,
+          tokens: fullTokens,
+          score: entry.score,
+        });
+        remaining -= fullTokens;
+        continue;
+      }
+      // Changed file exceeds remaining budget — fall through to normal tier logic
+      // so it can still get signatures instead of being skipped entirely
+    }
 
     // ── Oversized check (CTX-03) ──────────────────────────────────────
     if (fullTokens > OVERSIZED_THRESHOLD_TOKENS && entry.score >= 30 && parsed) {

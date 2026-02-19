@@ -66,6 +66,23 @@ export class AnalysisCache {
   }
 
   /**
+   * Return the set of file paths that have changed (or are new) since the last cache save.
+   * Compares current content hashes against cached hashes.
+   *
+   * @param currentHashes - Map of relative file paths to their current SHA-256 content hashes
+   * @returns Set of file paths whose hash differs from the cache (or are absent from cache)
+   */
+  getChangedFiles(currentHashes: Map<string, string>): Set<string> {
+    const changed = new Set<string>();
+    for (const [path, currentHash] of currentHashes) {
+      if (!this.isUnchanged(path, currentHash)) {
+        changed.add(path);
+      }
+    }
+    return changed;
+  }
+
+  /**
    * Number of cached entries (for stats/diagnostics).
    */
   get size(): number {
