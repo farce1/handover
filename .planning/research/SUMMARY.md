@@ -1,286 +1,282 @@
 # Project Research Summary
 
-**Project:** handover-cli v2.0 — Performance Engineering Milestone
-**Domain:** CLI Performance — Caching, Parallelization, Streaming, Token Optimization, Startup Speed, Large Repo Scaling
-**Researched:** 2026-02-18
+**Project:** handover-cli v3.0 — Testing and Robustness Milestone
+**Domain:** Brownfield test-infrastructure addition to a TypeScript CLI with LLM integrations
+**Researched:** 2026-02-19
 **Confidence:** HIGH
 
 ## Executive Summary
 
-handover-cli is a working TypeScript CLI that runs 6 sequential LLM rounds to generate codebase documentation. The v2.0 milestone is a brownfield performance engineering effort, not a greenfield build. The tool already has substantive performance infrastructure — a disk-based round cache, a file-content-hash analysis cache, a DAG orchestrator that runs independent steps in parallel, a terminal renderer, and a deterministic context compressor. The research converges on a critical finding: the existing foundations are largely correct in design but have gaps in correctness that must be fixed before any new performance features are layered on top. The cache fingerprint uses file path and size, not content — a same-size file edit silently serves stale documentation. Round N's cache key does not include Round (N-1)'s output hash, so a re-run of Round 1 does not invalidate Rounds 2-6. These are correctness bugs, not enhancement gaps, and they must ship first.
+handover-cli is a mature, 99-file TypeScript CLI that orchestrates multi-round LLM analysis of codebases. The v3.0 milestone is a quality and robustness milestone — no user-visible features. The codebase has 0 unit tests against an already-configured 80% Vitest coverage threshold, 8+ silent catch blocks, hardcoded magic numbers in scoring and pricing logic, and missing early input validation for the `--only` flag. The research confirms this is a well-understood problem domain: adding retroactive unit tests to a mature TypeScript project with LLM SDK dependencies and a DAG orchestrator has documented patterns, documented pitfalls, and a clear dependency order.
 
-The recommended approach sequences work in three phases tied to user-visible goals: (1) cache correctness — fix the fingerprint and cascade invalidation so fast re-runs are reliable, not accidental; (2) UX responsiveness — stream token output and show live progress so the 30-90 second LLM wait feels interactive rather than like a hang; (3) context efficiency — reduce tokens sent on incremental runs by limiting context to only changed files, add Anthropic prompt caching, and upgrade SDK versions. The stack additions are minimal: three new npm packages (piscina for CPU-bound worker threads, gpt-tokenizer for accurate token counting, p-limit for I/O concurrency caps) plus SDK upgrades to @anthropic-ai/sdk and openai. All new additions are ESM-compatible and have verified versions.
+The recommended approach is a layered build-up: start with pure-function tests that need no mocking infrastructure, then stateful class tests, then environment-dependent tests, and finally mock-boundary tests for the LLM provider interface. Only two new dev dependencies are justified (`memfs` for in-memory filesystem mocking, `vitest-mock-extended` for type-safe interface mocks). All existing stack choices are correct and settled. The critical architectural decision is to mock at the `LLMProvider` interface boundary — not at the Anthropic or OpenAI SDK level — which protects tests from SDK churn while still exercising application logic.
 
-The dominant risk is correctness regression: streaming requires accumulating full JSON before Zod validation (partial JSON will throw), parallel static analysis must not share the WASM tree-sitter instance across concurrent calls, and cache key changes without cascade invalidation produce documentation that contradicts itself. The pitfalls research documents ten specific failure modes with warning signs and recovery strategies. The architecture research is explicit: do not change DAGOrchestrator for parallelism (it already handles parallel steps correctly via Promise.race — fix the dep declarations instead), do not create a client-side prompt cache manager (Anthropic's API manages this automatically), and never write streaming tokens directly to stdout outside the TerminalRenderer abstraction.
+The primary risks are infrastructure mistakes made before any tests are written: incorrect ESM import extensions breaking CI, wrong LLM mock response shapes producing false-passing tests, and WASM-dependent parser files dragging coverage below threshold. All three are preventable in a single infrastructure setup phase that must come before any test files are authored. Once that foundation is correct, the test-writing phases follow well-established patterns documented in official Vitest sources with no novel research required.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-The production stack (TypeScript, Commander.js, Vitest, tsup, web-tree-sitter, Zod, fast-glob, simple-git, @anthropic-ai/sdk, openai) is unchanged. Performance work adds three new packages and upgrades two existing SDKs. No database, no streaming middleware, no in-memory cache layer — the disk JSON caches already in place are the correct model for a CLI that runs once and exits.
+The existing test runner (Vitest 3.x with V8 coverage at 80% thresholds) and all production dependencies are correct and unchanged. Only two new dev dependencies are justified:
 
 **Core technologies:**
 
-- `piscina@5.1.4`: Worker thread pool for CPU-bound AST parsing — most-downloaded worker pool (6.7M weekly), ESM-native, authored by Node.js core contributors; use only when file count exceeds ~200 (avoids thread setup overhead on small repos)
-- `gpt-tokenizer@3.4.0`: Accurate BPE token counting for OpenAI-family models — pure JS (no WASM), identical counts to Python tiktoken, zero native dependencies; replaces chars/4 heuristic that has 15-25% error rate
-- `p-limit@7.3.0`: Concurrency cap for I/O-bound file reads — prevents EMFILE errors on repos with 10k+ files; also controls fast-glob streaming fan-out
-- `@anthropic-ai/sdk` upgrade `0.39.0` → `0.76.0`: Unlocks streaming API, prompt caching (`cache_control` blocks), and `countTokens()` endpoint — verify breaking changes against `src/providers/anthropic.ts` before bumping
-- `openai` upgrade `5.23.2` → `6.22.0`: v6 has breaking changes in stream handling — verify against `src/providers/openai-compat.ts` before bumping
-- `NODE_COMPILE_CACHE` (Node.js 22.1+ built-in): Persists V8 bytecode across runs; reduces startup from ~130ms to ~80ms; no new dependency — document as opt-in for Node 22+ users
-- Dynamic `import()` for `ParserService`: Defers WASM loader until generate command path; eliminates WASM startup cost for `--help`, `estimate`, and other non-generate commands
+- `memfs@4.56.10` — in-memory filesystem mock — explicitly recommended by Vitest official docs; `vol.reset()` provides per-test isolation; actively maintained (last release Jan 2026); replaces unmaintained `mock-fs`
+- `vitest-mock-extended@3.1.0` — type-safe interface mocks — generates full mocks satisfying TypeScript interface contracts; required for the `LLMProvider` interface with 3 typed methods; compatible with Vitest ≥ 3.0.0
+- `vi.useFakeTimers()` (Vitest built-in) — timer control — needed for `retryWithBackoff` (30s base delay) without 30-second test waits; `advanceTimersByTimeAsync` variant required for Promise-safe advancement
+- `vi.hoisted()` (Vitest built-in) — mock factory scoping — required pattern for any variable referenced inside `vi.mock()` factory functions in ESM projects
+- `npx npm-check-updates` (on-demand workflow tool, not a project dependency) — dependency audit — run once before milestone to surface stale packages
 
-**What NOT to use:**
+**Critical anti-stack finding:** MSW and nock cannot intercept `@anthropic-ai/sdk` or `openai` HTTP traffic. Both SDKs use `undici` as their HTTP transport, which bypasses the `node:http`/`node:https` layer that MSW and nock intercept. Do not add MSW. Mock at the `LLMProvider` module boundary using `vi.mock()` instead.
 
-- `lru-cache` / `node-cache` / `keyv` — in-memory; cache lost on every CLI invocation; wrong model for a CLI
-- `better-sqlite3` — 8 MB native binary; overkill for hash-indexed JSON files already handled by stdlib
-- `@dqbd/tiktoken` / `tiktoken` npm (WASM) — 50-100ms cold start; pure JS gpt-tokenizer is accurate enough for pre-flight estimation
-- `workerpool` / `threads.js` — less maintained, fewer downloads; piscina is the ecosystem standard
-- `v8-compile-cache` npm package — CommonJS only; handover is ESM
+**Installation:** `npm install -D memfs vitest-mock-extended`
+
+See `.planning/research/STACK.md` for full integration patterns, `vi.hoisted()` examples, and version compatibility matrix.
 
 ### Expected Features
 
-Features research audited the existing codebase and separated what is already built from what needs building. The existing infrastructure is substantive — what's missing is correctness in caching and responsiveness in UX.
+This milestone adds no user-visible features. All work is internal quality infrastructure targeting the four identified gaps: 0 unit tests, 8+ silent catch blocks, hardcoded magic numbers, and missing early `--only` validation.
 
-**Must have — table stakes (P1 — cache correctness phase):**
+**Must have (table stakes — establishes minimum regression protection):**
 
-- Content-hash-based cache invalidation — replace size-only fingerprint in `RoundCache.computeAnalysisFingerprint()` with SHA-256 or mtime+size; makes fast re-runs reliable rather than accidental
-- Round-level incremental invalidation — per-round cache keys that cascade from prior round output hashes; delivers 50%+ token reduction on incremental runs; prerequisite: content-hash fingerprint
-- Cache hit/miss summary in completion — "X/6 rounds from cache"; makes the efficiency gain visible to users; low complexity
+- Mock LLM provider factory (`tests/helpers/mock-provider.ts`) — foundation for all round tests; implements `LLMProvider` interface using `vi.fn()`; shared across all test files to prevent mock definition duplication
+- Unit tests for `scoreFiles()` — deterministic algorithm with 6 weighted factors; highest-churn logic; table-driven with `test.each()`; no mocking needed
+- Unit tests for `computeTokenBudget()` and `estimateTokens()` — pure math used for billing accuracy; zero setup required
+- Unit tests for `resolveSelectedDocs()` and `computeRequiredRounds()` — CLI input path with documented throw; covers unknown alias, group expansion, INDEX-always behavior, transitive round dependency expansion
+- Named constants for scoring weights — prerequisite for scorer tests; extract 6 inline magic numbers to named exports with `as const`; no behavior change
+- Empty catch block audit — 8+ silent catches in `git-history.ts`, `env-scanner.ts`, `doc-analyzer.ts`, `round-cache.ts`; each needs either a comment explaining the intentional swallow or a `logger.debug()` call
 
-**Should have — differentiators (P2 — UX responsiveness phase):**
+**Should have (differentiators — algorithmic correctness coverage):**
 
-- Live token counter + elapsed time within round block — eliminates "is it hung?" anxiety; uses existing TerminalRenderer infra without streaming API changes
-- Streaming token output during LLM rounds — transforms perceived responsiveness for first runs; requires provider interface extension (`completeStream()`, `supportsStreaming()`) and TerminalRenderer `onRoundToken()` callback
-- Large repo file sampling coverage indicator — surfaces how many files were analyzed vs. skipped; addresses silent truncation in `packFiles()`
+- Unit tests for `packFiles()` context packing — complex 6-tier greedy algorithm with budget boundary conditions; mock `getFileContent` via `vi.fn()` (already an injected callback)
+- Unit tests for `validateProviderConfig()` — 5 explicit throw paths; `vi.stubEnv()` for env var isolation; assert `ProviderError.code` values
+- `--only` flag validation moved earlier in `generate.ts` — reorder 3 lines so `resolveSelectedDocs()` call runs before `validateProviderConfig()`; no new logic; improves error UX
+- Unit tests for `generateSignatureSummary()` — pure AST-to-text transformation; fixture-based; asserts output string format
 
-**Nice to have (P3 — context efficiency phase):**
+**Defer (P3 — orchestration layer, adds depth not breadth):**
 
-- Changed-files-only context packing — reduce tokens sent on incremental runs to only changed files' full content; requires `AnalysisCache.getChangedFiles()` API and `packFiles()` parameter extension
-- Anthropic prompt caching — `cache_control: { type: 'ephemeral' }` on static context block; 70-80% token cost reduction on rounds 2-6 for Anthropic users; requires SDK upgrade
-- Token usage summary with cache savings — concrete reporting: "Used 12,400 tokens (47% savings vs full re-run)"
-- Parallel document rendering — replace `for...of` with `Promise.all` in render phase; small but clean elimination of last sequential bottleneck
-- Accurate token counting via `gpt-tokenizer` — replaces chars/4 heuristic for OpenAI-family providers
+- Unit tests for `DAGOrchestrator` — mock steps as `vi.fn()`; assert ordering, cycle detection, skip propagation
+- Unit tests for `compressRoundOutput()` — inter-round context compressor; fixture round outputs; token budget enforcement
+- Error factory method tests for all defined `HandoverError` and `ProviderError` codes
 
-**Defer permanently (anti-features):**
+**Anti-features explicitly rejected:**
 
-- Multi-threaded analyzer execution — analyzers already run concurrently via `Promise.allSettled`; they are I/O-bound, not CPU-bound; threading adds overhead without benefit
-- Persistent background daemon — disk cache already provides fast re-runs; daemon adds battery drain, race conditions, IPC complexity
-- Streaming output to markdown files — rendering requires complete, Zod-validated JSON before markdown can be produced; streaming to files creates partial documents
-- Provider-level request batching — rounds are sequentially dependent by design; batching would require restructuring the round architecture
+- Real LLM API calls in tests — cost money on every CI run, are flaky, test API reliability not application logic
+- Snapshot testing for markdown renderer output — breaks on every intentional content change; trains developers to blindly update snapshots
+- 100% code coverage mandate — chasing 100% on 99 files produces quantity over quality; existing 80% threshold is correct
+- Testing `--help` CLI output — Commander generates it deterministically; testing adds maintenance with zero bug prevention
+
+See `.planning/research/FEATURES.md` for full prioritization matrix, feature dependency graph, and anti-feature rationale.
 
 ### Architecture Approach
 
-Performance features integrate as targeted modifications to existing layers — no new top-level folders. The caching layer extends existing RoundCache and AnalysisCache. The streaming path is an additive optional capability on the provider interface (non-streaming remains the default and fallback). Prompt caching is three lines of code in `AnthropicProvider.doComplete()` — not a new cache class. The DAGOrchestrator is not modified — only round dependency declarations are audited.
+Unit tests belong colocated with source files (`src/**/*.test.ts`) rather than in a separate `tests/unit/` directory. Vitest's existing `include` pattern already matches this with no config changes. The separation between unit and integration tests is structural: `src/` contains colocated unit tests; `tests/integration/` contains subprocess-based tests that require a built CLI binary. This separation must be preserved.
 
-**Major components and their changes:**
+**Major components and test seams:**
 
-1. `src/cache/round-cache.ts` — extend fingerprint to content hash; add cascade invalidation; expose `getCacheStatus()` for UI
-2. `src/providers/anthropic.ts` — add `cache_control` blocks to system prompt; add streaming path via `client.messages.stream()`
-3. `src/providers/base.ts` + `base-provider.ts` — add optional `completeStream()` and `supportsStreaming()` to provider interface
-4. `src/providers/streaming.ts` (NEW) — `StreamChunk` type and `StreamCallback` type; keep streaming types co-located with providers
-5. `src/context/token-counter.ts` — replace chars/4 with `gpt-tokenizer` for OpenAI-family providers; keep provider `estimateTokens()` as primary
-6. `src/ui/renderer.ts` + `types.ts` — add optional `onRoundToken()` callback; funnel all stdout through TerminalRenderer (never write streaming tokens directly)
-7. `src/analyzers/ast-analyzer.ts` — add piscina worker pool for large repos (> 200 files); use p-limit for I/O concurrency cap
-8. `src/ai-rounds/round-5-edge-cases.ts`, `round-6-deployment.ts` — verify dep declarations; rounds 5 and 6 have identical deps (rounds 1, 2) and can run in parallel automatically if dep declarations are correct
+1. `DAGOrchestrator` (`src/orchestrator/dag.ts`) — pure orchestration logic with no I/O; inject `vi.fn()` as step `execute` callbacks; test observable behavior (ordering, skip propagation, cycle detection) not internal state
+2. `LLMProvider` interface (`src/providers/base.ts`) — the primary mock boundary for all AI round tests; `makeMockProvider(overrides?)` factory pattern; mock at interface level, never at SDK level
+3. Pure function layer (`scorer.ts`, `token-counter.ts`, `packer.ts`, `registry.ts`) — no mocking needed; construct minimal fixture objects; use `test.each()` for tabular inputs
+4. Config schema (`src/config/schema.ts`) — Zod schemas are pure functions over their input; call `safeParse()` directly; no mocking; assert `.success`, `.data`, `.error.issues[0].path`
+5. Fixture helpers — colocated `__fixtures__/` directories adjacent to primary consumers; `AnalysisContext`, `StaticAnalysisResult`, `RenderContext` factories; added to coverage `exclude` in vitest config
+6. WASM-dependent parsers (`src/parsing/`) — explicitly excluded from unit test coverage; covered by existing integration tests; mixing WASM loading and `memfs` mocking causes incompatible failures
 
-**Key patterns from architecture research:**
+**4-layer test build order (from fewest to most dependencies):**
 
-- Streaming is UX-only: accumulate full response, validate Zod schema at stream end; never parse partial JSON mid-stream
-- Prompt caching is API-managed: add `cache_control` to static content block, add `betas` header; no client-side cache manager needed
-- Parallel rounds via dep declarations: the DAGOrchestrator already supports parallel steps; fix the declarations, not the orchestrator
-- WASM parser is a mutex resource: piscina handles per-thread isolation; never allow concurrent calls on a shared WASM instance
+- Layer 0: Zod schemas, error classes, pure factory functions, math functions — no mocks, no async
+- Layer 1: DAGOrchestrator, config loader, pure analyzers, TokenUsageTracker — stateful classes, no external deps
+- Layer 2: Scorer, validators, registry, provider factory — use Layer 0 type fixtures; no LLM mocking
+- Layer 3: Packer, AI round runner, renderers — require mock `LLMProvider` interface and `getFileContent`
+
+**6 core patterns documented in ARCHITECTURE.md:** LLM provider interface mocking, DAG step injection, Zod schema direct testing, pure analyzer fixture testing, renderer RenderContext fixture testing, and context packer injected I/O.
+
+See `.planning/research/ARCHITECTURE.md` for full colocated test topology, 6 anti-patterns to avoid, and integration point details.
 
 ### Critical Pitfalls
 
-1. **Cache invalidation based on file size alone** — A same-size edit (fixing a typo, changing a comment) returns an identical fingerprint and serves stale documentation silently. Fix: use mtime+size or SHA-256 of file content. Address before building any incremental analysis on top of the existing cache.
+1. **`vi.mock()` factory functions referencing top-level test variables** — Vitest hoists `vi.mock()` before variable initialization in ESM; referenced variables are `undefined` at factory execution time, producing silent wrong behavior rather than errors. Prevention: always use `vi.hoisted()` for any variable referenced inside a `vi.mock()` factory. Establish this as the project standard in a shared utilities file before any test is written.
 
-2. **Round N cache not invalidated when Round (N-1) changes** — The current cache key includes roundNumber + model + analysisFingerprint but not a hash of prior round output. When Round 1 re-runs (e.g., new file added), Rounds 2-6 serve cached results built on the old context. Fix: cascade-invalidate (clear rounds N, N+1, ..., 6) or include prior-round output hash in Round N's cache key. Non-negotiable correctness requirement.
+2. **LLM mock response shape mismatches produce false-passing tests** — `AnthropicProvider` reads `content.find(block => block.type === 'tool_use')?.input`; a mock returning `{ type: 'text' }` exercises the fallback path silently while the test passes green. Prevention: build typed mock factories using `satisfies Anthropic.Message`; TypeScript catches shape mismatches at compile time rather than silently at runtime.
 
-3. **Streaming structured JSON before schema is complete** — Partial JSON from streaming APIs will throw in `JSON.parse()` and in Zod validation. Fix: buffer the full stream response, then parse and validate at stream end. Streaming is for UX feedback (token counter, elapsed time) only — never expose partial output to round runners or write partial JSON to cache.
+3. **WASM-dependent files drag coverage below threshold** — `src/parsing/` files require `TreeSitter.init()` before any test can exercise them; without exclusion they show 0% coverage and may cause the global 80% threshold to fail even with extensive unit tests elsewhere. Prevention: add WASM-dependent files to `vitest.config.ts` coverage `exclude` list in the infrastructure setup phase, before running coverage for the first time.
 
-4. **Shared WASM parser state under parallelism** — web-tree-sitter's WASM runtime is not safe for concurrent calls. Parallel file reads within an analyzer can interleave WASM calls, corrupting AST output silently. Fix: use piscina (one WASM instance per worker thread) or p-limit with concurrency 1 for parser access.
+4. **Silent catch blocks produce false-passing tests** — 8+ catch blocks swallow errors; a test exercising a catch path passes while covering only the fallback, not verifying what happened. Coverage marks the catch as green. Prevention: for every catch block test, assert both (a) the expected fallback return value AND (b) `vi.spyOn(logger, 'warn')` was called; green coverage alone is not sufficient.
 
-5. **File cache ignoring config changes** — When the user changes `.handover.yml` (model, provider, context window), the file-level cache is still valid but analysis parameters have changed. Fix: include a hash of analysis-affecting config fields in the cache key. Must be defined before cache ships, not retrofitted.
+5. **ESM import extension omission breaks CI silently** — `NodeNext` module resolution requires `.js` extensions on all local TypeScript imports; `tsx` in local development may mask this; CI fails with `Cannot find module`. Prevention: add `import/extensions: always` ESLint rule; fix the existing broken import; establish the convention before any test files are written.
 
-6. **Streaming token output written directly to stdout** — The TerminalRenderer uses cursor control (sisteransi) to draw in-place progress. Any direct `process.stdout.write()` from a streaming callback interleaves with cursor positioning and corrupts TTY output. Fix: route all streaming events through `TerminalRenderer.onRoundToken()`.
+Additional moderate pitfalls: mocking at the SDK level instead of the `LLMProvider` interface (brittle to SDK updates), importing `src/cli/index.ts` in unit tests (triggers Commander.js `process.exit()`), and chasing 80% coverage with easy utility tests while leaving `src/providers/` uncovered.
 
-7. **Context compression degrading late-round quality** — Rounds 5 and 6 receive compressed output from earlier rounds. Aggressive compression that hits token count targets but loses specific module names, file paths, and function references causes Round 5 (edge cases) and Round 6 (deployment) to produce generic rather than specific documentation. Fix: validate compression quality by comparing Round 5/6 output specificity on a known codebase before and after any compression parameter changes.
+See `.planning/research/PITFALLS.md` for complete pitfall catalog with recovery strategies, phase-to-pitfall mapping, and "looks done but isn't" checklist.
+
+---
 
 ## Implications for Roadmap
 
-Based on the combined research, three phases emerge with clear dependency ordering grounded in correctness requirements, feature dependencies, and architecture build order.
+The milestone naturally decomposes into 4 sequential phases with hard dependencies between them. Phases 2-4 cannot safely begin without Phase 1's infrastructure foundation in place. The phase structure is derived from the feature dependency graph (FEATURES.md) and the pitfall-to-phase mapping (PITFALLS.md).
 
-### Phase 1: Cache Correctness
+### Phase 1: Test Infrastructure Setup
 
-**Rationale:** The existing RoundCache and AnalysisCache are correct in architecture but have two correctness gaps that produce wrong documentation on real-world usage: size-only fingerprinting and missing cascade invalidation. All other performance features (incremental context packing, token savings reporting, streaming) depend on a reliable cache. Building streaming on top of a cache that silently serves stale results makes the performance improvements untrustworthy. Fix the foundation first. This phase is also the highest ROI: on re-runs of unchanged codebases, all 6 LLM calls are already skipped — making that behavior correct and reliable delivers the "fast re-runs" goal immediately without any new API calls.
+**Rationale:** Three critical pitfalls (ESM import extensions, WASM coverage inflation, `vi.mock()` hoisting) are infrastructure mistakes that corrupt every subsequent test if not addressed first. This phase contains no test-writing — it is purely configuration, conventions, and mock utilities establishment.
 
-**Delivers:** Fast re-runs that users can trust; elimination of stale documentation from same-size edits; cache that invalidates correctly when any round's upstream inputs change; visible confirmation of efficiency gains per run.
+**Delivers:**
 
-**Addresses (from FEATURES.md P1):**
+- `vitest.config.ts` updated: WASM-dependent files in coverage `exclude`; fixture directories in coverage `exclude`; per-describe timeout config documented
+- ESLint `import/extensions: always` rule enforced; existing broken import fixed with `.js` extension
+- `__mocks__/fs.cjs` and `__mocks__/fs/promises.cjs` for `memfs` module mock integration
+- `src/providers/__fixtures__/mock-factories.ts` with `createMockProvider()` and `makeAnthropicToolResponse()` using `satisfies Anthropic.Message`
+- `vi.hoisted()` pattern documented as project test convention; no top-level variables inside `vi.mock()` factories anywhere in the test suite
 
-- Content-hash-based cache invalidation
-- Round-level incremental invalidation (cascading hash design)
-- Cache hit/miss summary in completion screen
-- Deletion detection (deleted files trigger full re-analysis)
-- Config-hash invalidation (model or provider changes bust cache)
+**Addresses:** `memfs` integration (STACK.md); colocated test placement convention (ARCHITECTURE.md)
 
-**Avoids (from PITFALLS.md):**
+**Avoids:** Pitfall 1 (vi.mock hoisting), Pitfall 3 (WASM coverage), Pitfall 8 (CI import extensions), Pitfall 11 (WASM threshold failure)
 
-- Pitfall 1: cache invalidation based on file size alone — fix fingerprint algorithm first
-- Pitfall 5: file cache ignoring config changes — compose cache key from file hash AND config hash
-- Pitfall 8: round N cache not invalidated when round N-1 changes — implement cascade invalidation
-- Pitfall 10: incremental analysis not detecting deleted files — diff current vs cached file list
+**Research flag:** Standard patterns — all configuration documented in official Vitest docs and Vitest GitHub issues. No further research needed.
 
-**Research flag:** Standard patterns for incremental analysis (eslint --cache, tsc --incremental are well-documented reference implementations). The cascading hash design for per-round keys is non-trivial to get right — verify the design against the PITFALLS.md "looks done but isn't" checklist before implementation closes.
+---
 
-### Phase 2: UX Responsiveness
+### Phase 2: Code Hardening and Pure Function Tests
 
-**Rationale:** Once cache correctness is established, address the perceived latency problem on first runs and on runs where rounds must re-execute. The 30-90 second LLM wait is the primary UX pain point. Two improvements deliver this: a live token counter + elapsed timer within each round block (LOW complexity, uses existing TerminalRenderer) and streaming token output from the LLM (HIGH complexity, requires provider interface extension). The live counter can ship independently of streaming — ship it first to unblock the UX improvement while streaming is implemented. This phase also includes parallel round execution for rounds 5 and 6 (potentially zero code change if dep declarations are already minimal) and large repo coverage indicator.
+**Rationale:** These tasks have no dependencies on mocking infrastructure beyond the factory from Phase 1 and deliver the highest return per unit of effort. Named constants must precede scorer tests because tests should reference `ENTRY_POINT_SCORE` not `30`. The empty catch block audit must precede catch-path tests so authors know which silences are intentional versus oversight. Both hardening tasks (constants extraction, catch documentation) are code changes that affect test assertability, not the tests themselves.
 
-**Delivers:** Live progress during every LLM round; streaming token display during model response; parallel execution of rounds 5 and 6; coverage transparency for large repos.
+**Delivers:**
 
-**Uses (from STACK.md):**
+- Named constants extracted from `scorer.ts` scoring weights and `presets.ts` pricing (all with `as const`); snapshot test for `scoreFile()` output on fixed fixture before and after extraction
+- Snapshot test for pricing constants (verifies future changes to pricing values are intentional)
+- Empty catch block audit complete: all 8+ catches have either a comment or `logger.debug()` call
+- Unit tests: `scoreFiles()` (table-driven with `test.each()`), `computeTokenBudget()`, `estimateTokens()`, `resolveSelectedDocs()`, `computeRequiredRounds()`, `HandoverConfigSchema`, `createStep()`
+- `--only` flag validation reordered to fire before `validateProviderConfig()` in `generate.ts`
 
-- `@anthropic-ai/sdk@0.76.0` (upgrade) — `client.messages.stream()` for Anthropic streaming
-- `openai@6.22.0` (upgrade) — `chat.completions.create({ stream: true })` for OpenAI streaming
-- `sisteransi` (existing) — cursor control for in-place token counter updates
-- `p-limit@7.3.0` (new) — concurrency cap for I/O fan-out in large repos
+**Addresses:** All P1 table stakes features (FEATURES.md); Layer 0 test build order (ARCHITECTURE.md)
 
-**Implements (from ARCHITECTURE.md):**
+**Avoids:** Pitfall 4 (silent catch testing), Pitfall 6 (constants extraction widens types), Pitfall 12 (pricing staleness), Pitfall 7 (coverage chasing easy files over critical paths)
 
-- `src/providers/streaming.ts` (new) — StreamChunk type, StreamCallback type
-- `src/providers/base.ts` — `supportsStreaming()` method on provider interface
-- `src/providers/base-provider.ts` — default `supportsStreaming()` returns false; `completeStream()` with non-streaming fallback
-- `src/ui/renderer.ts` — `onRoundToken()` optional callback; TerminalRenderer owns all stdout
-- Round 5 and 6 dep declarations — audit and remove excess deps if any
+**Research flag:** Standard patterns — pure function testing with `test.each()`, Zod `safeParse()` assertions, and `as const` extraction are well-documented. The TypeScript `as const` requirement is documented by TypeScript issue #43333.
 
-**Avoids (from PITFALLS.md):**
+---
 
-- Pitfall 3: streaming structured JSON before schema is complete — buffer full response, validate at stream end
-- Pitfall 6: streaming tokens written directly to stdout — route all writes through TerminalRenderer
-- Pitfall 7: streaming races with TerminalRenderer — TerminalRenderer is single owner of stdout in TTY mode
+### Phase 3: Algorithm and Validation Tests
 
-**Research flag:** The streaming implementation for structured output (tool_use + streaming) is the most complex element. Anthropic's `input_json_delta` streaming event for tool_use requires accumulating fragment JSON and parsing at stream end — this is documented in official Anthropic SDK docs but requires careful implementation. Plan for integration testing against the actual API before this phase closes.
+**Rationale:** These tests require the mock provider factory from Phase 1 and the named constants from Phase 2. `packFiles()` uses scoring output as input. `validateProviderConfig()` tests require understanding the error type hierarchy established in Phase 2. The DAG orchestrator tests are structurally independent but build on patterns established in Phase 2 test files.
 
-### Phase 3: Context Efficiency
+**Delivers:**
 
-**Rationale:** With cache correctness established and UX responsive, the final phase optimizes what gets sent to the LLM on incremental runs. Changed-files-only context packing reduces input tokens proportionally to how little changed — in a 1000-file repo where 10 files changed, this is potentially 90% fewer file content tokens. Anthropic prompt caching eliminates re-tokenizing the static context block across all 6 rounds (70-80% cost reduction on rounds 2-6 for Anthropic users). Accurate token counting via gpt-tokenizer eliminates the 15-25% error in the chars/4 heuristic that causes context window overflows. Parallel document rendering is a small independent cleanup that can ship in this phase without coupling risk.
+- Unit tests for `packFiles()` — all 6 tiers, budget boundary conditions, oversized file handling, small-project optimization; mock `getFileContent` via `vi.fn()` (existing injected callback seam)
+- Unit tests for `validateProviderConfig()` — all 5 throw paths (unknown provider, Ollama without model, Azure without baseUrl, missing API key, custom without baseUrl); `vi.stubEnv()` for env var isolation; assert `ProviderError.code`
+- Unit tests for `generateSignatureSummary()` — fixture `ParsedFile` inputs; assert output string format
+- Unit tests for `DAGOrchestrator` — step ordering, cycle detection, skip propagation on step failure, parallel execution tracking
+- Unit tests for `TokenUsageTracker` — stateful class with no external deps; accounting correctness
 
-**Delivers:** Substantially reduced token costs on incremental runs; accurate context budget enforcement; concrete savings reporting users can see; Anthropic prompt cache hits surfaced in usage tracking.
+**Addresses:** P2 differentiator features (FEATURES.md); Layers 1-3 test build order (ARCHITECTURE.md)
 
-**Uses (from STACK.md):**
+**Avoids:** Pitfall 5 (version constraint tightening during dependency review), Pitfall 9 (mocking at SDK level instead of interface level), Pitfall 10 (CLI import triggering Commander.js process.exit)
 
-- `gpt-tokenizer@3.4.0` (new) — BPE token counting for OpenAI-family providers; replaces chars/4
-- `piscina@5.1.4` (new) — worker thread pool for CPU-bound AST parsing on large repos (> 200 files)
-- `NODE_COMPILE_CACHE` (Node.js 22.1+ built-in) — V8 bytecode cache; document as opt-in for Node 22+ users
+**Research flag:** Standard patterns — DAG orchestration testing via step injection, `vi.stubEnv()`, and `vi.fn()` for injected callbacks are all documented in official Vitest API docs. No further research needed.
 
-**Implements (from ARCHITECTURE.md):**
+---
 
-- `src/context/token-counter.ts` — gpt-tokenizer path for OpenAI providers; Anthropic `countTokens()` endpoint for pre-flight estimation
-- `src/providers/anthropic.ts` — `cache_control: { type: 'ephemeral' }` on static context block; `betas: ['prompt-caching-2024-07-31']` header
-- `src/analyzers/ast-analyzer.ts` + new `src/workers/ast-worker.ts` — piscina pool (size = os.cpus().length); threshold guard (only activate > 200 files)
-- `src/analyzers/file-discovery.ts` — switch to `fast-glob` `.stream()` API for large repo file discovery
-- `src/analyzers/cache.ts` — expose `getChangedFiles()` method returning set of changed paths
-- `src/context/packer.ts` — accept changed-files set parameter; force changed files to `full` tier
-- `src/cli/generate.ts` — `--stream` flag; lazy dynamic import of ParserService for startup speed
-- `src/config/schema.ts` — `performance.promptCache`, `performance.streaming`, `performance.preciseTokenCounting` config fields
+### Phase 4: AI Round Tests and Coverage Enforcement
 
-**Avoids (from PITFALLS.md):**
+**Rationale:** AI round tests (`executeRound()`, `validateFileClaims()`, `checkRoundQuality()`) require the full typed mock provider infrastructure from Phase 1 and understanding of graceful degradation behavior documented in Phase 3's DAG tests. The retry/backoff tests require `vi.useFakeTimers()` which requires understanding of the async timer patterns established in Phase 3. Coverage threshold enforcement becomes meaningful only once enough tests exist to have real coverage numbers.
 
-- Pitfall 4: context compression degrading late-round quality — capture Round 5/6 quality baseline before any compression parameter changes
-- Pitfall 9: token optimization degrading quality on non-default providers — test on Anthropic + at least one alternative provider before shipping
-- Pitfall WASM concurrency: serialize parser access via piscina per-thread isolation
+**Delivers:**
 
-**Research flag:** The changed-files context packing requires the AnalysisCache diff API and packFiles() parameter extension — both are non-trivial internal API changes. Plan for regression testing against the existing packer behavior. The `gpt-tokenizer` upgrade requires verifying that the existing `provider.estimateTokens()` fallback chain still works correctly for Anthropic models (Anthropic uses a different tokenizer; chars/4 is already more accurate for Claude than for GPT models).
+- Unit tests for `executeRound()` — happy path with mock provider (typed tool_use response shape), degraded result on provider throw, retry behavior with `vi.useFakeTimers()` advancing past 30s backoff
+- Unit tests for `validateFileClaims()` — pure function; drop-rate thresholds; fixture `StaticAnalysisResult`
+- Unit tests for `checkRoundQuality()` — quality gate threshold assertions
+- Unit tests for `compressRoundOutput()` — fixture round outputs; field extraction; token budget enforcement
+- Renderer utility tests: `buildTable()`, `codeRef()`, `sectionIntro()` — pure string functions
+- One renderer integration test: `renderOverview()` with minimal `RenderContext` fixture
+- CI coverage gate verified: 80% threshold now has real tests to measure against; WASM exclusions confirm no false threshold failures
+
+**Addresses:** P3 deferred features (FEATURES.md); Layers 3-4 test build order (ARCHITECTURE.md)
+
+**Avoids:** Pitfall 2 (mock response shape mismatch — use `satisfies Anthropic.Message`), Pitfall 4 (silent catch assertions on round runner error paths), Pitfall 11 (WASM files inflating coverage gap)
+
+**Research flag:** Needs verification during execution — the Anthropic `tool_use` response shape and the OpenAI `choices[0].message.tool_calls[0].function.arguments` shape must be verified against the current provider source files (`src/providers/anthropic.ts`, `src/providers/openai-compat.ts`) before the mock factories in Phase 1 are finalized. The `satisfies` guard catches shape mismatches only if the type annotation is correct to begin with. Read the provider source first.
+
+---
 
 ### Phase Ordering Rationale
 
-- **Correctness before features:** The cache correctness bugs produce wrong documentation silently. Adding streaming or incremental packing on top of a broken cache produces fast delivery of stale results. Fix the foundation first.
-- **Cache P1 before streaming P2:** Streaming's main benefit (visible progress) is most valuable when rounds actually re-execute. If rounds are incorrectly cache-hitting, streaming is never invoked. Phase 1 ensures streaming is exercised correctly.
-- **SDK upgrades in Phase 2 not Phase 3:** Both `@anthropic-ai/sdk` and `openai` upgrades are needed for streaming (Phase 2). Prompt caching (Phase 3) also needs the SDK upgrade but is blocked by it, not the other way around. Upgrade once in Phase 2; Phase 3 uses the already-upgraded SDK.
-- **Piscina deferred to Phase 3:** CPU-bound parallelism for AST parsing is a large-repo optimization. It is not needed for correctness or basic UX. Implementing it after streaming and caching simplifies the concurrency model during the earlier phases.
-- **Parallel rendering is independent:** It can ship in Phase 3 without coupling to the other Phase 3 features. If time is constrained, it defers easily to v2.1.
+- **Infrastructure before any tests:** Pitfalls 1, 3, and 8 are "corrupt everything" problems if addressed retroactively across a large test suite. Fixing them first costs one phase and prevents cascading rework across phases 2-4.
+- **Named constants before scorer tests:** Tests that reference `30` (a magic number) instead of `ENTRY_POINT_SCORE` require dual updates when the weight changes — in source and in tests. Extract constants first; tests inherit the names.
+- **Silent catch audit before catch-path tests:** An undocumented `catch {}` leaves test authors uncertain whether to assert silence or a log warning. Documenting intent first enables assertive tests rather than coverage-filling placeholders.
+- **DAGOrchestrator before round runner:** The round runner depends on the DAG's step lifecycle. Understanding DAG behavior via tests in Phase 3 makes Phase 4 round runner assertions more precise about what is orchestrator behavior vs. runner behavior.
+- **Coverage enforcement in Phase 4:** Enforcing the 80% threshold in Phase 1 would make every CI run fail until Phase 4. Enable it in Phase 4 when the test suite is substantial enough for the threshold to be meaningful.
 
 ### Research Flags
 
-**Phases likely needing deeper research during planning:**
+Phases needing verification during execution:
 
-- **Phase 2 (Streaming structured output):** The Anthropic `tool_use` streaming pattern (accumulating `input_json_delta` events into valid JSON) is documented but requires careful implementation. The FEATURES.md research notes this as "non-trivial" and the PITFALLS.md identifies it as a critical failure mode. During Phase 2 planning, verify the current `AnthropicProvider.doComplete()` tool_use invocation pattern and confirm the streaming equivalent matches the expected schema shape.
+- **Phase 4 (AI round mock response shapes):** Anthropic tool_use response shape and OpenAI tool_calls response shape must be verified against current provider source before typed mock factories are finalized in Phase 1. The `satisfies Anthropic.Message` TypeScript guard provides compile-time safety only if the factory type annotation is correctly specified.
 
-- **Phase 3 (Changed-files context packing):** `AnalysisCache` currently exposes only `isUnchanged(path, hash)`. Adding `getChangedFiles()` requires understanding the existing cache structure. Read `src/analyzers/cache.ts` before finalizing Phase 3 tasks to scope this API change accurately.
+Phases with standard patterns (proceed without further research):
 
-- **Phase 2 (SDK upgrade breaking changes):** `@anthropic-ai/sdk` 0.39.0 → 0.76.0 and `openai` 5.23.2 → 6.22.0 both have breaking changes. Read the SDK changelogs and diff against `src/providers/anthropic.ts` and `src/providers/openai-compat.ts` before finalizing Phase 2 scope.
+- **Phase 1:** Vitest config, memfs `__mocks__` setup, ESLint `import/extensions` rule — all in official docs with HIGH confidence.
+- **Phase 2:** Pure function testing, `as const` extraction, Zod `safeParse()` assertions, `test.each()` tables — textbook patterns with no novel elements.
+- **Phase 3:** DAG step injection, `vi.stubEnv()`, `vi.fn()` injected callbacks — standard Vitest patterns, all in official API docs.
 
-**Phases with standard patterns (skip research-phase):**
-
-- **Phase 1 (Cache correctness):** Content-hash fingerprinting and cascade invalidation are well-documented patterns (eslint --cache, tsc --incremental). The PITFALLS.md provides a complete checklist. No additional research needed — the implementation path is clear.
-
-- **Phase 3 (Anthropic prompt caching):** The Anthropic docs for `cache_control` and the beta header are HIGH confidence (official docs). The ARCHITECTURE.md provides a concrete code example ready to implement. Standard pattern with no research gap.
-
-- **Phase 3 (piscina worker pool for AST parsing):** The STACK.md documents the exact integration pattern: `src/workers/ast-worker.ts`, workerData shape, pool size = `os.cpus().length`, threshold guard at 200 files. No additional research needed.
+---
 
 ## Confidence Assessment
 
-| Area         | Confidence | Notes                                                                                                                                                                                            |
-| ------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Stack        | HIGH       | All package versions verified via npm registry; streaming APIs verified via official Anthropic and OpenAI docs; worker pool comparison verified via npmtrends                                    |
-| Features     | HIGH       | Direct codebase audit of existing implementation; feature gaps identified from first-party source code reading; feature research is brownfield, not speculation                                  |
-| Architecture | HIGH       | Existing codebase read directly (dag.ts, round-cache.ts, providers, analyzers); integration patterns grounded in source; streaming patterns MEDIUM from web sources                              |
-| Pitfalls     | HIGH       | Caching and incremental analysis pitfalls are well-documented; streaming and concurrency pitfalls verified across multiple sources including 2026 arXiv preprints on context compression quality |
+| Area         | Confidence | Notes                                                                                                                                                                                                                             |
+| ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stack        | HIGH       | All recommendations verified against official docs and npm registry; memfs and vitest-mock-extended versions confirmed current; MSW/undici limitation documented by MSW maintainers and confirmed via GitHub issue #2165          |
+| Features     | HIGH       | Based on direct codebase audit of all 99 source files; gaps are observable facts (0 unit tests, 8+ empty catch blocks), not inferences; feature prioritization derived from first-party source reading                            |
+| Architecture | HIGH       | All patterns grounded in direct source reading of all major modules; Vitest colocated test pattern confirmed against existing `vitest.config.ts` include patterns; no speculation                                                 |
+| Pitfalls     | HIGH       | Critical pitfalls verified against official Vitest GitHub issues, TypeScript issue tracker, and real-world Backstage post-mortem; codebase-specific pitfalls from direct source inspection of providers, scorer, and catch blocks |
 
 **Overall confidence:** HIGH
 
-The research domain is well-covered. The existing codebase was read directly, eliminating speculation about what's already built. The new library additions (piscina, gpt-tokenizer, p-limit) are verified against npm registry and official documentation. The only MEDIUM-confidence elements are the streaming patterns from secondary sources — but these are secondary confirmations of official SDK docs, not the primary basis for recommendations.
+The research domain is well-covered. The existing codebase was read directly, eliminating speculation about what is already built. All new library additions are verified against npm registry and official documentation. The only area requiring execution-time verification is the LLM SDK response shapes for typed mock factories — this is a source-reading task, not a research gap.
 
 ### Gaps to Address
 
-- **SDK upgrade scope:** The exact breaking changes in @anthropic-ai/sdk 0.39.0 → 0.76.0 and openai 5.23.2 → 6.22.0 have not been fully catalogued. Before Phase 2 implementation begins, read the SDK changelogs and diff the existing provider files. The STACK.md flags this explicitly — "verify against src/providers/anthropic.ts and src/providers/openai-compat.ts before bumping."
+- **`fast-glob` + `memfs` interaction:** PITFALLS.md flags that `fast-glob` may use its own filesystem access that bypasses `vi.mock('node:fs')`. Verify during Phase 1 when memfs is configured whether affected analyzer tests need `fast-glob` mocked separately or whether they should move to the integration test suite.
 
-- **Round 5 and 6 dep declarations:** Whether rounds 5 and 6 currently over-declare dependencies (e.g., depending on rounds 3 or 4 when they don't consume those results) is unknown without reading `src/ai-rounds/round-5-edge-cases.ts` and `src/ai-rounds/round-6-deployment.ts`. This is a zero-to-2-hour investigation that could be Phase 2 scope-zero (no code change) or a small fix.
+- **`loadConfig()` spy target:** ARCHITECTURE.md recommends `vi.spyOn(fs, 'existsSync')` for config loader tests. Confirm at Phase 3 implementation whether `loadConfig()` uses `node:fs` or `node:fs/promises` for existence checks — this determines which spy target is correct.
 
-- **Anthropic prompt caching beta status:** The `betas: ['prompt-caching-2024-07-31']` header requirement may change as the feature moves from beta to GA. Verify the current API status before implementing Phase 3 prompt caching. The ARCHITECTURE.md research notes this as a MEDIUM confidence finding.
+- **Coverage threshold achievability before WASM exclusion:** After Phase 1's vitest config update, run `vitest --coverage --reporter=json` on the 0-test suite to get the actual denominator (the set of non-excluded source lines). This reveals whether 80% is achievable without testing every module or whether additional exclusions are needed before Phase 4's coverage enforcement.
 
-- **Quality regression baseline:** The PITFALLS.md recommends capturing Round 5 and Round 6 output on a known test codebase as ground truth before any compression optimization. This baseline does not yet exist. It should be created before Phase 3 token optimization work begins — not after.
+- **Provider mock response shape pre-verification:** Before finalizing the `makeAnthropicToolResponse()` and `makeOpenAIToolResponse()` factories in Phase 1, read `src/providers/anthropic.ts` and `src/providers/openai-compat.ts` to confirm which response fields are actually accessed. The mock shape must match the actual consumption pattern, not the SDK type definition.
 
-- **piscina threshold calibration:** The STACK.md recommends activating the piscina worker pool only when file count exceeds ~200. The actual crossover point (where thread setup overhead is exceeded by parsing parallelism gains) has not been benchmarked for this specific codebase and workload. Phase 3 planning should include a brief profiling session on a representative large repo to calibrate this threshold.
+---
 
 ## Sources
 
 ### Primary (HIGH confidence)
 
-- Direct codebase audit: `src/cache/round-cache.ts`, `src/analyzers/cache.ts`, `src/orchestrator/dag.ts`, `src/providers/anthropic.ts`, `src/providers/base-provider.ts`, `src/ai-rounds/runner.ts`, `src/cli/generate.ts`, `src/config/schema.ts`, `src/ui/renderer.ts`, `src/context/compressor.ts` — first-party source
-- [piscina npm registry](https://www.npmjs.com/package/piscina) — version 5.1.4; 6.7M weekly downloads
-- [piscinajs/piscina GitHub](https://github.com/piscinajs/piscina) — ESM support, pool configuration
-- [gpt-tokenizer npm](https://www.npmjs.com/package/gpt-tokenizer) — version 3.4.0; pure JS; identical accuracy to Python tiktoken
-- [p-limit npm](https://www.npmjs.com/package/p-limit) — version 7.3.0; sindresorhus; pure ESM
-- [Anthropic Streaming Messages — official docs](https://platform.claude.com/docs/en/api/messages-streaming) — .stream(), .on('text'), async iterator patterns
-- [Anthropic Prompt Caching — official docs](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) — cache_control, 5-min TTL, 1024-token minimum, pricing
-- [OpenAI Streaming API — official docs](https://platform.openai.com/docs/guides/streaming-responses) — stream: true async iterator pattern
-- [OpenAI Prompt Caching](https://openai.com/index/api-prompt-caching/) — automatic for ≥ 1024 tokens; usage.prompt_tokens_details.cached_tokens
-- [@anthropic-ai/sdk npm](https://www.npmjs.com/package/@anthropic-ai/sdk) — version 0.76.0 current (project has 0.39.0)
-- [openai npm](https://www.npmjs.com/package/openai) — version 6.22.0 current (project has 5.23.2)
-- [Node.js 22.1.0 release notes](https://nodejs.org/en/blog/release/v22.1.0) — NODE_COMPILE_CACHE feature
-- [fast-glob API docs — stream()](https://github.com/mrmlnc/fast-glob#streamnamestring-options-fastscanoptionsmatch-stream) — AsyncIterable interface
-- [Context Rot: How Increasing Input Tokens Impacts LLM Performance (Chroma Research)](https://research.trychroma.com/context-rot) — context compression quality degradation
-- [When Less is More: The LLM Scaling Paradox in Context Compression (arXiv 2602.09789)](https://arxiv.org/html/2602.09789) — semantic drift in compression
-- [Context Discipline and Performance Correlation (arXiv 2601.11564)](https://arxiv.org/html/2601.11564v1) — 15-47% performance drop from context length increase
+- [Vitest File System Mocking](https://vitest.dev/guide/mocking/file-system) — memfs integration, `__mocks__` setup, `vol.reset()` pattern
+- [Vitest Mocking Requests](https://vitest.dev/guide/mocking/requests) — MSW guidance; undici limitation caveat
+- [MSW Limitations](https://mswjs.io/docs/limitations/) — undici bypass of `http.ClientRequest` interception
+- [Vitest Mocking Modules](https://vitest.dev/guide/mocking/modules) — `vi.mock()` ESM hoisting, `vi.hoisted()` API
+- [Vitest `vi.useFakeTimers()`](https://vitest.dev/guide/mocking/timers) — `advanceTimersByTimeAsync` for async-safe timer control
+- [Vitest Mock Functions API](https://vitest.dev/api/mock) — `vi.fn()`, `vi.spyOn()`, partial mocking
+- [Vitest `vi.stubEnv()`](https://vitest.dev/api/vi.html) — auto-restored environment variable mocking
+- [Vitest Issue #3228](https://github.com/vitest-dev/vitest/issues/3228) — `vi.hoisted()` origin; hoisting problem documentation
+- [Vitest Coverage v8 ESM issues](https://github.com/vitest-dev/vitest/issues/6380) — V8 coverage limitations with ESM/TypeScript
+- [TypeScript Issue #43333](https://github.com/microsoft/TypeScript/issues/43333) — `as const` requirement for extracted literal constants
+- [Backstage Issue #20436](https://github.com/backstage/backstage/issues/20436) — `mock-fs` maintenance breakage post-mortem
+- [MSW GitHub issue #2165](https://github.com/mswjs/msw/issues/2165) — undici interception not supported; confirmed by MSW maintainers
+- [memfs npm](https://www.npmjs.com/package/memfs) — v4.56.10, last release Jan 2026
+- [vitest-mock-extended npm](https://www.npmjs.com/package/vitest-mock-extended) — v3.1.0, Vitest ≥ 3.0.0 requirement
+- [npm-check-updates npm](https://www.npmjs.com/package/npm-check-updates) — v19.4.0
+- Direct codebase audit: all 99 source files, `vitest.config.ts`, `package.json`, `tests/integration/setup.ts` — first-party source
 
 ### Secondary (MEDIUM confidence)
 
-- [npmtrends: piscina vs workerpool vs threads](https://npmtrends.com/node-worker-farm-vs-node-worker-pool-vs-piscina-vs-threads-vs-workerpool) — download volume comparison
-- [compare-tokenizers GitHub](https://github.com/transitive-bullshit/compare-tokenizers) — accuracy comparison gpt-tokenizer vs tiktoken
-- [pepicrft.me — Static imports and ESM startup time](https://pepicrft.me/blog/startup-time-in-node-clis/) — dynamic import for CLI startup optimization
-- [Structured Output Streaming for LLMs (Preston Blackburn, Medium 2025)](https://medium.com/@prestonblckbrn/structured-output-streaming-for-llms-a836fc0d35a2) — streaming vs. Zod validation ordering
-- [ESLint incremental caching issue #20186](https://github.com/eslint/eslint/issues/20186) — ESLint cache key design; roundSchemaVersion pattern
-- [LLM Cache Invalidation Patterns in Java — Token-Aware Caching (GoPenAI, Dec 2025)](https://blog.gopenai.com/llm-cache-invalidation-patterns-in-java-token-aware-caching-bccaa10ff7c0) — config-hash invalidation pattern
-- [Best practices to render streamed LLM responses (Chrome for Developers)](https://developer.chrome.com/docs/ai/render-llm-responses) — chunk-isolation and sanitization pitfalls
-
-### Tertiary (LOW confidence)
-
-- [Cache the prompt, not the response (Amit Kothari)](https://amitkoth.com/llm-caching-strategies/) — response vs. prompt caching distinction; consistent with observed patterns but single practitioner source
-- [Reduce LLM Costs: Token Optimization Strategies (Rost Glukhov, 2025)](https://www.glukhov.org/post/2025/11/cost-effective-llm-applications/) — input vs. output token asymmetry; practitioner source
+- [Vitest table-driven tests](https://oliviac.dev/blog/introduction-to-table-driven-tests-in-vitest/) — `test.each()` patterns for pure functions
+- [TypeScript error handling in catch blocks](https://kentcdodds.com/blog/get-a-catch-block-error-message-with-typescript) — `unknown` type enforcement, `useUnknownInCatchVariables`
+- [Zod Testing Patterns — Steve Kinney](https://stevekinney.com/courses/full-stack-typescript/testing-zod-schema) — schema test patterns consistent with official Zod docs
+- [Stack Overflow Blog: Coverage and code quality](https://stackoverflow.blog/2025/12/22/making-your-code-base-better-will-make-your-code-coverage-worse/) — coverage as lagging indicator for quality
+- [The Pitfalls of Code Coverage (David Burns, 2024)](https://www.theautomatedtester.co.uk/blog/2024/the-pitfalls-of-code-coverage/) — catch block coverage correctness problem
+- [openai-node GitHub issue #638](https://github.com/openai/openai-node/issues/638) — correct `vi.mock` pattern for OpenAI SDK default export
+- [How to Rapidly Introduce Tests When There Is No Test Coverage](https://medium.com/swlh/how-to-rapidly-introduce-tests-when-there-is-no-test-coverage-8bb07930a3ee) — priority ordering for retroactive test addition
 
 ---
 
-_Research completed: 2026-02-18_
+_Research completed: 2026-02-19_
 _Ready for roadmap: yes_

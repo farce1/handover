@@ -1,331 +1,505 @@
 # Architecture Research
 
-**Domain:** Performance Features — Caching, Parallel Execution, Streaming Output, Token Optimization
-**Researched:** 2026-02-18
-**Confidence:** HIGH (existing codebase read directly; patterns grounded in source; streaming patterns MEDIUM from web sources)
+**Domain:** Unit Testing Integration — TypeScript CLI with DAG Orchestrator, LLM Providers, Zod Pipelines
+**Researched:** 2026-02-19
+**Confidence:** HIGH (codebase read directly; patterns grounded in source; Vitest patterns HIGH from official docs + direct source inspection)
 
 ---
 
 ## Standard Architecture
 
-This document covers how four performance features integrate with the existing DAG orchestrator and multi-round LLM pipeline. It does not re-document what already exists — it focuses on what changes and what is new.
+This document covers how unit tests integrate with the existing 99-file TypeScript codebase. It does not re-document what already exists in `.planning/codebase/ARCHITECTURE.md` — it focuses on test file placement, mock boundaries, dependency seams, and build order for adding unit tests without breaking the existing integration test suite.
 
 ### System Overview
 
-Current pipeline (simplified):
+Existing test topology before this milestone:
 
 ```
-CLI
- └── generate.ts (orchestration coordinator)
-       ├── DAGOrchestrator.execute()
-       │     ├── static-analysis step (sequential, always runs)
-       │     ├── ai-round-1 step (depends on static-analysis)
-       │     ├── ai-round-2 step (depends on ai-round-1)
-       │     ├── ai-round-3 step (depends on ai-round-1, ai-round-2)
-       │     ├── ai-round-4 step (depends on ai-round-1..3)
-       │     ├── ai-round-5 step (depends on ai-round-1, ai-round-2)
-       │     ├── ai-round-6 step (depends on ai-round-1, ai-round-2)
-       │     └── render step (depends on terminal rounds)
-       ├── RoundCache (disk cache, already exists at src/cache/round-cache.ts)
-       ├── AnalysisCache (disk cache, already exists at src/analyzers/cache.ts)
-       ├── TokenUsageTracker (cost tracking, src/context/tracker.ts)
-       └── TerminalRenderer (progress UI, src/ui/renderer.ts)
+tests/
+  integration/
+    generate.test.ts      # Full CLI subprocess tests (env-gated)
+    edge-cases.test.ts    # Synthetic fixture edge cases
+    monorepo.test.ts      # Monorepo detection
+    performance.test.ts   # Performance benchmarks
+    setup.ts              # Shared fixture helpers (createFixtureScope, runCLI)
+    targets.ts            # Validation target definitions
+
+src/                      # No test files exist yet
+  (99 source files, 0 test files)
 ```
 
-Performance feature integration points:
+Target topology after this milestone — tests colocated with source:
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  CACHING LAYER (already partially exists — extend, do not rewrite)  │
-│                                                                     │
-│  AnalysisCache (src/analyzers/cache.ts)                             │
-│    File-hash-based: skip re-parsing unchanged files                 │
-│                                                                     │
-│  RoundCache (src/cache/round-cache.ts)                              │
-│    Content-hash-based: skip LLM calls for unchanged codebases       │
-│    Already wired into generate.ts wrapWithCache()                   │
-│                                                                     │
-│  NEW: PromptCache coordination (Anthropic prompt caching API)       │
-│    Prefix caching: mark static system context as cacheable          │
-│    Lives in: src/providers/anthropic.ts (modify doComplete)         │
-└─────────────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  PARALLEL EXECUTION (extend DAGOrchestrator behavior)               │
-│                                                                     │
-│  Current: DAGOrchestrator already runs independent steps in         │
-│           parallel via Promise.race (lines 227-228 in dag.ts)       │
-│  Current: AI rounds 5 and 6 have identical deps (rounds 1,2)       │
-│           — they could run in parallel but don't because they are   │
-│             created sequentially with sequential dep declarations   │
-│                                                                     │
-│  NEW: Declare rounds 5 and 6 with same deps → DAG runs them        │
-│       concurrently automatically (no orchestrator changes needed)   │
-│                                                                     │
-│  NEW: AnalyzerConcurrencyConfig — expose config.analysis.concurrency│
-│       already exists in schema; verify coordinator uses it          │
-└─────────────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  STREAMING OUTPUT (new capability in providers)                     │
-│                                                                     │
-│  Current: providers use non-streaming tool_use / function calls     │
-│           Response arrives all at once; no progress during LLM wait │
-│                                                                     │
-│  NEW: StreamingProvider interface extension                         │
-│       Adds optional completeStream() method to BaseProvider         │
-│       Streaming incompatible with tool_use structured output        │
-│       → Stream text, then parse/validate JSON at stream end         │
-│       → Falls back to non-streaming if provider doesn't support it  │
-│                                                                     │
-│  UI integration: TerminalRenderer.onRoundToken() callback           │
-│  new: shows "receiving..." progress during LLM wait                 │
-└─────────────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  TOKEN OPTIMIZATION (extend existing context layer)                 │
-│                                                                     │
-│  Current: computeTokenBudget(), scoreFiles(), packFiles()           │
-│           compressRoundOutput() deterministic field extraction      │
-│           estimateTokens() uses chars/4 heuristic                   │
-│                                                                     │
-│  NEW: Anthropic prompt caching headers (cache_control blocks)       │
-│       Marks stable context prefix as cacheable → 90% token discount │
-│                                                                     │
-│  NEW: Improved token estimator (tiktoken or provider native)        │
-│       chars/4 is 15-20% inaccurate; inaccuracy wastes budget       │
-│                                                                     │
-│  NEW: Dynamic context budget tuning based on --only selection       │
-│       If only 2 rounds needed, budget can be larger per round       │
-└─────────────────────────────────────────────────────────────────────┘
+src/
+  orchestrator/
+    dag.test.ts           # NEW — DAGOrchestrator unit tests
+    step.test.ts          # NEW — createStep() validation tests
+  analyzers/
+    todo-scanner.test.ts  # NEW — scanFileForTodos() pure function
+    file-tree.test.ts     # NEW — tree building logic
+    coordinator.test.ts   # NEW — allSettled failure isolation
+  context/
+    token-counter.test.ts # NEW — estimateTokens, computeTokenBudget
+    scorer.test.ts        # NEW — scoreFiles() with fixture data
+    packer.test.ts        # NEW — packFiles() tier assignment
+    tracker.test.ts       # NEW — TokenUsageTracker accounting
+  config/
+    schema.test.ts        # NEW — Zod schema validation rules
+    loader.test.ts        # NEW — loadConfig() precedence layering
+  providers/
+    factory.test.ts       # NEW — validateProviderConfig() error paths
+  ai-rounds/
+    validator.test.ts     # NEW — validateFileClaims(), drop-rate logic
+    quality.test.ts       # NEW — checkRoundQuality() thresholds
+    runner.test.ts        # NEW — executeRound() with mock provider
+  renderers/
+    registry.test.ts      # NEW — resolveSelectedDocs(), computeRequiredRounds()
+    render-01-overview.test.ts  # NEW — renderer with fixture RenderContext
+    utils.test.ts         # NEW — buildTable(), codeRef(), sectionIntro()
+
+tests/
+  integration/            # UNCHANGED — existing 4 test files remain
+    generate.test.ts
+    edge-cases.test.ts
+    monorepo.test.ts
+    performance.test.ts
+    setup.ts              # EXTEND — add unit test helpers if needed
 ```
 
-### Component Responsibilities (New vs Modified)
+### Component Boundaries for Testing
 
-| Component                             | Status | Responsibility                                                | Modified By                                                                |
-| ------------------------------------- | ------ | ------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `src/cache/round-cache.ts`            | EXISTS | Disk cache for AI round results                               | Already wired. Extension: expose `getCacheStatus()` for better UI feedback |
-| `src/analyzers/cache.ts`              | EXISTS | File-hash cache for static analysis                           | Already exists. Verify coordinator uses it                                 |
-| `src/providers/anthropic.ts`          | MODIFY | Add `cache_control` headers for prompt caching                | Prompt cache blocks                                                        |
-| `src/providers/base-provider.ts`      | MODIFY | Add optional streaming path (`completeStream`)                | Streaming support                                                          |
-| `src/providers/base.ts` (interface)   | MODIFY | Expose streaming capability flag                              | Streaming support                                                          |
-| `src/context/token-counter.ts`        | MODIFY | Improve token estimation accuracy                             | Token optimization                                                         |
-| `src/ai-rounds/round-5-edge-cases.ts` | MODIFY | Verify deps declare only rounds 1,2                           | Parallel execution                                                         |
-| `src/ai-rounds/round-6-deployment.ts` | MODIFY | Verify deps declare only rounds 1,2                           | Parallel execution                                                         |
-| `src/cli/generate.ts`                 | MODIFY | Expose --stream flag; parallel round sequencing               | All features                                                               |
-| `src/ui/renderer.ts`                  | MODIFY | Add `onRoundToken()` for streaming progress                   | Streaming support                                                          |
-| `src/ui/types.ts`                     | MODIFY | Add streaming state to DisplayState                           | Streaming support                                                          |
-| `src/config/schema.ts`                | MODIFY | Add `performance.promptCache`, `performance.streaming` fields | Config                                                                     |
-| NEW: `src/providers/streaming.ts`     | NEW    | Streaming result types and utilities                          | Streaming support                                                          |
+| Component                  | Testability                     | Primary Seam                   | Mock Strategy                                |
+| -------------------------- | ------------------------------- | ------------------------------ | -------------------------------------------- |
+| `DAGOrchestrator`          | HIGH — pure logic, no I/O       | `StepDefinition.execute`       | Pass `vi.fn()` as execute callbacks          |
+| `createStep()`             | HIGH — pure validation          | None needed                    | Direct call with invalid inputs              |
+| `scoreFiles()`             | HIGH — pure function            | `StaticAnalysisResult`         | Construct minimal fixture objects            |
+| `packFiles()`              | HIGH — pure + injected I/O      | `getFileContent` callback      | Pass `vi.fn()` returning test content        |
+| `computeTokenBudget()`     | HIGH — pure math                | None                           | Direct call with numbers                     |
+| `estimateTokens()`         | HIGH — pure function            | `LLMProvider` (optional)       | No mock needed for standalone path           |
+| `TokenUsageTracker`        | HIGH — stateful class           | None (no external deps)        | Instantiate directly                         |
+| `HandoverConfigSchema`     | HIGH — Zod schema               | None                           | `.parse()` / `.safeParse()` directly         |
+| `loadConfig()`             | MEDIUM — file I/O + env         | `fs.existsSync`, `process.env` | `vi.spyOn(fs, 'existsSync')` + env overrides |
+| `validateProviderConfig()` | HIGH — pure logic + env         | `process.env`                  | Set/unset env vars in beforeEach             |
+| `validateFileClaims()`     | HIGH — pure function            | `StaticAnalysisResult`         | Construct minimal fixture                    |
+| `executeRound()`           | MEDIUM — uses injected provider | `LLMProvider.complete`         | Mock LLMProvider interface                   |
+| `renderOverview()`         | HIGH — pure function            | `RenderContext`                | Construct fixture RenderContext              |
+| `resolveSelectedDocs()`    | HIGH — pure function            | `DocumentSpec[]`               | Use DOCUMENT_REGISTRY directly               |
+| `scanFileForTodos()`       | HIGH — pure function            | None                           | Pass string content directly                 |
+| Individual analyzers       | MEDIUM — file system I/O        | `AnalysisContext`              | Inject mock ctx.files array                  |
 
 ---
 
 ## Recommended Project Structure
 
-The performance features do not require new top-level folders. All additions are targeted modifications or small new files within existing directories.
+### Test File Placement: Colocated, Not Separated
+
+Place unit test files adjacent to the source file they test. This is the correct pattern for this codebase because:
+
+1. Vitest's `include` already matches `src/**/*.test.ts` — no config change needed
+2. Colocated tests make import paths short (`../dag` becomes `./dag` or just `'./dag.js'`)
+3. Source-adjacent placement prevents test files from drifting out of sync with implementations
+4. Integration tests remain in `tests/integration/` — the separation between unit and integration is `src/` vs `tests/`
 
 ```
 src/
-├── cache/
-│   └── round-cache.ts          # EXISTS — minor: add getCacheStatus() helper
-├── analyzers/
-│   └── cache.ts                # EXISTS — verify coordinator uses it fully
-├── providers/
-│   ├── base.ts                 # MODIFY — add hasStreamingSupport() to interface
-│   ├── base-provider.ts        # MODIFY — add completeStream() with fallback
-│   ├── anthropic.ts            # MODIFY — add cache_control headers to doComplete()
-│   ├── openai-compat.ts        # MODIFY — add stream: true path for compatible providers
-│   └── streaming.ts            # NEW — StreamChunk type, streaming result utilities
+├── orchestrator/
+│   ├── dag.ts
+│   ├── dag.test.ts         # tests for DAGOrchestrator class
+│   ├── step.ts
+│   └── step.test.ts        # tests for createStep() factory
 ├── context/
-│   └── token-counter.ts        # MODIFY — optional: more accurate estimator
-├── ai-rounds/
-│   ├── round-5-edge-cases.ts   # VERIFY deps, no change if already correct
-│   └── round-6-deployment.ts   # VERIFY deps, no change if already correct
-├── cli/
-│   └── generate.ts             # MODIFY — --stream flag, wiring
+│   ├── scorer.ts
+│   ├── scorer.test.ts      # tests for scoreFiles()
+│   ├── packer.ts
+│   ├── packer.test.ts      # tests for packFiles()
+│   ├── token-counter.ts
+│   ├── token-counter.test.ts
+│   └── tracker.ts
+│   └── tracker.test.ts
 ├── config/
-│   └── schema.ts               # MODIFY — performance config block
-└── ui/
-    ├── types.ts                 # MODIFY — streaming display state
-    └── renderer.ts              # MODIFY — onRoundToken() callback
+│   ├── schema.ts
+│   ├── schema.test.ts      # Zod schema validation tests
+│   ├── loader.ts
+│   └── loader.test.ts      # loadConfig() precedence tests
+├── ai-rounds/
+│   ├── validator.ts
+│   ├── validator.test.ts   # claim validation unit tests
+│   ├── quality.ts
+│   ├── quality.test.ts
+│   ├── runner.ts
+│   └── runner.test.ts      # executeRound() with mock provider
+├── analyzers/
+│   ├── todo-scanner.ts
+│   ├── todo-scanner.test.ts  # scanFileForTodos() pure logic
+│   └── coordinator.test.ts   # allSettled failure isolation
+└── renderers/
+    ├── registry.ts
+    ├── registry.test.ts    # resolveSelectedDocs(), computeRequiredRounds()
+    └── utils.test.ts       # buildTable(), etc.
 ```
 
 ### Structure Rationale
 
-- **No new top-level folders:** All performance features are modifications to existing layers. Creating `src/performance/` or `src/streaming/` would fragment cohesion — streaming belongs in `providers/`, caching belongs in `cache/`, token work belongs in `context/`.
-- **streaming.ts in providers/:** Streaming is a provider capability, not a pipeline concept. The type definitions and utilities belong alongside the providers that use them.
-- **Schema changes minimal:** One new `performance` block in `HandoverConfigSchema` controls all performance flags. This keeps config discoverable and opt-in.
+- **`src/**/\*.test.ts` pattern:\*\* Already in vitest include config — zero config changes required.
+- **No `tests/unit/` directory:** Putting unit tests in a separate top-level directory creates the same maintenance problem as monolithic test files — distance from the code being tested.
+- **`tests/integration/` stays unchanged:** The integration tests run against the built CLI and require `npm run build` first. They are fundamentally different from unit tests. Keeping them separate preserves this distinction.
+- **Shared test utilities for unit tests:** If shared fixtures or mock factories are needed, add `src/__tests__/helpers.ts` or colocate a `fixtures.ts` file next to the module under test.
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Prompt Caching via cache_control Headers (Anthropic)
+### Pattern 1: Mock LLMProvider Interface with vi.fn()
 
-**What:** Anthropic's API supports marking message content blocks with `"cache_control": {"type": "ephemeral"}`. Cached blocks are stored for 5 minutes and cost 10% of normal input tokens on cache hit (90% discount). Cache miss costs 25% extra but subsequent hits recoup this immediately.
+**What:** The `LLMProvider` interface has three methods (`complete`, `estimateTokens`, `maxContextTokens`). Create a mock object satisfying the interface using `vi.fn()` for each method. This avoids any real API calls in unit tests.
 
-**When to use:** Mark the static system context (file tree, dependency summary, static analysis data) as cacheable. This context is identical across all 6 rounds in a single run. Without prompt caching, this context is re-tokenized and billed 6 times. With prompt caching, it is tokenized once; rounds 2-6 pay 10%.
+**When to use:** Any test that exercises code receiving an `LLMProvider` — primarily `executeRound()` in `src/ai-rounds/runner.ts` and `estimateTokens()` in `src/context/token-counter.ts`.
 
-**Trade-offs:** Only available on Anthropic provider. Other providers do not have equivalent. Must be guarded by provider check. Cache is ephemeral (5 minutes) — only useful within a single `handover generate` run, not across runs.
+**Trade-offs:** Interface mocks require manual maintenance when the interface changes. Use them only at explicit boundaries — do not mock deeply into implementations.
 
-**Example — modified AnthropicProvider.doComplete():**
+**Example:**
 
 ```typescript
-// In src/providers/anthropic.ts
-protected async doComplete<T>(
-  request: CompletionRequest,
-  schema: z.ZodType<T>,
-): Promise<CompletionResult & { data: T }> {
-  const inputSchema = zodToToolSchema(schema) as Anthropic.Tool.InputSchema;
+// src/ai-rounds/runner.test.ts
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import type { LLMProvider } from '../providers/base.js';
+import { executeRound } from './runner.js';
+import { z } from 'zod';
 
-  // Mark the static context in system prompt as cacheable
-  // This is the large block of file content / static analysis data
-  const systemContent: Anthropic.TextBlockParam[] = request.cacheablePrefix
-    ? [
-        {
-          type: 'text',
-          text: request.cacheablePrefix,
-          cache_control: { type: 'ephemeral' },  // <-- NEW
-        },
-        {
-          type: 'text',
-          text: request.systemPrompt,
-        },
-      ]
-    : [{ type: 'text', text: request.systemPrompt }];
+function makeMockProvider(overrides?: Partial<LLMProvider>): LLMProvider {
+  return {
+    name: 'mock',
+    complete: vi.fn(),
+    estimateTokens: vi.fn((text: string) => Math.ceil(text.length / 4)),
+    maxContextTokens: vi.fn(() => 200_000),
+    ...overrides,
+  };
+}
 
-  const response = await this.client.messages.create({
-    model: this.model,
-    max_tokens: request.maxTokens ?? 4096,
-    system: systemContent,  // now array, not string
-    messages: [{ role: 'user', content: request.userPrompt }],
-    // ... tools unchanged
-    betas: ['prompt-caching-2024-07-31'],  // required for cache_control
+describe('executeRound', () => {
+  it('returns degraded result when provider throws', async () => {
+    const provider = makeMockProvider({
+      complete: vi.fn().mockRejectedValue(new Error('network error')),
+    });
+    // ... test graceful degradation path
   });
-  // ...
-}
+});
 ```
 
-**CompletionRequest must be extended:**
+### Pattern 2: DAGOrchestrator Testing via Step Injection
+
+**What:** `DAGOrchestrator` accepts `StepDefinition[]` where each step has an `execute` callback. Tests can inject `vi.fn()` callbacks to control step outcomes (success, failure, ordering) without any real pipeline code running.
+
+**When to use:** All DAG tests — topology validation, cycle detection, skip propagation, parallel execution ordering.
+
+**Trade-offs:** Tests of the DAG are purely structural. They verify the orchestrator's scheduling logic, not the steps themselves. Keep DAG tests focused on orchestration behavior only.
+
+**Example:**
 
 ```typescript
-// In src/domain/types.ts
-export interface CompletionRequest {
-  systemPrompt: string;
-  userPrompt: string;
-  maxTokens?: number;
-  temperature?: number;
-  cacheablePrefix?: string; // NEW — stable context block to cache
-}
+// src/orchestrator/dag.test.ts
+import { describe, it, expect, vi } from 'vitest';
+import { DAGOrchestrator } from './dag.js';
+import { createStep } from './step.js';
+
+describe('DAGOrchestrator', () => {
+  it('executes independent steps in parallel', async () => {
+    const dag = new DAGOrchestrator();
+    const order: string[] = [];
+
+    dag.addSteps([
+      createStep({
+        id: 'a',
+        name: 'A',
+        deps: [],
+        execute: async () => {
+          order.push('a');
+          return {};
+        },
+      }),
+      createStep({
+        id: 'b',
+        name: 'B',
+        deps: [],
+        execute: async () => {
+          order.push('b');
+          return {};
+        },
+      }),
+      createStep({ id: 'c', name: 'C', deps: ['a', 'b'], execute: async () => 'done' }),
+    ]);
+
+    const results = await dag.execute();
+    expect(results.get('c')?.status).toBe('completed');
+    // a and b both ran before c
+    expect(order).toContain('a');
+    expect(order).toContain('b');
+  });
+
+  it('skips dependents when a step fails', async () => {
+    const dag = new DAGOrchestrator();
+    dag.addSteps([
+      createStep({
+        id: 'fail',
+        name: 'Fail',
+        deps: [],
+        execute: async () => {
+          throw new Error('boom');
+        },
+      }),
+      createStep({ id: 'skip-me', name: 'Skip', deps: ['fail'], execute: vi.fn() }),
+    ]);
+
+    const results = await dag.execute();
+    expect(results.get('fail')?.status).toBe('failed');
+    expect(results.get('skip-me')?.status).toBe('skipped');
+  });
+
+  it('detects cycles during validate()', () => {
+    const dag = new DAGOrchestrator();
+    dag.addSteps([
+      createStep({ id: 'x', name: 'X', deps: ['y'], execute: async () => {} }),
+      createStep({ id: 'y', name: 'Y', deps: ['x'], execute: async () => {} }),
+    ]);
+    const { valid, errors } = dag.validate();
+    expect(valid).toBe(false);
+    expect(errors[0]).toMatch(/cyclic/i);
+  });
+});
 ```
 
-**Where `cacheablePrefix` comes from:** The packed file context (`packedContext.fileContent`) is the stable prefix — it does not change between rounds. The per-round instructions go in `systemPrompt`. The round factory (`src/ai-rounds/round-factory.ts`) passes `packedContext` already; extracting the file content into `cacheablePrefix` is a targeted change there.
+### Pattern 3: Zod Schema Testing — Valid, Invalid, and Edge Cases
 
-### Pattern 2: Parallel Round Execution via DAG Dependency Declaration
+**What:** Test `HandoverConfigSchema` and all AI round output schemas by calling `.safeParse()` directly with constructed inputs. No mocking needed — Zod schemas are pure functions over their input.
 
-**What:** The existing DAGOrchestrator already supports parallel execution — independent steps run via `Promise.race`. The bottleneck is dependency declarations. Rounds 5 and 6 both depend only on rounds 1 and 2, making them candidates for parallel execution.
+**When to use:** All config schema tests, all AI round output schema tests. This catches schema regressions when fields are added, renamed, or made required.
 
-**When to use:** Any two rounds that do not consume each other's output can be declared with the same dependencies and will run in parallel automatically.
+**Trade-offs:** Tests are tightly coupled to schema shape. Schema changes require test updates. This coupling is intentional — it prevents silent schema drift.
 
-**Trade-offs:** Round execution order becomes non-deterministic for rounds with same deps. This is fine — rounds are independent by design. The `roundResults` Map in generate.ts is safe because DAG guarantees a round's `execute()` only runs after its deps complete.
-
-**Example — verifying round dep declarations:**
+**Example:**
 
 ```typescript
-// src/ai-rounds/round-5-edge-cases.ts
-export const ROUND_5_CONFIG: StandardRoundConfig<Round5Output> = {
-  roundNumber: 5,
-  name: 'Edge Cases & Conventions',
-  deps: ['static-analysis', 'ai-round-1', 'ai-round-2'], // NOT round 3 or 4
-  // ...
+// src/config/schema.test.ts
+import { describe, it, expect } from 'vitest';
+import { HandoverConfigSchema } from './schema.js';
+
+describe('HandoverConfigSchema', () => {
+  it('accepts minimal config (zero-config mode)', () => {
+    const result = HandoverConfigSchema.safeParse({});
+    expect(result.success).toBe(true);
+    expect(result.data?.provider).toBe('anthropic');
+    expect(result.data?.audience).toBe('human');
+    expect(result.data?.analysis.concurrency).toBe(4);
+  });
+
+  it('rejects negative concurrency', () => {
+    const result = HandoverConfigSchema.safeParse({ analysis: { concurrency: -1 } });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path).toEqual(['analysis', 'concurrency']);
+  });
+
+  it('rejects invalid baseUrl format', () => {
+    const result = HandoverConfigSchema.safeParse({ baseUrl: 'not-a-url' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unknown provider values', () => {
+    const result = HandoverConfigSchema.safeParse({ provider: 'unknown-llm' });
+    expect(result.success).toBe(false);
+  });
+});
+```
+
+### Pattern 4: Pure Analyzer Logic — Fixture-Driven Tests
+
+**What:** Static analyzer functions that take `AnalysisContext` or return typed result objects are testable by constructing minimal fixture objects. The key insight is that most analyzers have a pure inner function (e.g., `scanFileForTodos`) that processes strings and returns typed data.
+
+**When to use:** `scanFileForTodos()`, `scoreFiles()`, `validateFileClaims()`, `generateSignatureSummary()`, and any analyzer function that does not touch the filesystem directly.
+
+**Trade-offs:** Filesystem-touching functions (`scanTodos()`, `analyzeFileTree()`) are harder to unit test. Test the pure inner logic; leave the I/O coordinator to integration tests.
+
+**Example:**
+
+```typescript
+// src/analyzers/todo-scanner.test.ts
+import { describe, it, expect } from 'vitest';
+// Note: scanFileForTodos is not exported — test the exported scanTodos
+// OR restructure to export the pure function.
+// If not exported, test via the public contract or export it.
+
+// Preferred: export scanFileForTodos from todo-scanner.ts for testability
+import { scanFileForTodos } from './todo-scanner.js';
+
+describe('scanFileForTodos', () => {
+  it('detects TODO marker with text', () => {
+    const items = scanFileForTodos('// TODO: fix this\nconst x = 1;', 'src/foo.ts');
+    expect(items).toHaveLength(1);
+    expect(items[0].marker).toBe('TODO');
+    expect(items[0].category).toBe('tasks');
+    expect(items[0].text).toBe('fix this');
+    expect(items[0].line).toBe(1);
+  });
+
+  it('extracts issue references from TODO line', () => {
+    const items = scanFileForTodos('// TODO: fix #123 and JIRA-456', 'src/foo.ts');
+    expect(items[0].issueRefs).toEqual(['#123', 'JIRA-456']);
+  });
+
+  it('classifies FIXME as bugs category', () => {
+    const items = scanFileForTodos('// FIXME: broken edge case', 'src/bar.ts');
+    expect(items[0].category).toBe('bugs');
+  });
+
+  it('returns empty array for files with no markers', () => {
+    const items = scanFileForTodos('const x = 1;\nconst y = 2;', 'src/clean.ts');
+    expect(items).toHaveLength(0);
+  });
+});
+```
+
+### Pattern 5: Renderer Testing via RenderContext Fixtures
+
+**What:** Renderer functions (`renderOverview`, `renderArchitecture`, etc.) take a `RenderContext` object and return a markdown string. They are pure functions with no external dependencies. Test by constructing minimal `RenderContext` fixtures and asserting on the output string.
+
+**When to use:** All 14 renderer functions, renderer utilities (`buildTable`, `codeRef`, `sectionIntro`), and `renderDocument` template.
+
+**Trade-offs:** Constructing a minimal `RenderContext` requires understanding all required fields. Extract a `makeRenderContext()` factory function shared across renderer tests to reduce duplication.
+
+**Example:**
+
+```typescript
+// src/renderers/registry.test.ts
+import { describe, it, expect } from 'vitest';
+import { resolveSelectedDocs, computeRequiredRounds, DOCUMENT_REGISTRY } from './registry.js';
+
+describe('resolveSelectedDocs', () => {
+  it('returns all docs when onlyFlag is undefined', () => {
+    const docs = resolveSelectedDocs(undefined, DOCUMENT_REGISTRY);
+    expect(docs).toHaveLength(DOCUMENT_REGISTRY.length);
+  });
+
+  it('always includes INDEX when alias is specified', () => {
+    const docs = resolveSelectedDocs('overview', DOCUMENT_REGISTRY);
+    expect(docs.map((d) => d.id)).toContain('00-index');
+  });
+
+  it('throws on unknown alias', () => {
+    expect(() => resolveSelectedDocs('not-a-doc', DOCUMENT_REGISTRY)).toThrow(
+      /unknown document alias/i,
+    );
+  });
+
+  it('expands group aliases', () => {
+    const docs = resolveSelectedDocs('core', DOCUMENT_REGISTRY);
+    const ids = docs.map((d) => d.id);
+    expect(ids).toContain('03-architecture');
+    expect(ids).toContain('06-modules');
+    expect(ids).toContain('05-features');
+  });
+});
+
+describe('computeRequiredRounds', () => {
+  it('returns empty set for index-only docs', () => {
+    const indexDoc = DOCUMENT_REGISTRY.find((d) => d.id === '00-index')!;
+    const rounds = computeRequiredRounds([indexDoc]);
+    expect(rounds.size).toBe(0);
+  });
+
+  it('expands transitive deps for round 4 (needs rounds 1-3)', () => {
+    const archDoc = DOCUMENT_REGISTRY.find((d) => d.id === '03-architecture')!;
+    const rounds = computeRequiredRounds([archDoc]);
+    expect(rounds.has(1)).toBe(true);
+    expect(rounds.has(2)).toBe(true);
+    expect(rounds.has(3)).toBe(true);
+    expect(rounds.has(4)).toBe(true);
+  });
+});
+```
+
+### Pattern 6: Context Packer Testing via Injected I/O
+
+**What:** `packFiles()` accepts a `getFileContent: (path: string) => Promise<string>` callback. This seam allows unit tests to inject controlled file content without touching the filesystem. Combined with fixture `FilePriority[]` and `ASTResult` objects, the full packing algorithm is testable in isolation.
+
+**When to use:** `packFiles()` in `src/context/packer.ts` — all tier assignment logic, budget boundary conditions, oversized file handling, changed-file priority.
+
+**Trade-offs:** Constructing realistic `FilePriority[]` and `ASTResult` requires some fixture verbosity. Extract a `makeFilePriority()` helper to reduce repetition.
+
+**Example:**
+
+```typescript
+// src/context/packer.test.ts
+import { describe, it, expect, vi } from 'vitest';
+import { packFiles } from './packer.js';
+import type { FilePriority, TokenBudget } from './types.js';
+import type { ASTResult } from '../analyzers/types.js';
+
+const EMPTY_AST: ASTResult = {
+  files: [],
+  summary: {
+    totalFunctions: 0,
+    totalClasses: 0,
+    totalExports: 0,
+    totalImports: 0,
+    languageBreakdown: {},
+  },
 };
 
-// src/ai-rounds/round-6-deployment.ts
-export const ROUND_6_CONFIG: StandardRoundConfig<Round6Output> = {
-  roundNumber: 6,
-  name: 'Deployment Inference',
-  deps: ['static-analysis', 'ai-round-1', 'ai-round-2'], // NOT round 3 or 4
-  // ...
+const TIGHT_BUDGET: TokenBudget = {
+  total: 10_000,
+  promptOverhead: 3000,
+  outputReserve: 4096,
+  fileContentBudget: 1000, // very tight
 };
-```
 
-If rounds 5 and 6 currently declare these deps, parallel execution is free — no orchestrator changes needed. If they over-declare (e.g., depending on round 3 or 4 when they don't use those results), removing the excess deps is the only change needed.
+describe('packFiles', () => {
+  it('returns empty PackedContext for empty scored list', async () => {
+    const result = await packFiles(
+      [],
+      EMPTY_AST,
+      TIGHT_BUDGET,
+      (t) => Math.ceil(t.length / 4),
+      vi.fn(),
+    );
+    expect(result.files).toHaveLength(0);
+    expect(result.metadata.totalFiles).toBe(0);
+  });
 
-**Analyzer parallelism:** `config.analysis.concurrency` already exists in the schema (default: 4). Verify `src/analyzers/coordinator.ts` respects this value when running the 8 analyzers concurrently.
+  it('assigns full tier when file fits in budget', async () => {
+    const scored: FilePriority[] = [{ path: 'src/foo.ts', score: 50, breakdown: {} as any }];
+    const content = 'const x = 1;'; // ~3 tokens
+    const getContent = vi.fn().mockResolvedValue(content);
 
-### Pattern 3: Streaming with Deferred Schema Validation
+    const result = await packFiles(
+      scored,
+      EMPTY_AST,
+      TIGHT_BUDGET,
+      (t) => Math.ceil(t.length / 4),
+      getContent,
+    );
+    expect(result.files[0].tier).toBe('full');
+    expect(result.files[0].content).toBe(content);
+  });
 
-**What:** LLM APIs support streaming responses (token by token) for faster perceived performance. However, Anthropic's `tool_use` and OpenAI's `function_call` structured output patterns require the complete JSON before Zod validation can run. The streaming pattern for structured output is: stream the raw text, accumulate it, then parse and validate the complete JSON at stream end.
+  it('assigns skip tier when budget is exhausted', async () => {
+    // Budget allows only first file; second must be skipped
+    const scored: FilePriority[] = [
+      { path: 'src/big.ts', score: 50, breakdown: {} as any },
+      { path: 'src/also-big.ts', score: 40, breakdown: {} as any },
+    ];
+    const bigContent = 'x'.repeat(5000); // exceeds budget
+    const getContent = vi.fn().mockResolvedValue(bigContent);
 
-**When to use:** When `--stream` is enabled and the provider supports streaming. Stream is opt-in because it complicates error handling and adds UI state management complexity.
-
-**Trade-offs:** Streaming does not reduce total LLM token cost or total execution time — it only improves perceived latency (user sees activity rather than a spinning cursor). For long rounds (4096 max_tokens), streaming shows output token-by-token which is visible. For structured output, the JSON is not meaningful until complete — but the user sees characters appearing, signaling progress.
-
-**Example — new streaming.ts types:**
-
-```typescript
-// src/providers/streaming.ts
-export interface StreamChunk {
-  type: 'token' | 'done' | 'error';
-  content?: string; // token text
-  error?: Error; // on error
-  fullText?: string; // on done: accumulated text
-}
-
-export type StreamCallback = (chunk: StreamChunk) => void;
-```
-
-**Example — interface extension in base.ts:**
-
-```typescript
-// src/providers/base.ts
-export interface LLMProvider {
-  readonly name: string;
-  complete<T>(request: CompletionRequest, schema: z.ZodType<T>, options?: {...}): Promise<CompletionResult & { data: T }>;
-  estimateTokens(text: string): number;
-  maxContextTokens(): number;
-  supportsStreaming(): boolean;  // NEW — providers declare capability
-}
-```
-
-**Example — UI integration:**
-
-```typescript
-// src/ui/types.ts (extend Renderer interface)
-export interface Renderer {
-  // ... existing methods
-  onRoundToken?(roundNum: number, token: string): void; // NEW — optional
-}
-```
-
-The `TerminalRenderer` shows a character counter or partial text indicator when `onRoundToken` is called. The `CIRenderer` ignores it (no-op). Both are safe because the method is optional.
-
-### Pattern 4: Improved Token Estimation
-
-**What:** The current `estimateTokens(text)` uses `Math.ceil(text.length / 4)` — the chars/4 heuristic. This is accurate within 15-20% for English code. For token budget computation (`computeTokenBudget`), this inaccuracy compounds: if the budget is calculated at 200K tokens but the actual usage is 15% higher, files get packed that overflow the context window.
-
-**When to use:** A more accurate estimator benefits all runs. The improvement is in `src/context/token-counter.ts` and the provider's `estimateTokens()` implementation.
-
-**Recommended approach:** Use `js-tiktoken` (the JavaScript port of OpenAI's tiktoken) for GPT-family providers. For Anthropic, the chars/4 heuristic is closer to accurate because Claude uses a similar tokenizer. Alternatively, use the Anthropic token counting API endpoint (`/v1/messages/count_tokens`) as a pre-flight check — but this adds latency and an extra API call.
-
-**Practical recommendation:** Keep chars/4 as the default. Add `tiktoken` as an optional estimator for OpenAI-family providers when `performance.preciseTokenCounting: true` is in config. The complexity budget for this feature is low relative to prompt caching.
-
-**Example — config schema extension:**
-
-```typescript
-// src/config/schema.ts
-export const HandoverConfigSchema = z.object({
-  // ... existing fields
-  performance: z
-    .object({
-      promptCache: z.boolean().default(true), // Anthropic prompt caching
-      streaming: z.boolean().default(false), // streaming output
-      preciseTokenCounting: z.boolean().default(false), // tiktoken estimator
-    })
-    .default({}),
+    const result = await packFiles(
+      scored,
+      EMPTY_AST,
+      TIGHT_BUDGET,
+      (t) => Math.ceil(t.length / 4),
+      getContent,
+    );
+    // At least one file should be skipped
+    expect(result.files.some((f) => f.tier === 'skip')).toBe(true);
+  });
 });
 ```
 
@@ -333,238 +507,247 @@ export const HandoverConfigSchema = z.object({
 
 ## Data Flow
 
-### Caching Flow (per-run)
+### Mock Data Flow for Unit Tests
 
 ```
-generate.ts starts
-    ↓
-RoundCache.getCachedRounds()  → check what's already cached
-    ↓
-[for each required round]
-    wrapWithCache() checks hash
-        ├── HIT:  return cached result, mark UI as 'cached', skip LLM call
-        └── MISS: execute round → LLM call → store result → return
-    ↓
-All rounds complete (mix of cache hits and LLM calls)
-    ↓
-Render step (reads roundResults, all populated regardless of hit/miss)
+Test file
+    │
+    ├── Construct fixture inputs (inline objects or factory functions)
+    │     e.g., { fileTree: { directoryTree: [...] }, ... }
+    │
+    ├── Inject mocks for I/O seams
+    │     e.g., getFileContent: vi.fn().mockResolvedValue('content')
+    │         or provider.complete: vi.fn().mockResolvedValue({ data: {...}, usage: {...} })
+    │
+    ├── Call function under test directly (no subprocess, no CLI)
+    │     e.g., scoreFiles(analysis)
+    │         or executeRound({ provider: mockProvider, ... })
+    │
+    └── Assert on returned value
+          e.g., expect(result[0].score).toBe(45)
+              or expect(provider.complete).toHaveBeenCalledOnce()
 ```
 
-### Parallel Round Flow
+### Dependency Graph for Test Modules
+
+Tests are ordered from fewest to most dependencies. Build tests bottom-up:
 
 ```
-static-analysis step completes
-    ↓ (DAGOrchestrator checkDependents triggers)
-ai-round-1 starts
-    ↓ (ai-round-1 completes)
-ai-round-2 starts (depends on round-1)
-    ↓ (ai-round-2 completes)
-ai-round-3 starts (depends on rounds 1,2)
-ai-round-4 starts (depends on rounds 1,2,3 — waits for 3)
-ai-round-5 starts (depends on rounds 1,2 — starts same time as 3)  ← parallel
-ai-round-6 starts (depends on rounds 1,2 — starts same time as 3)  ← parallel
-    ↓ (all terminal rounds complete)
-render step starts
+Layer 0 (no deps):
+  src/config/schema.test.ts          — Zod only, no imports
+  src/utils/errors.test.ts           — pure classes
+  src/orchestrator/step.test.ts      — pure factory
+  src/context/token-counter.test.ts  — math functions
+
+Layer 1 (depend on Layer 0 types):
+  src/orchestrator/dag.test.ts       — uses StepDefinition interface
+  src/config/loader.test.ts          — uses HandoverConfigSchema
+  src/analyzers/todo-scanner.test.ts — uses TodoItem type
+  src/context/tracker.test.ts        — standalone class
+
+Layer 2 (depend on Layer 1 outputs):
+  src/context/scorer.test.ts         — uses StaticAnalysisResult fixtures
+  src/ai-rounds/validator.test.ts    — uses StaticAnalysisResult fixtures
+  src/renderers/registry.test.ts     — uses DOCUMENT_REGISTRY
+  src/providers/factory.test.ts      — uses HandoverConfig type
+
+Layer 3 (depend on Layer 2, use mock interfaces):
+  src/context/packer.test.ts         — uses scored FilePriority[], injected getFileContent
+  src/ai-rounds/runner.test.ts       — uses mock LLMProvider
+  src/renderers/render-01-overview.test.ts  — uses RenderContext fixture
+
+Layer 4 (end-to-end unit, still no real I/O):
+  src/analyzers/coordinator.test.ts  — tests allSettled failure isolation with mock analyzers
 ```
 
-Note: Rounds 3 and 4 remain sequential (4 depends on 3). Rounds 5 and 6 run in parallel with rounds 3 and 4 if their deps are correctly declared.
+### Key Data Flows for Mocking
 
-### Streaming Flow (per round, when enabled)
+1. **LLMProvider mock flow:** Tests inject a mock `LLMProvider` into `executeRound()`. The mock `complete()` returns a pre-constructed `CompletionResult & { data: T }` object. This verifies the runner's validation, quality checking, retry, and fallback logic without any network calls.
 
-```
-provider.completeStream(request, onChunk) called
-    ↓
-LLM streams tokens
-    ↓ (each token)
-onChunk({ type: 'token', content: '...' })
-    → renderer.onRoundToken(roundNum, token)
-    → UI shows partial output indicator
-    ↓ (stream ends)
-onChunk({ type: 'done', fullText: '...' })
-    → Zod schema.parse(JSON.parse(fullText))
-    → validation and quality check run on complete data
-    → RoundCache.set() stores complete validated result
-```
+2. **AnalysisContext mock flow:** Analyzer unit tests construct a minimal `AnalysisContext` with `files: []` or a small array of `{ path, absolutePath, extension }` objects. The `ctx.cache` is mocked with `{ get: vi.fn(), set: vi.fn() }`. This lets each analyzer's pure logic run without filesystem access.
 
-### Prompt Cache Flow (Anthropic, within a single run)
+3. **loadConfig() environment isolation:** `loadConfig()` reads `process.env` and `fs.existsSync`. Use `vi.spyOn(process, 'env', 'get')` or set env vars in `beforeEach`/`afterEach` with restoration. Use `vi.spyOn(fs, 'existsSync')` to control whether `.handover.yml` appears to exist.
 
-```
-Round 1 call:
-  system: [{ text: packedFileContent, cache_control: ephemeral }, { text: round1Instructions }]
-  → Anthropic stores packedFileContent in cache for 5 minutes
-  → Usage: cache_creation_input_tokens (billed at 125%)
-
-Round 2 call:
-  system: [{ text: packedFileContent, cache_control: ephemeral }, { text: round2Instructions }]
-  → Anthropic recognizes same prefix in cache
-  → Usage: cache_read_input_tokens (billed at 10%)
-
-Rounds 3-6: same pattern → each pays 10% for the large static context block
-```
-
-### Key Data Flows
-
-1. **Cache hit bypasses `executeRound`:** When `wrapWithCache()` returns cached data, it stores directly into `roundResults` and updates UI state. The `executeRound` function is never called, saving the LLM API call, all retry logic, and quality checking.
-
-2. **Parallel rounds share `roundResults` safely:** The `roundResults` Map is shared mutable state. It is safe because the DAG guarantees sequential-by-dependency execution — a round's `execute()` cannot read from `roundResults` before its declared deps have written to it.
-
-3. **Prompt caching is transparent to round logic:** Round factories build prompts as normal. The `cacheablePrefix` extraction happens in the round factory or the prompt builder — round-specific logic does not change.
-
-4. **Streaming fallback is provider-local:** If `completeStream` is not implemented or `supportsStreaming()` returns false, `BaseProvider.complete()` is called unchanged. The streaming path is additive, not replacing the existing path.
+4. **DAG event tracking:** `DAGOrchestrator` accepts a `DAGEvents` object at construction. Tests can pass `{ onStepStart: vi.fn(), onStepComplete: vi.fn() }` to assert that events fire correctly during execution.
 
 ---
 
 ## Scaling Considerations
 
-These performance features target the primary pain point: a single `handover generate` run takes 3-8 minutes on a medium-sized codebase, mostly waiting for 6 sequential LLM API calls.
+This is a test infrastructure concern, not a user-scale concern. The relevant question is: how do test run times scale as tests are added?
 
-| Concern          | Current      | With Parallel (rounds 5+6) | With Prompt Cache                       | With Round Cache (2nd run)  |
-| ---------------- | ------------ | -------------------------- | --------------------------------------- | --------------------------- |
-| Total LLM calls  | 6 sequential | ~4 sequential steps        | 6 calls, 5 cached reads                 | 0 (full hit) or partial     |
-| Perceived wait   | 3-8 min      | ~2-4 min                   | 3-8 min (savings are cost, not latency) | <30s (static analysis only) |
-| Token cost       | 100%         | 100%                       | ~20-30%                                 | 0%                          |
-| Code change size | —            | Small (dep declarations)   | Medium (provider layer)                 | Already implemented         |
+| Test Count                | Expected Run Time | Notes                          |
+| ------------------------- | ----------------- | ------------------------------ |
+| 0-50 unit tests           | < 1 second        | Pure functions, no I/O         |
+| 50-200 unit tests         | 2-5 seconds       | Mostly pure, minimal async     |
+| 200+ unit tests           | 5-30 seconds      | Depends on async fixture setup |
+| Integration tests (gated) | 2-10 minutes      | Unchanged — require env var    |
 
 ### Scaling Priorities
 
-1. **First win: Round cache is already implemented.** Second runs on an unchanged codebase skip all LLM calls. This is the highest-ROI feature. Ensure it is correctly wired and working.
+1. **First constraint: Test timeout.** The current vitest timeout is 120 seconds (set for integration tests). Unit tests should complete in milliseconds. Do not lower the global timeout — add `timeout: 5000` at the `describe` level for test files that do not need 2-minute timeouts.
 
-2. **Second win: Parallel rounds 5+6.** Rounds 5 and 6 have identical deps (rounds 1, 2) and do not consume each other's output. If their dep declarations are correct, the DAG runs them concurrently automatically. This is potentially zero code change if the dep declarations are already minimal.
+2. **Second constraint: ESM module mock hoisting.** Vitest hoists `vi.mock()` calls to the top of the file in ESM mode. For ESM projects (this codebase uses `"type": "module"`), module mocking via `vi.mock()` works correctly. Avoid `vi.doMock()` for static analysis — use it only for tests that require dynamic mock switching.
 
-3. **Third win: Prompt caching.** 70-80% token cost reduction on rounds 2-6 for Anthropic users. Medium code change in the provider layer. No impact on other providers.
-
-4. **Fourth win: Streaming.** Improves perceived latency only. Medium complexity — new UI state, new provider path, careful error handling. Lower ROI than caching but noticeable UX improvement for first-time runs.
-
-5. **Defer: Precise token counting.** The chars/4 heuristic is sufficient. Tiktoken adds a dependency with marginal accuracy gain. Address only if token budget overflows are observed in practice.
+3. **Third constraint: Coverage thresholds.** The current config requires 80% coverage on lines/functions/branches. Adding unit tests will increase coverage significantly. The threshold is a floor — do not lower it if a new test reveals a gap.
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Adding a Separate Cache Layer for Prompt Caching
+### Anti-Pattern 1: Testing Implementation Details Inside DAGOrchestrator
 
-**What people do:** Create a new `src/cache/prompt-cache.ts` to "manage" Anthropic prompt caching.
+**What people do:** Mock the `Map` internals, spy on `checkDependents` private methods, or assert on the `inDegree` Map state.
 
-**Why it's wrong:** Anthropic prompt caching is managed entirely by the Anthropic API — it's ephemeral (5 minute TTL), automatic on subsequent calls with the same prefix, and requires no client-side state management. Adding a client-side cache layer for something the API already manages is pure overhead.
+**Why it's wrong:** Private implementation details of `DAGOrchestrator` can change without breaking the contract. Tests of internals become maintenance debt — every refactor breaks them.
 
-**Do this instead:** Add `cache_control` headers in `AnthropicProvider.doComplete()` and add `cacheablePrefix` to `CompletionRequest`. That's the entire implementation. No new cache class.
+**Do this instead:** Test only observable behavior: `dag.execute()` returns the correct `Map<string, StepResult>`, steps fire in the correct order (verified via side effects in execute callbacks), skipped steps have status 'skipped'. The `validate()` method is public and directly testable.
 
-### Anti-Pattern 2: Streaming with Partial JSON Validation
+### Anti-Pattern 2: Creating a `MockProvider` Class
 
-**What people do:** Try to validate the streaming Zod schema as tokens arrive, using partial JSON parsers.
+**What people do:** Write a `MockProvider extends BaseProvider` class with stub implementations for all methods.
 
-**Why it's wrong:** Handover's structured output uses Anthropic's `tool_use` block and OpenAI's `function_call`, both of which require the complete JSON string before Zod can validate. Partial JSON parsers are fragile and add complexity without benefit — the schema validation needs the full response regardless.
+**Why it's wrong:** A `MockProvider` class encodes assumptions about how the mock should behave across all tests. Tests that need different mock behavior (e.g., one test wants the provider to throw, another wants it to return cached data) need subclasses or mutating state.
 
-**Do this instead:** Stream tokens for UI feedback only. Accumulate the full text. Parse and validate at stream end exactly as the non-streaming path does.
+**Do this instead:** Use `vi.fn()` to create the minimal object satisfying `LLMProvider` interface per test. The `makeMockProvider(overrides?)` factory pattern (shown in Pattern 1) provides defaults while allowing per-test customization without a class hierarchy.
 
-### Anti-Pattern 3: Changing DAGOrchestrator for Parallelism
+### Anti-Pattern 3: Placing Unit Tests in `tests/unit/`
 
-**What people do:** Add concurrency controls, thread pools, or max-parallel settings to DAGOrchestrator.
+**What people do:** Create `tests/unit/orchestrator/dag.test.ts` to mirror the source tree.
 
-**Why it's wrong:** The DAGOrchestrator already runs independent steps in parallel via `Promise.race` (line 227 in dag.ts). The concurrency model is correct. The only thing preventing rounds 5 and 6 from running in parallel is their dependency declarations. Fix the declarations, not the orchestrator.
+**Why it's wrong:** Path duplication (`src/orchestrator/dag.ts` ↔ `tests/unit/orchestrator/dag.test.ts`) means two places to update when source is moved or renamed. Import paths become long (`../../../src/orchestrator/dag.js`).
 
-**Do this instead:** Audit the dep declarations in `round-5-edge-cases.ts` and `round-6-deployment.ts`. Remove any over-declared deps (deps that the round doesn't actually consume). The orchestrator will handle the rest.
+**Do this instead:** Colocate tests in `src/`. The vitest include pattern already matches `src/**/*.test.ts`. Import paths become relative and short (`'./dag.js'`).
 
-### Anti-Pattern 4: Caching LLM Responses by Prompt Hash
+### Anti-Pattern 4: Mocking Zod Schemas
 
-**What people do:** Hash the full prompt text and use that as the cache key, storing LLM responses in a key-value store keyed by prompt hash.
+**What people do:** Mock `zod` module or stub `schema.parse` to always return a fixed object.
 
-**Why it's wrong:** Handover already has the correct cache key: content hash of (round number + model name + analysis fingerprint). The analysis fingerprint is a hash of all file paths and sizes — a cheap proxy for "did the codebase change?" This is more stable than a prompt hash (prompts include timestamps, config values) and already implemented in `RoundCache.computeHash()`.
+**Why it's wrong:** Zod schemas are pure value objects. Mocking them bypasses the entire point of schema tests — verifying that the schema correctly accepts and rejects inputs.
 
-**Do this instead:** Keep the existing cache key strategy. The only valid reason to change it is if false cache hits occur in practice (cache returns stale data). Verify this doesn't happen before considering changes.
+**Do this instead:** Call `schema.safeParse()` with real inputs. If a test needs to bypass validation inside a function under test (e.g., simulating an already-validated object passed downstream), construct the object directly as a typed constant.
 
-### Anti-Pattern 5: Making Streaming Mandatory
+### Anti-Pattern 5: Using `runCLI()` for Unit Tests
 
-**What people do:** Replace `provider.complete()` calls with `provider.completeStream()` for all rounds.
+**What people do:** Reuse `tests/integration/setup.ts`'s `runCLI()` helper (which spawns a subprocess) to test individual module behavior.
 
-**Why it's wrong:** Streaming complicates error handling (partial network failure mid-stream), requires UI state management for partial output, and has no benefit in CI environments or when piped output is used. The existing non-streaming path is simpler and more reliable.
+**Why it's wrong:** `runCLI()` spawns a child process, requires a built dist/, and takes seconds per invocation. Unit tests that use it are integration tests wearing unit test clothes. They are slow, fragile (require build step), and do not isolate failures.
 
-**Do this instead:** Make streaming opt-in via `--stream` flag and `performance.streaming: true` in config. Default to non-streaming. The `supportsStreaming()` method on the provider interface allows the generate command to check capability before attempting to stream.
+**Do this instead:** Import the module directly and call its exported functions. If a function is only accessible through the CLI entry point, that is a sign it needs to be extracted and exported for direct testing.
+
+### Anti-Pattern 6: Importing from `dist/` in Unit Tests
+
+**What people do:** Import from `'../../dist/index.js'` in unit test files to get typed exports.
+
+**Why it's wrong:** Unit tests in `src/` must import from `src/` source files. Importing from `dist/` couples test execution to the build step, which breaks `vitest run` without a prior `npm run build`.
+
+**Do this instead:** Import from relative source paths with `.js` extensions (required for ESM): `import { DAGOrchestrator } from './dag.js'`. Vitest resolves `.ts` files transparently even with `.js` import extensions.
 
 ---
 
 ## Integration Points
 
-### External Services
+### Vitest Configuration — No Changes Required
 
-| Service                       | Integration Pattern                                                                     | Notes                                                                                       |
-| ----------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Anthropic API                 | Add `cache_control` to system content array; add `betas: ['prompt-caching-2024-07-31']` | Only for Anthropic provider; must check API version support; beta header may change         |
-| Anthropic API (streaming)     | `client.messages.stream()` instead of `client.messages.create()`                        | Streaming path through beta streaming API; verify current Anthropic SDK version supports it |
-| OpenAI-compat API (streaming) | `client.chat.completions.create({ stream: true })`                                      | OpenAI SDK supports streaming natively; returns `Stream<ChatCompletionChunk>`               |
+The existing `vitest.config.ts` already supports unit tests without modification:
 
-### Internal Boundaries
-
-| Boundary                                  | Communication                                                               | Notes                                                                                                                             |
-| ----------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `generate.ts` ↔ `RoundCache`              | Direct instantiation, `wrapWithCache()` closure                             | Already implemented. No interface change needed.                                                                                  |
-| `generate.ts` ↔ `LLMProvider`             | Via `provider.complete()` and new `provider.completeStream()`               | `completeStream` is optional; generate.ts checks `supportsStreaming()` before using it                                            |
-| `CompletionRequest` ↔ `AnthropicProvider` | `cacheablePrefix` field on request object                                   | Anthropic-only field; OpenAI-compat provider ignores it (no `if` needed — just unused)                                            |
-| `round-factory.ts` ↔ `CompletionRequest`  | `buildPrompt()` extracts `packedContext.fileContent` into `cacheablePrefix` | Factory already receives `packedContext`; minimal change to split prompt into prefix + instructions                               |
-| `TerminalRenderer` ↔ streaming            | New `onRoundToken()` callback on `Renderer` interface (optional method)     | `CIRenderer` does not implement it; `TerminalRenderer` shows token counter; optional prevents breaking existing renderer contract |
-| `DisplayState` ↔ streaming                | New `streamingRound?: number` field                                         | Optional field; `buildRoundLines()` checks for it and shows partial indicator                                                     |
-
----
-
-## Build Order
-
-The four features have dependencies on each other and on codebase understanding. Build in this order:
-
-```
-1. Verify parallel round deps (rounds 5, 6)
-   — Read round-5-edge-cases.ts and round-6-deployment.ts
-   — Check which prior rounds they actually consume in getPriorContexts()
-   — If deps are already minimal: zero code change; document the finding
-   — If over-declared: remove excess deps; test that rounds still produce correct output
-   — Cost: 30 min to 2 hours
-
-2. Extend CompletionRequest with cacheablePrefix
-   — Modify src/domain/types.ts
-   — Zero runtime behavior change: field is optional, providers ignore if not used
-   — Cost: 15 minutes
-
-3. Implement Anthropic prompt caching
-   — Modify src/providers/anthropic.ts: system as array, cache_control, betas header
-   — Modify src/ai-rounds/round-factory.ts: extract packedContext.fileContent → cacheablePrefix
-   — Test with actual Anthropic API: verify cache_read_input_tokens appear in usage
-   — Cost: 2-4 hours (includes API testing)
-
-4. Add performance config block
-   — Modify src/config/schema.ts: add performance.promptCache, performance.streaming, etc.
-   — Wire flags into generate.ts
-   — Cost: 1 hour
-
-5. Implement streaming (if in scope for this milestone)
-   — New src/providers/streaming.ts: StreamChunk type, StreamCallback
-   — Modify src/providers/base.ts: supportsStreaming() method
-   — Modify src/providers/base-provider.ts: default supportsStreaming() returns false
-   — Implement AnthropicProvider.completeStream() using client.messages.stream()
-   — Implement OpenAICompatibleProvider.completeStream() using stream: true
-   — Modify src/ui/types.ts: add onRoundToken to Renderer interface (optional)
-   — Modify src/ui/renderer.ts: implement onRoundToken for TerminalRenderer
-   — Modify src/cli/generate.ts: check supportsStreaming(), pass onChunk callback
-   — Cost: 4-8 hours
-
-6. Token estimation improvement (if in scope)
-   — Install js-tiktoken (or equivalent)
-   — Modify src/context/token-counter.ts: conditional tiktoken path
-   — Wire behind performance.preciseTokenCounting flag
-   — Cost: 2-3 hours
+```typescript
+// vitest.config.ts (current — no changes needed)
+include: ['src/**/*.test.ts', 'tests/**/*.test.ts']  // already matches colocated tests
+exclude: ['node_modules', 'dist', '.claude', '.planning']
+coverage: {
+  include: ['src/**/*.ts'],  // collects coverage from source files
+}
 ```
 
-**Critical path:** Steps 1-3 are the highest-value changes. Steps 4-6 are improvements. If time is constrained, deliver steps 1-3 and defer streaming and token estimation.
+The 80% coverage thresholds will be easier to meet once unit tests are added. Do not raise thresholds preemptively — let them be enforced organically.
+
+### ESM Module Mocking Boundary
+
+This project uses `"type": "module"` (package.json line 4). Vitest handles ESM mocking correctly via compile-time hoisting of `vi.mock()` calls. Rules:
+
+- `vi.mock('modulePath')` must be called at the top level of a test file (Vitest hoists it)
+- `vi.mock()` with a factory function is the preferred pattern for replacing module exports
+- `vi.spyOn()` works for mocking methods on imported objects without replacing the whole module
+- Do not use `jest.mock()` syntax — it is not hoisted correctly in ESM mode by Vitest
+
+### Fixture Factory Helpers
+
+Several test modules will need shared fixture construction. Create these helpers colocated with their primary consumers, not in a global `tests/fixtures/` directory:
+
+| Helper Location                                  | Purpose                                |
+| ------------------------------------------------ | -------------------------------------- |
+| `src/analyzers/__fixtures__/analysis-context.ts` | Minimal `AnalysisContext` factory      |
+| `src/context/__fixtures__/static-analysis.ts`    | Minimal `StaticAnalysisResult` factory |
+| `src/renderers/__fixtures__/render-context.ts`   | Minimal `RenderContext` factory        |
+
+These are `__fixtures__` directories (double-underscore convention), not test files themselves. They export factory functions that tests import.
+
+### Coverage Collection Boundary
+
+The vitest coverage config already includes `src/**/*.ts` and excludes `src/**/*.test.ts`. This means:
+
+- All 99 source files are included in coverage collection
+- New test files (`*.test.ts`) are excluded from coverage targets
+- Fixture files in `__fixtures__/` are included in coverage unless explicitly excluded
+
+Add a coverage exclusion for fixture helpers:
+
+```typescript
+// vitest.config.ts — add to coverage.exclude
+exclude: [
+  'src/**/*.test.ts',
+  'src/**/*.spec.ts',
+  'src/**/__fixtures__/**', // NEW — exclude fixture helpers from coverage
+];
+```
+
+### Build Order for Test Module Additions
+
+Add tests in this sequence to build confidence incrementally:
+
+```
+Phase 1 — Pure Functions (no mocks, no async):
+  1. src/config/schema.test.ts          — Zod validation rules
+  2. src/orchestrator/step.test.ts      — createStep() validation
+  3. src/context/token-counter.test.ts  — estimateTokens, computeTokenBudget
+  4. src/analyzers/todo-scanner.test.ts — scanFileForTodos() string parsing
+  5. src/renderers/registry.test.ts     — resolveSelectedDocs, computeRequiredRounds
+
+Phase 2 — Stateful Objects (no mocks, test class behavior):
+  6. src/orchestrator/dag.test.ts       — DAGOrchestrator topology + execution
+  7. src/context/tracker.test.ts        — TokenUsageTracker accounting
+  8. src/ai-rounds/validator.test.ts    — claim validation pure functions
+
+Phase 3 — Environment-Dependent (spyOn or env var isolation):
+  9. src/config/loader.test.ts          — loadConfig() precedence + env vars
+ 10. src/providers/factory.test.ts      — validateProviderConfig() error paths
+
+Phase 4 — Mock Boundaries (mock interfaces):
+ 11. src/context/scorer.test.ts         — scoreFiles() with fixture StaticAnalysisResult
+ 12. src/context/packer.test.ts         — packFiles() with injected getFileContent
+ 13. src/ai-rounds/quality.test.ts      — checkRoundQuality() thresholds
+ 14. src/ai-rounds/runner.test.ts       — executeRound() with mock LLMProvider
+
+Phase 5 — Renderer Tests (RenderContext fixtures):
+ 15. src/renderers/utils.test.ts        — buildTable, codeRef, sectionIntro
+ 16. src/renderers/render-01-overview.test.ts  — with/without r1 data
+ 17. Additional renderers as needed
+```
+
+Dependencies between phases: each phase depends on the prior phase passing. Phase 1 tests must pass before Phase 2 tests are written (otherwise layered failures obscure root causes). Phases 1-2 have no test infrastructure dependencies. Phases 3-4 require understanding of `vi.spyOn` and `vi.fn()` patterns.
 
 ---
 
 ## Sources
 
-- Direct codebase reading: `src/orchestrator/dag.ts`, `src/cache/round-cache.ts`, `src/providers/anthropic.ts`, `src/providers/base-provider.ts`, `src/ai-rounds/runner.ts`, `src/cli/generate.ts`, `src/config/schema.ts` — HIGH confidence
-- [Anthropic Prompt Caching documentation](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) — MEDIUM confidence (API still beta as of research date; `betas` header requirement may change)
-- [OpenAI Streaming documentation](https://platform.openai.com/docs/api-reference/streaming) — HIGH confidence
-- [Streaming Structured LLM Response — Medium](https://medium.com/@amitsriv99/genai-streaming-structured-llm-response-over-http-2450ed7b6749) — MEDIUM confidence (secondary source)
-- [LLMOps Caching Guide — Redis](https://redis.io/blog/large-language-model-operations-guide/) — MEDIUM confidence (general patterns, not handover-specific)
+- Direct codebase reading: `src/orchestrator/dag.ts`, `src/orchestrator/step.ts`, `src/providers/base.ts`, `src/providers/base-provider.ts`, `src/ai-rounds/runner.ts`, `src/ai-rounds/validator.ts`, `src/context/scorer.ts`, `src/context/packer.ts`, `src/context/tracker.ts`, `src/config/schema.ts`, `src/config/loader.ts`, `src/analyzers/todo-scanner.ts`, `src/analyzers/coordinator.ts`, `src/renderers/registry.ts`, `src/renderers/render-01-overview.ts`, `tests/integration/setup.ts`, `vitest.config.ts`, `package.json` — HIGH confidence
+- [Vitest Mocking Guide](https://vitest.dev/guide/mocking) — HIGH confidence (official docs)
+- [Vitest Mock Functions API](https://vitest.dev/api/mock) — HIGH confidence (official docs)
+- [Vitest ESM Module Mocking](https://vitest.dev/guide/mocking/modules) — HIGH confidence (official docs)
+- [Zod Testing Patterns — Steve Kinney](https://stevekinney.com/courses/full-stack-typescript/testing-zod-schema) — MEDIUM confidence (secondary source, consistent with observed patterns)
 
 ---
 
-_Architecture research for: Handover CLI — Performance Features Milestone_
-_Researched: 2026-02-18_
+_Architecture research for: Handover CLI — Unit Testing Milestone_
+_Researched: 2026-02-19_

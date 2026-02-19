@@ -1,28 +1,23 @@
 # Feature Research
 
-**Domain:** Performance improvements for an AI-powered TypeScript CLI code analysis tool (handover-cli)
-**Researched:** 2026-02-18
-**Confidence:** HIGH — existing codebase audited directly; performance patterns verified against Anthropic SDK docs, ESLint incremental caching, and LLM streaming patterns; token optimization techniques verified via multiple sources
+**Domain:** Robustness and testing milestone for an AI-powered TypeScript CLI code analysis tool (handover-cli)
+**Researched:** 2026-02-19
+**Confidence:** HIGH — existing codebase audited directly (99 source files, 0 unit tests); testing patterns verified against Vitest 3.x docs and official sources; input validation patterns verified against Zod docs
 
 ---
 
-## Context: What Is Already Built
+## Context: This Is a Brownfield Robustness Milestone
 
-Before categorizing features, it is essential to map what performance infrastructure already exists. The milestone is additive — these are NOT features to build:
+The milestone does NOT add user-visible features. It adds **internal quality infrastructure** to a mature codebase. Specific existing gaps that drive this milestone:
 
-| Component                           | Location                       | What It Does                                                                           | Status |
-| ----------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------- | ------ |
-| `RoundCache`                        | `src/cache/round-cache.ts`     | Content-hash disk cache for AI round results; JSON-per-round; survives process crashes | BUILT  |
-| `AnalysisCache`                     | `src/analyzers/cache.ts`       | File-content-hash map; skip re-parsing unchanged files on repeat runs                  | BUILT  |
-| `Promise.allSettled` in coordinator | `src/analyzers/coordinator.ts` | All 8 analyzers run concurrently; graceful degradation on individual failure           | BUILT  |
-| `DAGOrchestrator` parallel dispatch | `src/orchestrator/dag.ts`      | Independent DAG steps start immediately when deps resolve via `Promise.race()`         | BUILT  |
-| `TerminalRenderer` with throttle    | `src/ui/renderer.ts`           | In-place multi-line TTY updates at ~16fps; spinner ticks at 80ms                       | BUILT  |
-| `compressRoundOutput()`             | `src/context/compressor.ts`    | Deterministic 2000-token inter-round compression; no LLM calls                         | BUILT  |
-| `--only` selective rounds           | `src/cli/generate.ts`          | `computeRequiredRounds()` skips unneeded AI rounds based on requested docs             | BUILT  |
-| `--no-cache` flag                   | `src/cli/generate.ts`          | Clears `RoundCache` before execution; forces fresh LLM calls                           | BUILT  |
-| Size-based fingerprint              | `src/cache/round-cache.ts`     | `computeAnalysisFingerprint()` hashes file paths + sizes for round cache key           | BUILT  |
+| Gap                                                 | Location                                                   | Impact                                                 |
+| --------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
+| 0 unit tests across 99 source files                 | Entire codebase                                            | Any refactor is blind; regressions are invisible       |
+| 8+ empty catch blocks (no comments, no logging)     | `src/analyzers/`, `src/cache/`, `src/parsing/`, `src/cli/` | Silent failures in production; hard to diagnose        |
+| No `--only` input validation before pipeline starts | `src/renderers/registry.ts` `resolveSelectedDocs()`        | Error surfaces mid-pipeline; wasted startup time       |
+| Hardcoded model pricing and scoring weights         | `src/providers/presets.ts`, `src/context/scorer.ts`        | Cannot unit-test logic in isolation from magic numbers |
 
-**The existing cache is crash-recovery, not true incremental analysis.** The `RoundCache` fingerprint uses file paths and sizes — not content hashes. Any file size change (or any new/deleted file) invalidates all 6 round caches. The `AnalysisCache` uses content hashes but only for the static analysis layer (skipping re-parsing), not for deciding which LLM rounds need re-execution.
+All features below concern **how to test and harden existing behavior**, not what new behavior to add.
 
 ---
 
@@ -30,168 +25,227 @@ Before categorizing features, it is essential to map what performance infrastruc
 
 ### Table Stakes (Users Expect These)
 
-Features that users of performance-sensitive CLI tools assume exist. Missing these makes handover feel slow and opaque relative to tools like `eslint --cache`, `tsc --incremental`, or `jest --watch`.
+For a TypeScript CLI with LLM integrations, these testing and validation features are expected. Their absence means contributors cannot safely change the codebase and users cannot trust the tool.
 
-| Feature                                    | Why Expected                                                                                                                                                                                                                                                                                                                | Complexity | Notes                                                                                                                                                                                                                                                            |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Content-hash-based cache invalidation      | Users expect that only changing files triggers re-analysis, not file metadata changes. `eslint --cache` does this; TypeScript `--incremental` does this. Size-only fingerprinting invalidates on trivial changes (touch, line ending, formatting)                                                                           | MEDIUM     | **Gap identified**: `RoundCache` uses paths+sizes. Switch fingerprint to SHA-256 over file content for changed files. The `AnalysisCache` already has per-file content hashes — the round cache fingerprint should incorporate these, not recompute from sizes.  |
-| Live progress during LLM rounds            | Users staring at a spinner for 30-90 seconds with no output feel the tool is hung. Every modern CLI tool with long-running async work shows incremental progress. The current `TerminalRenderer` already has the spinner infra — but rounds show only "running/done/failed" with no tokens-generated count during execution | LOW-MEDIUM | The Anthropic SDK and OpenAI-compat SDK both support streaming responses. The `LLMProvider.complete()` interface is blocking — no `onToken` callback or `stream` option. Adding streaming output requires extending the provider interface and the round runner. |
-| Measurable time-to-first-output on re-runs | Users expect that if nothing changed, re-runs are fast (seconds, not minutes). The current re-run experience hits the `RoundCache` and returns cached results — but only if the fingerprint matches. Improving the fingerprint to be content-based is the prerequisite.                                                     | MEDIUM     | Prerequisite: content-hash fingerprint above. With correct invalidation, only truly-changed rounds re-execute. Unchanged rounds restore from cache in <100ms each.                                                                                               |
-| `--cache` / `--no-cache` flag transparency | Users need to know whether they're seeing cached or fresh results. The current UI shows "cached" status for rounds that hit cache — this is present. Missing: cache hit/miss stats in completion summary (how many rounds were cached vs re-run)                                                                            | LOW        | Extend the completion summary in `TerminalRenderer.onComplete()` to show "X/6 rounds from cache". The `displayState` already carries round statuses including 'cached'.                                                                                          |
-| Graceful handling of empty/tiny repos      | Repos with zero source files should fail fast and clearly, not run all 8 analyzers to discover nothing. The current code has an `isEmptyRepo` check but only after static analysis completes.                                                                                                                               | LOW        | Already partially addressed by `isEmptyRepo` guard. The gap: the check happens after `runStaticAnalysis()` completes (including all 8 analyzers). For truly empty repos, file discovery alone should trigger early exit.                                         |
+| Feature                                         | Why Expected                                                                                                                                                                                                                                          | Complexity | Notes                                                                                                                                                                 |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit tests for pure scoring logic               | `scoreFiles()` in `scorer.ts` is a deterministic algorithm with 6 weighted factors and explicit caps. Any function that takes structured data and returns a sorted list is trivially unit-testable. Missing = no regression protection.               | LOW        | `test.each()` table-driven tests. No mocking needed — `scoreFiles()` takes a `StaticAnalysisResult` and returns `FilePriority[]`.                                     |
+| Unit tests for token budget computation         | `computeTokenBudget()` and `estimateTokens()` in `token-counter.ts` are pure math functions. They have documented defaults and edge cases (zero context window, negative values).                                                                     | LOW        | Inline pure function tests. `computeTokenBudget(200_000)` should return specific numbers. No I/O or mocking.                                                          |
+| Unit tests for `resolveSelectedDocs()`          | `resolveSelectedDocs()` is a pure function over a registry. It has a documented throw path (unknown alias), group alias expansion, and INDEX-always behavior. All 3 paths need coverage.                                                              | LOW        | Tests for: valid alias, group alias, unknown alias throws, empty string, comma-separated list, INDEX always included.                                                 |
+| Unit tests for `computeRequiredRounds()`        | Pure function that expands transitive dependencies from `ROUND_DEPS`. Has a documented contract. Needs table tests for each round number.                                                                                                             | LOW        | `computeRequiredRounds([{requiredRounds: [3]}])` should include rounds 1, 2, 3 via transitive expansion.                                                              |
+| Unit tests for `generateSignatureSummary()`     | Pure function that formats AST data into a compact text representation. Easy to test with fixture `ParsedFile` inputs.                                                                                                                                | LOW        | Fixture-based tests. Input: `ParsedFile` with known exports/functions/classes. Assert output string format.                                                           |
+| LLM provider mock for round testing             | The 6 AI round steps (`round-1-overview.ts` through `round-6-deployment.ts`) currently cannot be tested without real API calls. A mock `LLMProvider` implementation is the foundation for all round-level unit tests.                                 | MEDIUM     | Implement `LLMProvider` interface with `vi.fn()` for `complete()`. Return pre-built `CompletionResult`. One mock factory function shared across all round test files. |
+| Empty catch block documentation                 | 8+ catch blocks silently swallow errors in `git-history.ts`, `env-scanner.ts`, `doc-analyzer.ts`, `cache/round-cache.ts`, etc. Each needs either: (a) a comment explaining why it is safe to swallow, or (b) a `logger.debug()` call for diagnostics. | LOW        | Not a test — a code hardening task. Standard practice: never leave `catch {}` without a comment.                                                                      |
+| Input validation for `--only` flag at CLI layer | `resolveSelectedDocs()` already throws `HandoverError` for unknown aliases. However, this runs mid-pipeline (after config load, API key check). The error should surface as soon as the flag is parsed, before any I/O.                               | LOW        | Add Zod schema validation of `options.only` tokens in `runGenerate()` before `validateProviderConfig()`. No new logic — just reorder validation.                      |
 
 ### Differentiators (Competitive Advantage)
 
-Features that separate handover from generic code analysis tools and make it the fastest tool for its specific use case.
+These go beyond minimal correctness and establish the quality bar for ongoing development.
 
-| Feature                                                           | Value Proposition                                                                                                                                                                                                                                                                                                                                                          | Complexity | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Streaming token output during LLM rounds                          | Shows live text being generated during each AI round — like watching Claude "think". Transforms a 45-second wait into 45 seconds of visible progress. Makes the tool feel interactive, not batch-style. No other code analysis CLI does this.                                                                                                                              | HIGH       | Requires: (1) adding `stream` option to `LLMProvider.complete()`, (2) Anthropic SDK streaming via `client.messages.stream()`, (3) OpenAI streaming via `for await (chunk of stream)`, (4) updating the `TerminalRenderer` to display a scrolling token buffer in the round block, (5) deciding whether to stream to the display only or also to the structured output (structured output requires tool_use, which may conflict with streaming in some providers). **CRITICAL CONSTRAINT**: Anthropic tool_use with streaming is supported — `stream` + `tool_choice: {type: 'tool'}` works in the Anthropic SDK. The structured JSON must be assembled from streamed input_json_delta events. This is non-trivial. |
-| Round-level incremental invalidation (only re-run changed rounds) | When a developer makes a small code change, only the round(s) whose inputs changed should re-execute. If only a test file changed, Round 5 (edge cases) re-runs but Rounds 1-3 (overview, modules, features) can remain cached. This gives 50%+ token reduction on typical incremental runs.                                                                               | HIGH       | Requires per-round input fingerprinting. Round N's cache key must incorporate: (a) the global file fingerprint for files relevant to that round, (b) the compressed output of all prior rounds that round N receives as input. This means Round 1's cache key is independent of Rounds 2-6. Round 2's key depends on Round 1's output hash. This is a cascading invalidation model, not a single global fingerprint. Implementation: `RoundCache.computeHash()` currently takes `(roundNumber, model, analysisFingerprint)` — extend to include `priorRoundOutputHash`.                                                                                                                                            |
-| Changed-files-only context packing                                | On incremental re-runs, skip full file content for files that haven't changed since the last run — send only signatures (or skip entirely) unless the file is marked as changed by the `AnalysisCache`. This reduces tokens sent per re-run proportionally to change ratio. In a 1000-file repo where 10 files changed, this is potentially 90% fewer file content tokens. | HIGH       | Requires: `AnalysisCache` to expose which files changed since last run (currently only exposes `isUnchanged(path, hash)`). The `packFiles()` function in `context/packer.ts` needs a "changed files" set parameter to force changed files to `full` tier and allow unchanged files to drop to `signatures` or `skip`. This is an additive change to `packFiles()`.                                                                                                                                                                                                                                                                                                                                                 |
-| Token usage summary with cache savings                            | Report: "Used 12,400 tokens (47% savings vs full re-run — 3 rounds cached)". Gives users concrete evidence of speed/cost improvement. Reinforces the value proposition on every incremental run.                                                                                                                                                                           | LOW-MEDIUM | `TokenUsageTracker` already accumulates token usage. Add a "baseline estimate" concept: at run start, compute what a full re-run would cost; at completion, show actual vs estimated. Or simpler: show "X rounds cached, saved ~Y tokens" based on average tokens per round from prior runs.                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Large repo file sampling with coverage indicator                  | For repos exceeding the context window capacity (e.g., 50,000+ lines after filtering), automatically sample files weighted by importance score and show "Analyzed N of M files (top by importance)" rather than silently truncating. The current `packFiles()` silently drops low-priority files when the budget fills — no indicator is shown.                            | MEDIUM     | The `PackedContext` type should expose how many files were full/signatures/skipped. The renderer should show this as a coverage indicator. The file scorer in `context/scorer.ts` already produces priority scores — expose the coverage ratio.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Parallel document rendering                                       | Currently, the render phase writes 14 documents sequentially (`for...of` loop in `generate.ts`). Since renderers are pure functions (`doc.render(ctx)` returning a string), they can run in parallel with `Promise.all()`. Small gain (rendering is fast), but eliminates the last sequential bottleneck.                                                                  | LOW        | Replace `for (const doc of selectedDocs)` with `await Promise.all(selectedDocs.map(...))`. Requires careful handling of `displayState.renderedDocs` ordering — use a pre-allocated results array, fill by index, then append in order. INDEX still goes last.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Feature                                       | Value Proposition                                                                                                                                                                                                                                                                                                                                     | Complexity | Notes                                                                                                                                                                                     |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Named constants for scoring weights and caps  | `scorer.ts` has 6 magic numbers (`30`, `3`, `30`, `2`, `20`, `10`, `10`, `15`, `-15`) hardcoded inline. Extracting these to named exports (`ENTRY_POINT_SCORE`, `IMPORT_SCORE_PER_IMPORTER`, `IMPORT_SCORE_CAP`, etc.) makes the algorithm readable and lets unit tests document the expected behavior via named constants rather than magic numbers. | LOW        | Purely internal refactor. No behavior change. Named constants become test fixtures.                                                                                                       |
+| Unit tests for context packing algorithm      | `packFiles()` in `packer.ts` is a complex greedy algorithm with 6 tiers and special cases (oversized, changed-files, small-project optimization, batch I/O). Testing it requires a mock `getFileContent` function — straightforward with `vi.fn()`.                                                                                                   | MEDIUM     | Mock `getFileContent` as `vi.fn().mockResolvedValue(content)`. Build minimal `FilePriority[]` and `ASTResult` fixtures. Assert tier assignments, budget accounting, metadata correctness. |
+| Unit tests for DAG orchestrator               | `DAGOrchestrator` has documented behavior: executes deps before dependents, detects cycles, handles step failures with graceful degradation. These are deterministic state machine behaviors.                                                                                                                                                         | MEDIUM     | Mock steps as `vi.fn()` returning promises. Test: step ordering, cycle detection throws, failed step propagates correctly.                                                                |
+| Unit tests for `compressRoundOutput()`        | The inter-round context compressor is a pure function over a `Record<string, unknown>`. It has documented field extraction logic and token budget enforcement.                                                                                                                                                                                        | MEDIUM     | Fixture round outputs. Assert compressed output contains expected fields, respects token budget.                                                                                          |
+| Coverage threshold enforcement                | Vitest v8 coverage is already configured at 80% for lines/functions/branches. Enforcing this in CI prevents regression. Currently the threshold runs against 0 tests — it would pass trivially on any coverage.                                                                                                                                       | LOW        | Already configured. The threshold becomes meaningful once tests exist. Document it as a quality gate.                                                                                     |
+| Error surface testing for provider validation | `validateProviderConfig()` has 5 explicit throw paths (unknown provider, Ollama without model, Azure without baseUrl, missing API key, custom without baseUrl). Each path should have a test asserting the correct `ProviderError` code is thrown.                                                                                                    | LOW        | All pure function testing. Mock `process.env` via `vi.stubEnv()`. Assert `toThrow(ProviderError)` with specific `.code` properties.                                                       |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-| Feature                                              | Why Requested                                                                     | Why Problematic                                                                                                                                                                                                                                                                                                                                                                                 | Alternative                                                                                                                                                                                                  |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Multi-threaded analyzer execution via worker_threads | "Run analyzers in true parallel threads for 8x speed"                             | The 8 analyzers already run concurrently via `Promise.allSettled()`. They are I/O-bound (file reads, git commands, tree-sitter parsing) — the bottleneck is I/O, not CPU. Worker threads add serialization overhead and complexity without meaningful speedup for I/O-bound work. The only CPU-intensive work is tree-sitter AST parsing, which is already done in the main thread efficiently. | Keep `Promise.allSettled()`. Profile before threading. If AST parsing becomes the bottleneck on very large repos, target that specific analyzer with a worker pool.                                          |
-| Persistent background daemon                         | "Run handover as a daemon that watches files and pre-caches results"              | File watchers in the background drain battery, have race conditions with editors saving partial files, and add IPC complexity. The disk cache already provides instant re-run results without a daemon. Users do not run handover frequently enough to justify always-on infrastructure.                                                                                                        | The disk cache (RoundCache) is the right solution. Fast enough on re-runs without a daemon. If watch mode is needed later, it belongs as a `handover watch` command with explicit lifecycle, not a daemon.   |
-| Streaming output to markdown files                   | "Stream LLM output directly to the output files as tokens arrive"                 | The output documents require complete, structured JSON from LLM tool calls before they can be rendered. The rendering phase transforms structured data into Markdown — it cannot be streamed because the Zod-validated schema output isn't known until the full response arrives. Partial streaming to files creates partial documents that would confuse consumers of the output.              | Stream tokens to the terminal display only. Write complete documents to disk only after all rounds complete.                                                                                                 |
-| Distributed analysis across machines                 | "Split the codebase across multiple machines for large repos"                     | Handover's analysis is inherently sequential at the AI rounds layer — Round 2 requires Round 1's output. Distributing the static analysis phase is possible but the benefit is small (static analysis takes 5-15 seconds even for large repos). The complexity of distributed coordination far exceeds the benefit.                                                                             | For very large repos: focus on file sampling/filtering to reduce context sent to the LLM. The bottleneck is LLM round latency, not static analysis. Sampling the right files beats distributing analysis.    |
-| Provider-level request batching                      | "Send all 6 rounds in one API call for efficiency"                                | The rounds are sequentially dependent — Round 2 uses Round 1's output, Round 3 uses Rounds 1+2, etc. They cannot be batched without fundamentally changing the architecture. Even if a batch API existed, the round architecture would need to be restructured to a single-pass design, losing the iterative refinement that makes the analysis high quality.                                   | The existing sequential round structure is correct. Optimize within each round (streaming, caching) rather than restructuring the round model.                                                               |
-| LLM-based context compression                        | "Use an LLM to intelligently summarize prior rounds before sending to next round" | The current `compressRoundOutput()` is deterministic and token-budget-bounded. Using another LLM call for compression adds: latency (one extra API call per round = 6 extra calls), cost (the compression tokens often exceed what's saved), and non-determinism (same inputs give different compressed outputs, breaking cache invalidation).                                                  | The deterministic compressor at 2000 tokens per round is already well-tuned. The real token savings come from the incremental context packing feature (sending only changed files' full content on re-runs). |
-| Aggressive file filtering to reduce context          | "Skip all test files, all docs, all config files automatically"                   | Aggressive auto-filtering removes context that rounds need for accurate analysis. Round 5 (edge cases) specifically benefits from test file analysis. Round 6 (deployment) needs config files. Filtering by file type trades analysis quality for speed — users who want speed should use `--only` to skip rounds they don't need, not filter out files that inform those rounds.               | Use `--only` to skip entire rounds. Use the importance scorer in `context/scorer.ts` to prioritize high-value files when the budget is tight, rather than blindly excluding categories.                      |
+| Feature                                              | Why Requested                              | Why Problematic                                                                                                                                                                                                                                          | Alternative                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| End-to-end integration tests that call real LLM APIs | "Tests should test the real system"        | Real API calls in tests: cost money on every CI run, are flaky (network issues, rate limits, model changes), take 30-120 seconds per run, and fail when API keys are not present in CI. They test the API provider's reliability, not your code's logic. | Mock the `LLMProvider` interface for unit tests. Write one optional smoke-test behind an env flag (`RUN_INTEGRATION_TESTS=true`) that can be run manually but never in CI by default.                                                                                 |
+| Snapshot testing for markdown renderer output        | "Snapshots catch any output change"        | Snapshot tests for text output break on every intentional content change, training developers to blindly update snapshots. For template-based Markdown renderers, snapshot churn is the biggest source of false test failures.                           | Assert structural properties of the output: "contains the heading", "has at least 3 sections", "includes the project name". Not the exact whitespace. Use `toContain()` not `toMatchSnapshot()`.                                                                      |
+| Mocking `fs` for file I/O tests                      | "Mock the filesystem for pure unit tests"  | Node.js `fs` mocking with `vi.mock('node:fs/promises')` is fragile — it intercepts all file I/O in the process, including calls from internal Node.js modules and test infrastructure. Mocking the wrong layer causes subtle failures.                   | Instead, abstract file I/O behind injected callbacks (as `packFiles()` already does with `getFileContent`). Pass mock functions directly. For analyzer tests that truly need file system access, use real temp directories with `node:fs/promises` and `os.tmpdir()`. |
+| 100% code coverage mandate                           | "Full coverage means no bugs"              | Chasing 100% coverage on a 99-file codebase with 0 tests leads to test quantity over quality — developers write tests that hit lines without asserting anything meaningful. The existing 80% Vitest threshold is the right target.                       | Set 80% threshold (already configured). Exempt complex I/O orchestration paths in `generate.ts` and the DAG's concurrency plumbing — these are better covered by integration tests. Focus coverage effort on pure functions.                                          |
+| Testing the CLI's `--help` output                    | "Test that the CLI prints the right flags" | Commander generates `--help` output deterministically from the command definition. Testing its output against a string snapshot adds test maintenance overhead for zero bug prevention. Changing a description string shouldn't fail tests.              | Trust Commander. Write tests for the business logic that the CLI flags control (`resolveSelectedDocs`, `validateProviderConfig`, etc.), not for the help text itself.                                                                                                 |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Content-hash fingerprint (improved invalidation)
-    └──required before──> Round-level incremental invalidation
-                              └──required before──> Token savings reporting
-                                                        (needs baseline to compare against)
+Named constants for scoring weights
+    └──required before──> Unit tests for scoreFiles()
+                               (tests reference constant names, not magic numbers)
 
-Changed-files-only context packing
-    └──requires──> AnalysisCache exposing changed-file set
-    └──requires──> packFiles() receiving changed-files parameter
+LLM provider mock factory
+    └──required before──> Unit tests for AI round steps (round-1 through round-6)
+    └──required before──> Unit tests for compressRoundOutput() (needs mock round output)
 
-Streaming token output (provider-level)
-    └──requires──> LLMProvider interface extended with stream option
-    └──requires──> AnthropicProvider streaming implementation
-    └──requires──> OpenAI-compat provider streaming implementation
-    └──requires──> TerminalRenderer stream buffer in round display
-    └──blocks──> (nothing downstream, purely additive to UX)
+Mock getFileContent function (vi.fn())
+    └──required before──> Unit tests for packFiles() algorithm
 
-Large repo file sampling indicator
-    └──requires──> PackedContext exposing coverage stats
-    └──builds on──> existing file scorer in context/scorer.ts
+--only validation moved to CLI layer
+    └──independent of──> all test features
+    └──depends on──> existing resolveSelectedDocs() (no new logic, just reordering)
 
-Parallel document rendering
+Empty catch block documentation
     └──independent of──> all other features
-    └──requires──> careful ordering of displayState updates
+    └──prerequisite for──> being able to write tests that assert catch behavior
+                           (must know which catch blocks are intentional vs oversight)
 
-Cache hit/miss summary in completion
-    └──requires──> displayState tracking cached round count
-    └──builds on──> existing 'cached' round status already in displayState
+Unit tests for pure functions (scorer, token-counter, registry)
+    └──no dependencies──> these are isolated pure functions with no I/O
+    └──foundational for──> enabling safe refactoring of rest of codebase
+
+Coverage threshold enforcement
+    └──requires──> tests to exist (threshold against 0 tests is meaningless)
+    └──already configured──> vitest.config.ts thresholds at 80%
 ```
 
 ### Dependency Notes
 
-- **Content-hash fingerprint is a prerequisite for incremental invalidation:** Without content-based cache keys, the round cache cannot know which rounds are truly stale vs which are safe to reuse. This is the foundation feature for the "50%+ fewer tokens on incremental runs" goal.
+- **Named constants must come before scorer tests:** Tests that document expected behavior should use named constants, not repeat the magic numbers from the source. If tests duplicate `30` everywhere, updating the weight requires updating both source and tests — constants make this a single-source change.
 
-- **Streaming conflicts with structured output assembly:** Anthropic's `tool_use` with streaming delivers structured JSON as `input_json_delta` events — partial JSON fragments. The provider must accumulate these fragments and parse the complete JSON only at stream end before validating with Zod. The terminal display can show the raw text delta as "thinking" output. Implementation must not expose partially-assembled JSON to round runners.
+- **Provider mock is the test-infrastructure foundation:** 6 round files all take `LLMProvider` as a parameter. A single `createMockProvider()` factory shared via a test helper file (`tests/helpers/mock-provider.ts`) prevents mock definition duplication. Build it once, use it everywhere.
 
-- **Changed-files context packing requires AnalysisCache to expose its diff:** The `AnalysisCache` currently only exposes `isUnchanged(path, hash)`. A new method `getChangedFiles(files)` returning the set of paths whose hash differs from cache is needed to feed `packFiles()`.
+- **Empty catch documentation before testing catch paths:** A catch block with `// intentional: git binary not present; empty result is correct fallback` tells a test author to assert the empty result. An undocumented `catch {}` leaves a test author uncertain whether to assert silence or a logged warning.
 
-- **Parallel rendering is independent:** It can be delivered in isolation as a small cleanup PR. It does not depend on or conflict with any other performance feature.
+- **`--only` validation reordering is independent but fast:** It touches only `generate.ts` (move `resolveSelectedDocs()` call 3 lines earlier). No new code. Can land in the same PR as the registry unit tests.
 
 ---
 
 ## MVP Definition
 
-This is a brownfield milestone. The "MVP" is the minimum set that delivers the user-visible goals: fast re-runs (seconds not minutes), responsive UX (live progress), measurable gains (2-5x faster, 50%+ fewer tokens on incremental runs).
+This is a brownfield milestone. MVP = the minimum that gives contributors meaningful regression protection and removes the three most dangerous quality gaps.
 
-### Launch With (Phase 1 — Cache Correctness)
+### Launch With (Phase 1 — Test Infrastructure + Pure Functions)
 
-The content-hash fingerprint is the enabler for everything else. Without it, incremental runs are unreliable — a formatting commit re-runs all 6 rounds unnecessarily; a pure rename does the same. Fix the foundation first.
+These can be written without any architectural changes to the source:
 
-- [ ] Content-hash-based cache invalidation — replaces size-based fingerprint in `RoundCache`; makes "fast re-runs" reliable rather than accidental
-- [ ] Round-level incremental invalidation — per-round cache keys that cascade from prior round outputs; delivers the 50%+ token reduction goal
-- [ ] Cache hit/miss summary in completion — shows users they got the benefit; required for "measurable gains" goal
+- [ ] Mock LLM provider factory (`tests/helpers/mock-provider.ts`) — foundation for all round tests; one file, shared by all tests
+- [ ] Unit tests for `scoreFiles()` — highest-value pure function; table-driven with `test.each()`; uses named constants
+- [ ] Unit tests for `computeTokenBudget()` and `estimateTokens()` — pure math; zero setup
+- [ ] Unit tests for `resolveSelectedDocs()` and `computeRequiredRounds()` — pure registry functions; includes throw-path coverage
+- [ ] Empty catch block audit — not tests; code comments/logging; prerequisite for knowing what is intentional
+- [ ] Named constants for scoring weights — prerequisite for scorer tests; source change only
 
-### Add After Phase 1 (Phase 2 — UX Responsiveness)
+### Add After Phase 1 (Phase 2 — Algorithm and Validation Tests)
 
-Once cache correctness is established, improve perceived speed and responsiveness during the LLM wait.
+Once test infrastructure exists:
 
-- [ ] Live progress during LLM rounds (token counter + elapsed time update within round block) — the simplest responsiveness improvement; uses existing `TerminalRenderer` infra; does not require streaming API changes
-- [ ] Streaming token output during LLM rounds — shows raw model output live; the most impactful UX change; requires provider interface extension
-- [ ] Large repo file sampling coverage indicator — shows what percentage of the codebase was analyzed; addresses silent truncation problem
+- [ ] Unit tests for `packFiles()` context packing — complex algorithm; uses mock `getFileContent`; asserts tier assignments and budget accounting
+- [ ] Unit tests for `validateProviderConfig()` — 5 throw paths; uses `vi.stubEnv()`; asserts correct `ProviderError.code`
+- [ ] `--only` flag validation moved earlier in `generate.ts` — reordering, not new code
+- [ ] Unit tests for `generateSignatureSummary()` — fixture-based; asserts format of AST-to-text transformation
 
-### Add After Phase 2 (Phase 3 — Context Efficiency)
+### Add After Phase 2 (Phase 3 — Orchestration and Integration)
 
-Once UX is responsive and cache is correct, optimize what gets sent to the LLM on incremental runs.
+Requires more setup; deferred until Phase 1/2 establish patterns:
 
-- [ ] Changed-files-only context packing — reduces tokens sent on incremental runs to only files that changed; delivers the "50%+ fewer tokens" goal for context (complementing the round caching from Phase 1)
-- [ ] Parallel document rendering — small but clean win; eliminates last sequential bottleneck; simple implementation
-- [ ] Token usage summary with cache savings — concrete reporting of efficiency gains
+- [ ] Unit tests for `DAGOrchestrator` — mock steps; assert ordering, cycle detection, failure handling
+- [ ] Unit tests for `compressRoundOutput()` — fixture round outputs; asserts field extraction and token budget
+- [ ] Error surface tests for each defined `HandoverError` and `ProviderError` factory method
+- [ ] Coverage threshold CI enforcement becomes meaningful (all 80% gates now have real tests to measure against)
 
 ---
 
 ## Feature Prioritization Matrix
 
-| Feature                              | User Value                                            | Implementation Cost                                                                               | Priority |
-| ------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------- |
-| Content-hash cache invalidation      | HIGH — makes fast re-runs reliable                    | MEDIUM — extend `computeAnalysisFingerprint()` to hash file contents; thread through `RoundCache` | P1       |
-| Round-level incremental invalidation | HIGH — 50%+ token reduction on incremental; core goal | HIGH — cascading hash design for per-round cache keys                                             | P1       |
-| Cache hit/miss summary               | MEDIUM — makes the benefit visible                    | LOW — extend `displayState` and `TerminalRenderer.onComplete()`                                   | P1       |
-| Live token counter in round block    | HIGH — eliminates "is it hung?" anxiety               | LOW-MEDIUM — update `DisplayState.rounds` with elapsed timer; already has spinner                 | P2       |
-| Streaming token output               | HIGH — transforms perceived responsiveness            | HIGH — provider interface + 2 provider implementations + renderer update                          | P2       |
-| Large repo coverage indicator        | MEDIUM — transparency for large repos                 | MEDIUM — expose `PackedContext` coverage stats; add renderer line                                 | P2       |
-| Changed-files context packing        | HIGH — reduces input tokens on re-runs                | HIGH — `AnalysisCache` diff API + `packFiles()` parameter                                         | P3       |
-| Parallel document rendering          | LOW — rendering is already fast (~1-2s)               | LOW — replace `for...of` with `Promise.all` + ordered results                                     | P3       |
-| Token savings reporting              | MEDIUM — confirms efficiency gains                    | MEDIUM — baseline estimation logic                                                                | P3       |
+| Feature                                | User Value                                 | Implementation Cost                          | Priority |
+| -------------------------------------- | ------------------------------------------ | -------------------------------------------- | -------- |
+| Mock LLM provider factory              | HIGH — enables all round testing           | LOW — implement `LLMProvider` interface once | P1       |
+| Tests for `scoreFiles()`               | HIGH — core ranking algorithm              | LOW — table-driven pure function             | P1       |
+| Tests for `computeTokenBudget()`       | HIGH — context window math                 | LOW — pure function                          | P1       |
+| Tests for `resolveSelectedDocs()`      | HIGH — CLI input path with throw           | LOW — pure function                          | P1       |
+| Named constants for scoring weights    | HIGH — makes tests readable; single-source | LOW — extract 6 constants                    | P1       |
+| Empty catch block audit                | HIGH — silent failures become diagnosable  | LOW — code comments, not tests               | P1       |
+| Tests for `packFiles()`                | HIGH — greedy algorithm correctness        | MEDIUM — mock `getFileContent`               | P2       |
+| Tests for `validateProviderConfig()`   | HIGH — 5 throw paths; user-facing errors   | LOW — `vi.stubEnv()`                         | P2       |
+| `--only` validation moved earlier      | MEDIUM — better error UX                   | LOW — reorder 3 lines                        | P2       |
+| Tests for `generateSignatureSummary()` | MEDIUM — output format correctness         | LOW — fixture-based                          | P2       |
+| Tests for `DAGOrchestrator`            | MEDIUM — orchestration correctness         | MEDIUM — mock step definitions               | P3       |
+| Tests for `compressRoundOutput()`      | MEDIUM — inter-round compressor            | MEDIUM — fixture round outputs               | P3       |
+| Error factory method tests             | LOW — error messages tested indirectly     | LOW — straightforward assertions             | P3       |
 
 **Priority key:**
 
-- P1: Must have — enables the "fast re-runs" goal
-- P2: Should have — delivers "responsive UX" goal
-- P3: Nice to have — extends efficiency gains; worth delivering if phases 1+2 complete
+- P1: Must have for launch — establishes test infrastructure and covers highest-churn pure functions
+- P2: Should have — covers validation and algorithm correctness in algorithms with documented behavior
+- P3: Nice to have — completes coverage of orchestration layer; adds depth not breadth
 
 ---
 
-## Competitor Feature Analysis
+## Approach Notes: Testing TypeScript CLIs with LLM APIs
 
-Examining how comparable tools handle these performance challenges:
+These are patterns specific to this domain, verified against Vitest docs and community practice:
 
-| Feature            | ESLint (`--cache`)                      | TypeScript (`--incremental`)                     | Jest (`--watch`)               | Our Approach                                                                   |
-| ------------------ | --------------------------------------- | ------------------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------ |
-| Cache invalidation | Content-hash per file; version-keyed    | Content-hash + dependency graph                  | File watcher + jest-haste-map  | Content-hash via existing `AnalysisCache` (extend to drive round invalidation) |
-| Cache key design   | `{filePath}:{contentHash}:{ruleHashes}` | Per-file `.tsbuildinfo` with dependency tracking | Module hash map                | `{roundNumber}:{model}:{contentFingerprint}:{priorRoundHash}`                  |
-| Incremental scope  | Skip unchanged files entirely           | Skip unchanged source files in compilation       | Re-run tests for changed files | Skip unchanged rounds; reduce context to changed files                         |
-| Live progress      | None (batch output)                     | `--diagnostics` for verbose timing               | `--verbose` per-test streaming | Streaming token display during each AI round                                   |
-| Large scale        | Sampling via `--ext` glob               | `--maxNodeModuleJsDepth`                         | `--testPathPattern`            | File importance scoring + coverage indicator                                   |
-| Cache transparency | `--cache-location` + printed stats      | `.tsbuildinfo` file                              | Cache managed transparently    | Hit/miss summary in completion screen                                          |
+### Pattern: Mock the Interface, Not the SDK
 
-**Key insight from ESLint's cache design:** ESLint's `--cache` stores a hash of the file content plus the ESLint version plus the rule configuration — not just file content. Changing the rules invalidates the cache without changing files. Handover's equivalent: the `model` is already in the cache key (changing models invalidates rounds), but the round-specific prompt/schema version is not. Consider adding a `roundSchemaVersion` constant to each round (bumped when prompts change) as part of the cache key.
+The `LLMProvider` interface (`src/providers/base.ts`) already abstracts the SDK. Mock the interface:
+
+```typescript
+// tests/helpers/mock-provider.ts
+import { vi } from 'vitest';
+import type { LLMProvider } from '../../src/providers/base.js';
+import type { CompletionResult } from '../../src/domain/types.js';
+
+export function createMockProvider(overrides?: Partial<LLMProvider>): LLMProvider {
+  return {
+    name: 'mock',
+    complete: vi.fn().mockResolvedValue({
+      data: {},
+      tokens: { input: 100, output: 50 },
+      cost: 0.001,
+      status: 'success',
+    } satisfies CompletionResult & { data: unknown }),
+    estimateTokens: vi.fn().mockImplementation((text: string) => Math.ceil(text.length / 4)),
+    maxContextTokens: vi.fn().mockReturnValue(200_000),
+    ...overrides,
+  };
+}
+```
+
+Do NOT mock the Anthropic SDK or OpenAI SDK — that tests the SDK's internals, not your code.
+
+### Pattern: Table-Driven Tests for Scoring
+
+Vitest's `test.each()` is the correct pattern for scoring algorithms with multiple inputs:
+
+```typescript
+test.each([
+  { path: 'src/index.ts', expectedEntryPoint: 30 }, // matches ENTRY_POINT_PATTERNS
+  { path: 'src/utils/helpers.ts', expectedEntryPoint: 0 },
+  { path: 'package.json', expectedConfigFile: 15 }, // matches CONFIG_FILE_PATTERNS
+])('scores $path correctly', ({ path, expectedEntryPoint, expectedConfigFile }) => {
+  const result = scoreFiles(buildMinimalAnalysis({ filePath: path }));
+  const scored = result.find((f) => f.path === path);
+  expect(scored?.breakdown.entryPoint).toBe(expectedEntryPoint ?? 0);
+});
+```
+
+### Pattern: `vi.stubEnv()` for Environment-Dependent Tests
+
+Provider validation reads from `process.env`. Vitest provides `vi.stubEnv()` that auto-restores after each test:
+
+```typescript
+test('throws ProviderError when API key is missing', () => {
+  vi.stubEnv('ANTHROPIC_API_KEY', '');
+  expect(() => validateProviderConfig({ provider: 'anthropic', ... }))
+    .toThrow(ProviderError);
+});
+```
+
+### Pattern: Injected I/O for Testable Algorithms
+
+`packFiles()` already accepts a `getFileContent` callback instead of importing `fs` directly. This is the correct design for testability — pass a `vi.fn()` as the callback. Analyzers that read files directly are harder to test; they need temp directories or file-path indirection.
 
 ---
 
 ## Sources
 
-- Codebase audit: `src/cache/round-cache.ts`, `src/analyzers/cache.ts`, `src/orchestrator/dag.ts`, `src/analyzers/coordinator.ts`, `src/ui/renderer.ts`, `src/context/compressor.ts`, `src/cli/generate.ts`, `src/providers/anthropic.ts`, `src/providers/base.ts` — HIGH confidence (direct source)
-- [Anthropic SDK streaming documentation](https://docs.anthropic.com/en/api/messages-streaming) — streaming `tool_use` with `input_json_delta` events — MEDIUM confidence (official docs; streaming + tool_use support verified in SDK)
-- [LangChain JS streaming](https://js.langchain.com/docs/how_to/streaming_llm/) — streaming pattern with `handleLLMNewToken` callback — MEDIUM confidence (official docs)
-- [ESLint incremental caching issue #20186](https://github.com/eslint/eslint/issues/20186) — ESLint's approach to content-hash caching and cache key design — HIGH confidence (official GitHub repo discussion)
-- [Prompt compression techniques — Medium](https://medium.com/@kuldeep.paul08/prompt-compression-techniques-reducing-context-window-costs-while-improving-llm-performance-afec1e8f1003) — 40-60% token reduction via extractive compression — LOW confidence (secondary source; consistent with existing `compressRoundOutput()` approach which is already extractive)
-- [Context window management strategies](https://www.getmaxim.ai/articles/context-window-management-strategies-for-long-context-ai-agents-and-chatbots/) — summarization vs extractive compression tradeoffs — MEDIUM confidence (verified against existing implementation)
-- [LLM streaming via Vellum](https://www.vellum.ai/llm-parameters/llm-streaming) — streaming token delivery patterns — MEDIUM confidence (secondary source)
-- [Monorepo AI code review tools](https://monorepo.tools/ai) — large-scale codebase analysis challenges — MEDIUM confidence (industry survey)
+- Codebase audit: `src/context/scorer.ts`, `src/context/token-counter.ts`, `src/context/packer.ts`, `src/renderers/registry.ts`, `src/providers/factory.ts`, `src/providers/base.ts`, `src/utils/errors.ts`, `src/cli/generate.ts`, `vitest.config.ts`, `package.json` — HIGH confidence (direct source inspection)
+- [Vitest Mocking Guide](https://vitest.dev/guide/mocking) — `vi.mock()`, `vi.fn()`, `vi.spyOn()`, partial mocking — HIGH confidence (official docs)
+- [Vitest `vi.mock()` module hoisting](https://vitest.dev/guide/mocking/modules) — ESM hoisting behavior, partial mock with `importOriginal` — HIGH confidence (official docs)
+- [Vitest table-driven tests](https://oliviac.dev/blog/introduction-to-table-driven-tests-in-vitest/) — `test.each()` patterns for pure functions — MEDIUM confidence (community source, consistent with official `test.each` docs)
+- [Parameterized tests in Vitest](https://www.the-koi.com/projects/parameterized-data-driven-tests-in-vitest-example/) — data-driven test patterns with objects — MEDIUM confidence
+- [Zod input validation best practices](https://zod.dev/) — `safeParse()` vs `parse()` for CLI validation — HIGH confidence (official docs)
+- [TypeScript error handling in catch blocks](https://kentcdodds.com/blog/get-a-catch-block-error-message-with-typescript) — `unknown` type enforcement, `useUnknownInCatchVariables` — MEDIUM confidence (community source by Kent C. Dodds, widely cited)
+- [Vitest `vi.stubEnv()`](https://vitest.dev/api/vi.html) — auto-restored environment variable mocking — HIGH confidence (official docs)
 
 ---
 
-_Feature research for: Handover CLI — performance improvements milestone_
-_Researched: 2026-02-18_
+_Feature research for: Handover CLI — robustness and testing milestone_
+_Researched: 2026-02-19_
