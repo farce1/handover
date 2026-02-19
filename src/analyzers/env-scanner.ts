@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { isBinaryFile } from './file-discovery.js';
 import type { AnalysisContext, AnalyzerResult, EnvResult } from './types.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * STAT-05: EnvScanner Analyzer
@@ -70,8 +71,10 @@ export async function scanEnvVars(ctx: AnalysisContext): Promise<AnalyzerResult<
 
         envFiles.push({ path: file.path, variables });
         envFileNames.add(basename(file.path));
-      } catch {
-        // Skip unreadable .env files
+      } catch (err) {
+        logger.debug(
+          `Skipped unreadable .env file ${file.path}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
@@ -98,7 +101,10 @@ export async function scanEnvVars(ctx: AnalysisContext): Promise<AnalyzerResult<
           try {
             const content = await readFile(file.absolutePath, 'utf-8');
             return scanFileForEnvRefs(content, file.path);
-          } catch {
+          } catch (err) {
+            logger.debug(
+              `Skipped unreadable source file ${file.path}: ${err instanceof Error ? err.message : String(err)}`,
+            );
             return [];
           }
         }),

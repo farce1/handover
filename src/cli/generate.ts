@@ -213,10 +213,16 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       return;
     }
 
-    // Fail-fast validation before pipeline starts (PROV-05)
+    // Fail-fast validation before pipeline starts
+    // Order: cheapest/most-actionable first (HARD-03)
+    // 1. Validate --only alias (pure, no env/API dependency)
+    const selectedDocs = resolveSelectedDocs(options.only, DOCUMENT_REGISTRY);
+    const requiredRounds = computeRequiredRounds(selectedDocs);
+
+    // 2. Validate provider config (structural check — PROV-05)
     validateProviderConfig(config);
 
-    // Resolve API key (validates it exists -- fail fast)
+    // 3. Resolve API key (environment-dependent — fail fast)
     resolveApiKey(config);
 
     // Initialize round cache for crash recovery
@@ -229,10 +235,6 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     // Resolve audience mode: CLI --audience overrides config
     const audience: 'human' | 'ai' =
       options.audience === 'ai' ? 'ai' : (config.audience ?? 'human');
-
-    // Resolve selected documents and required AI rounds
-    const selectedDocs = resolveSelectedDocs(options.only, DOCUMENT_REGISTRY);
-    const requiredRounds = computeRequiredRounds(selectedDocs);
 
     // Build the DAG pipeline
     const startTime = Date.now();

@@ -62,7 +62,7 @@ async function tryRegisterTreeSitterExtractors(service: ParserService): Promise<
     service.registerExtractor('javascript', tsExtractor);
     service.registerExtractor('jsx', tsExtractor);
   } catch {
-    // TypeScript extractor not yet available (plan 02-02 pending)
+    // Parser unavailable for this language — skip file silently (expected for unsupported file types)
   }
 
   // Python extractor (dynamic path avoids TS2307 when file doesn't exist yet)
@@ -72,7 +72,7 @@ async function tryRegisterTreeSitterExtractors(service: ParserService): Promise<
     const pyExtractor = new pyModule.PythonExtractor();
     service.registerExtractor('python', pyExtractor);
   } catch {
-    // Python extractor not yet available (plan 02-02 pending)
+    // Parser unavailable for this language — skip file silently (expected for unsupported file types)
   }
 }
 

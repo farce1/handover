@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import type { AnalysisContext, AnalyzerResult, TestResult } from './types.js';
+import { logger } from '../utils/logger.js';
 
 // ─── Framework detection patterns ───────────────────────────────────────────
 
@@ -116,8 +117,10 @@ export async function analyzeTests(ctx: AnalysisContext): Promise<AnalyzerResult
         if ('vitest' in allDeps) detectedFrameworks.add('vitest');
         if ('jest' in allDeps) detectedFrameworks.add('jest');
         if ('mocha' in allDeps) detectedFrameworks.add('mocha');
-      } catch {
-        // Invalid package.json -- non-critical
+      } catch (err) {
+        logger.debug(
+          `Failed to parse package.json: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
@@ -138,8 +141,11 @@ export async function analyzeTests(ctx: AnalysisContext): Promise<AnalyzerResult
           count += matches?.length ?? 0;
         }
         testFile.testCount = count;
-      } catch {
-        // File read failure -- non-critical, leave count at 0
+      } catch (err) {
+        logger.debug(
+          `Failed to read test file ${testFile.path}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        // Leave count at 0 -- non-critical
       }
     }
 

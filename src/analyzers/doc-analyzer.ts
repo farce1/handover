@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, dirname } from 'node:path';
 import { isBinaryFile } from './file-discovery.js';
 import type { AnalysisContext, AnalyzerResult, DocResult } from './types.js';
+import { logger } from '../utils/logger.js';
 
 // ─── Documentation detection patterns ────────────────────────────────────────
 
@@ -108,8 +109,10 @@ export async function analyzeDocs(ctx: AnalysisContext): Promise<AnalyzerResult<
         if (hasInlineDoc) {
           filesWithDocs++;
         }
-      } catch {
-        // File read failure -- skip this file
+      } catch (err) {
+        logger.debug(
+          `Skipped unreadable doc file ${file.path}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 

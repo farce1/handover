@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { isBinaryFile } from './file-discovery.js';
 import type { AnalysisContext, AnalyzerResult, TodoItem, TodoResult } from './types.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * STAT-04: TodoScanner Analyzer
@@ -47,7 +48,10 @@ export async function scanTodos(ctx: AnalysisContext): Promise<AnalyzerResult<To
           try {
             const content = await readFile(file.absolutePath, 'utf-8');
             return scanFileForTodos(content, file.path);
-          } catch {
+          } catch (err) {
+            logger.debug(
+              `Failed to scan file for TODOs ${file.path}: ${err instanceof Error ? err.message : String(err)}`,
+            );
             return [];
           }
         }),

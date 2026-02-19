@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { isBinaryFile } from './file-discovery.js';
 import type { AnalysisContext, AnalyzerResult, FileTreeResult } from './types.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * STAT-01: FileTree Analyzer
@@ -49,7 +50,10 @@ export async function analyzeFileTree(
             const content = await readFile(file.absolutePath, 'utf-8');
             const lines = content.split('\n').length;
             return { path: file.path, lines };
-          } catch {
+          } catch (err) {
+            logger.debug(
+              `Failed to read file for line count ${file.path}: ${err instanceof Error ? err.message : String(err)}`,
+            );
             return { path: file.path, lines: 0 };
           }
         }),

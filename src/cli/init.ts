@@ -138,7 +138,7 @@ function detectProject(): { name: string; language: string } {
       name = pkg.name ?? name;
       language = 'typescript';
     } catch {
-      // Ignore parse errors
+      // Ignore parse errors in existing config — treat as if no config exists; user will re-configure
     }
   }
 
