@@ -5,13 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** Planning next milestone
+**Current focus:** v3.0 Robustness — defining requirements
 
 ## Current Position
 
-Milestone: v2.0 Performance — SHIPPED 2026-02-19
-Status: All milestones complete. Ready for next milestone.
-Last activity: 2026-02-19 — v2.0 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-19 — Milestone v3.0 started
 
 ## Performance Metrics
 
@@ -64,5 +65,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: v2.0 milestone archived — ready for next milestone
-Resume file: .planning/MILESTONES.md
+Stopped at: v3.0 Robustness — defining requirements
+Resume file: .planning/PROJECT.md

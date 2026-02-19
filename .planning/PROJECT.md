@@ -46,7 +46,19 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ### Active
 
-None — planning next milestone.
+#### Current Milestone: v3.0 Robustness
+
+**Goal:** Harden the codebase with comprehensive unit tests, fix CI, merge blocked dependency updates, and eliminate validation gaps, hardcoded values, and silent error handling.
+
+**Target features:**
+
+- Comprehensive unit test suite targeting 60%+ coverage (~100+ tests)
+- Fix TypeScript error blocking CI on main
+- Merge 5 blocked Dependabot PRs
+- Input validation hardening (CLI args, config paths, API keys)
+- Error handling cleanup (document intentional catches, protect grammar downloader)
+- Extract hardcoded values (model pricing, scoring weights, batch sizes) to config
+- Tighten 0.x dependency version constraints
 
 ### Out of Scope
 
@@ -103,4 +115,4 @@ None — planning next milestone.
 
 ---
 
-_Last updated: 2026-02-19 after v2.0 milestone complete_
+_Last updated: 2026-02-19 after v3.0 milestone started_
