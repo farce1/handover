@@ -91,12 +91,12 @@ Plans:
 3. `DAGOrchestrator` tests verify step ordering, cycle detection, skip propagation on step failure, and parallel execution tracking using injected `vi.fn()` steps
 4. `TokenUsageTracker` tests confirm stateful accounting is correct across multiple update calls
 5. `generateSignatureSummary()` tests produce deterministic output strings from fixture `ParsedFile` inputs
-   **Plans**: TBD
+   **Plans:** 2 plans in 1 wave
 
 Plans:
 
-- [ ] 10-01: Write packFiles and validateProviderConfig tests
-- [ ] 10-02: Write DAGOrchestrator, TokenUsageTracker, and generateSignatureSummary tests
+- [ ] 10-01: Write packFiles, generateSignatureSummary, and validateProviderConfig tests
+- [ ] 10-02: Write DAGOrchestrator and TokenUsageTracker tests
 
 ### Phase 11: AI Round Tests and Coverage Enforcement
 
