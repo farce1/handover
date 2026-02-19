@@ -140,6 +140,12 @@ export class TerminalRenderer implements Renderer {
       if (state.phase === 'static-analysis') {
         this.write(renderAnalyzerBlock(state.analyzers));
       } else if (state.phase === 'ai-rounds') {
+        // Update elapsedMs for running rounds before re-rendering
+        for (const [, rd] of state.rounds) {
+          if (rd.status === 'running' && rd.roundStartMs) {
+            rd.elapsedMs = Date.now() - rd.roundStartMs;
+          }
+        }
         this.write(this.buildRoundLines(state));
       }
     }, 80);

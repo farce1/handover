@@ -49,6 +49,7 @@ export function createRound2Step(
   estimateTokensFn: (text: string) => number,
   getRound1Result: () => RoundExecutionResult<Round1Output> | undefined,
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
+  onToken?: () => ((tokenCount: number) => void) | undefined,
 ): StepDefinition {
   // Map the single-round getter to the factory's generic round getter
   const roundGetter = <U>(n: number) => {
@@ -66,6 +67,7 @@ export function createRound2Step(
     estimateTokensFn,
     roundGetter,
     onRetry,
+    onToken,
   );
 }
 

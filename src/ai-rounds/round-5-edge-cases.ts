@@ -47,7 +47,10 @@ export function createRound5Step(
     round2?: RoundExecutionResult<Round2Output>;
   },
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
+  _onToken?: () => ((tokenCount: number) => void) | undefined,
 ): StepDefinition {
+  // Note: Round 5 fans out per module (multiple parallel LLM calls), so onToken
+  // is accepted for API consistency but not threaded into per-module calls.
   return createStep({
     id: 'ai-round-5',
     name: 'AI Round 5: Edge Cases & Conventions',

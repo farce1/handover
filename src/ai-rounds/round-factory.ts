@@ -62,6 +62,7 @@ export function createStandardRoundStep<T>(
   estimateTokensFn: (text: string) => number,
   roundGetter: <U>(n: number) => RoundExecutionResult<U> | undefined,
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
+  onToken?: () => ((tokenCount: number) => void) | undefined,
 ): StepDefinition {
   const { roundNumber, name, deps, maxTokens, schema, buildData, buildFallback, getPriorContexts } =
     roundConfig;
@@ -110,6 +111,7 @@ export function createStandardRoundStep<T>(
         tracker,
         estimateTokensFn,
         onRetry,
+        onToken: onToken?.(),
       });
     },
     onSkip: () => buildFallback(staticAnalysis),

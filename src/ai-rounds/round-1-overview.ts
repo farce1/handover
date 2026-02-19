@@ -41,6 +41,7 @@ export function createRound1Step(
   tracker: TokenUsageTracker,
   estimateTokensFn: (text: string) => number,
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
+  onToken?: () => ((tokenCount: number) => void) | undefined,
 ): StepDefinition {
   // Round 1 has no prior results, so the getter always returns undefined
   const roundGetter = <U>(_n: number) =>
@@ -56,6 +57,7 @@ export function createRound1Step(
     estimateTokensFn,
     roundGetter,
     onRetry,
+    onToken,
   );
 }
 

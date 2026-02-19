@@ -22,6 +22,10 @@ export interface RoundDisplayState {
   retryStartMs?: number;
   retryReason?: string;
   affectedDocs?: string[];
+  /** Live token count from streaming callback (undefined when not streaming). */
+  streamingTokens?: number;
+  /** Timestamp when round began executing, for live elapsed time computation. */
+  roundStartMs?: number;
 }
 
 /** High-level phase of the pipeline display. */
@@ -59,6 +63,8 @@ export interface DisplayState {
   renderedDocs: string[];
   completionDocs: number;
   errors: ErrorInfo[];
+  /** Running total of tokens across all completed + current rounds (for "(X total)" display). */
+  cumulativeTokens?: number;
 }
 
 /**

@@ -35,6 +35,7 @@ export function createRound6Step(
     round2?: RoundExecutionResult<Round2Output>;
   },
   onRetry?: (attempt: number, delayMs: number, reason: string) => void,
+  onToken?: () => ((tokenCount: number) => void) | undefined,
 ): StepDefinition {
   // Round 6's buildData needs packedContext, so we create the config inside
   // this function to capture packedContext in the closure.
@@ -70,6 +71,7 @@ export function createRound6Step(
     estimateTokensFn,
     roundGetter,
     onRetry,
+    onToken,
   );
 }
 

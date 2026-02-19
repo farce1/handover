@@ -20,6 +20,7 @@ export interface ExecuteRoundOptions<T> {
   tracker: TokenUsageTracker;
   estimateTokensFn: (text: string) => number;
   onRetry?: (attempt: number, delayMs: number, reason: string) => void;
+  onToken?: (tokenCount: number) => void;
 }
 
 // ─── Round Execution Engine ────────────────────────────────────────────────
@@ -54,7 +55,10 @@ export async function executeRound<T>(
     const request = buildPrompt(isRetry);
 
     // 2. Call LLM with Zod schema validation
-    const result = await provider.complete<T>(request, schema, { onRetry: options.onRetry });
+    const result = await provider.complete<T>(request, schema, {
+      onRetry: options.onRetry,
+      onToken: options.onToken,
+    });
 
     // 3. Record token usage
     const promptText = request.systemPrompt + request.userPrompt;

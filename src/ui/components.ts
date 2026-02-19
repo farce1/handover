@@ -79,12 +79,28 @@ export function renderAnalyzerBlock(analyzers: Map<string, AnalyzerStatus>): str
 }
 
 /**
+ * Compute the cumulative token count across all rounds.
+ * Sums authoritative tokens for done rounds and streaming tokens for the running round.
+ */
+export function computeCumulativeTokens(rounds: Map<number, RoundDisplayState>): number {
+  let total = 0;
+  for (const [, rd] of rounds) {
+    if (rd.status === 'done' || rd.status === 'cached') {
+      total += rd.tokens ?? 0;
+    } else if (rd.status === 'running') {
+      total += rd.streamingTokens ?? 0;
+    }
+  }
+  return total;
+}
+
+/**
  * Render the AI rounds block.
  *
  * Stacked lines per active/complete round:
- * - Running: spinner + name + elapsed time
- * - Done:   `✓ R1 Project Overview · 12K tokens · $0.02`
- * - Failed: `✗ R3 failed (reason) · Missing: DOC1, DOC2`
+ * - Running: `Round N/T ◆ X,XXX tokens (Y,YYY total) · Zs`
+ * - Done:    `✓ Round N · X,XXX tokens · Zs`
+ * - Failed:  `✗ Round N failed (reason) · Missing: DOC1, DOC2`
  *
  * Bottom line: running total cost.
  * Cost warning line if over threshold.
@@ -104,25 +120,28 @@ export function renderRoundBlock(
     return [`  ${pc.dim(`All ${rounds.size} rounds cached`)}`];
   }
 
+  const totalRounds = rounds.size;
+  const cumulativeTokens = computeCumulativeTokens(rounds);
+
   for (const [, rd] of rounds) {
-    const roundLabel = `R${rd.roundNumber}`;
+    const roundLabel = `Round ${rd.roundNumber}`;
 
     switch (rd.status) {
       case 'cached': {
         // Cached round: show green check with "cached" label (no tokens/cost -- no API call)
-        lines.push(`  ${pc.green(SYMBOLS.done)} ${roundLabel} ${rd.name}${sep}${pc.dim('cached')}`);
+        lines.push(`  ${pc.green(SYMBOLS.done)} ${roundLabel}${sep}${pc.dim('cached')}`);
         break;
       }
 
       case 'done': {
-        const tokenStr = !isLocal && rd.tokens !== undefined ? formatTokens(rd.tokens) : '';
-        const costStr = !isLocal && rd.cost !== undefined ? pc.yellow(formatCost(rd.cost)) : '';
-        const parts = [
-          `${pc.green(SYMBOLS.done)} ${roundLabel} ${rd.name}`,
-          tokenStr,
-          costStr,
-        ].filter(Boolean);
-        lines.push(`  ${parts.join(sep)}`);
+        const tokenStr = formatTokens(rd.tokens ?? 0);
+        const durationStr = formatDuration(rd.elapsedMs);
+        const parts = [`${pc.green(SYMBOLS.done)} ${roundLabel}`, tokenStr, durationStr];
+        // Show cost for cloud providers
+        if (!isLocal && rd.cost !== undefined) {
+          parts.push(pc.yellow(formatCost(rd.cost)));
+        }
+        lines.push(`  ${parts.filter(Boolean).join(sep)}`);
         break;
       }
 
@@ -137,13 +156,18 @@ export function renderRoundBlock(
             )}`,
           );
         } else {
-          // Show spinner + elapsed time
+          // Show live progress: Round N/T ◆ X,XXX tokens (Y,YYY total) · Zs
           const frame =
             spinnerFrame !== undefined
               ? SPINNER_FRAMES.frames[spinnerFrame % SPINNER_FRAMES.frames.length]
               : SPINNER_FRAMES.frames[0];
-          const elapsed = pc.dim(formatDuration(rd.elapsedMs));
-          lines.push(`  ${pc.magenta(frame)} ${roundLabel} ${pc.bold(rd.name)}${sep}${elapsed}`);
+          const streamTokens = rd.streamingTokens ?? 0;
+          const tokenCount = streamTokens.toLocaleString();
+          const totalCount = cumulativeTokens.toLocaleString();
+          const elapsedSec = ((rd.elapsedMs ?? 0) / 1000).toFixed(1);
+          lines.push(
+            `  ${pc.magenta(frame)} ${roundLabel}/${totalRounds} ${pc.dim('\u00B7')} ${tokenCount} tokens ${pc.dim(`(${totalCount} total)`)} ${pc.dim('\u00B7')} ${pc.dim(`${elapsedSec}s`)}`,
+          );
         }
         break;
       }
@@ -159,7 +183,7 @@ export function renderRoundBlock(
       }
 
       case 'pending': {
-        lines.push(`  ${pc.dim(SYMBOLS.pending)} ${pc.dim(`${roundLabel} ${rd.name}`)}`);
+        lines.push(`  ${pc.dim(SYMBOLS.pending)} ${pc.dim(`${roundLabel}`)}`);
         break;
       }
     }

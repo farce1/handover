@@ -276,6 +276,13 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         orchestratorEvents.onStepRetry?.(`ai-round-${roundNum}`, attempt, delayMs, reason);
       };
 
+    // Per-round onToken callbacks: update streamingTokens on each token event.
+    // Stored in a Map so callbacks can be created in onStepStart and retrieved at step factory call sites.
+    const roundTokenCallbacks = new Map<number, (count: number) => void>();
+
+    // Lazy getter for use in round step factories: resolves callback at execute() time.
+    const makeOnToken = (roundNum: number) => () => roundTokenCallbacks.get(roundNum);
+
     // DAG orchestrator events -- update display state and call renderer
     const orchestratorEvents: DAGEvents = {
       onStepStart: (id, name) => {
@@ -284,12 +291,24 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         if (match) {
           const roundNum = parseInt(match[1], 10);
           const roundName = ROUND_NAMES[roundNum] ?? name;
+          const roundStartMs = Date.now();
           displayState.rounds.set(roundNum, {
             roundNumber: roundNum,
             name: roundName,
             status: 'running',
             elapsedMs: 0,
+            roundStartMs,
           });
+
+          // Create the per-round streaming token callback
+          const onToken = (count: number) => {
+            const rd = displayState.rounds.get(roundNum);
+            if (rd && rd.status === 'running') {
+              rd.streamingTokens = count;
+            }
+          };
+          roundTokenCallbacks.set(roundNum, onToken);
+
           renderer.onRoundUpdate(displayState);
         }
       },
@@ -313,6 +332,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             rd.cost = roundData.cost;
             rd.elapsedMs = result.duration;
             rd.retrying = false; // Clear any retry state from a preceding retry attempt
+            rd.streamingTokens = undefined; // Clear live counter -- authoritative value now in rd.tokens
           }
 
           // If degraded, also record an error and affected docs
@@ -560,6 +580,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         tracker,
         estimateTokensFn,
         makeOnRetry(1),
+        makeOnToken(1),
       );
       steps.push(wrapWithCache(1, step, []));
     }
@@ -574,6 +595,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         estimateTokensFn,
         () => getRound<Round1Output>(1),
         makeOnRetry(2),
+        makeOnToken(2),
       );
       steps.push(wrapWithCache(2, step, [1]));
     }
@@ -591,6 +613,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           round2: getRound<Round2Output>(2),
         }),
         makeOnRetry(3),
+        makeOnToken(3),
       );
       steps.push(wrapWithCache(3, step, [1, 2]));
     }
@@ -609,6 +632,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           round3: getRound<Round3Output>(3),
         }),
         makeOnRetry(4),
+        makeOnToken(4),
       );
       steps.push(wrapWithCache(4, step, [1, 2, 3]));
     }
@@ -626,6 +650,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           round2: getRound<Round2Output>(2),
         }),
         makeOnRetry(5),
+        makeOnToken(5),
       );
       steps.push(wrapWithCache(5, step, [1, 2]));
     }
@@ -643,6 +668,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           round2: getRound<Round2Output>(2),
         }),
         makeOnRetry(6),
+        makeOnToken(6),
       );
       steps.push(wrapWithCache(6, step, [1, 2]));
     }
