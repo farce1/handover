@@ -37,7 +37,7 @@
   },
   "homepage": "https://github.com/farce1/handover#readme",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.76.0",
+    "@anthropic-ai/sdk": "0.76.0",
     "@clack/prompts": "^1.0.1",
     "commander": "^14.0.3",
     "fast-glob": "^3.3.3",
@@ -48,7 +48,7 @@
     "simple-git": "^3.31.1",
     "sisteransi": "^1.0.5",
     "smol-toml": "^1.6.0",
-    "web-tree-sitter": "^0.26.5",
+    "web-tree-sitter": "0.26.5",
     "yaml": "^2.7.0",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.24.0"
@@ -56,19 +56,19 @@
   "devDependencies": {
     "@commitlint/cli": "^20.4.1",
     "@commitlint/config-conventional": "^20.4.1",
-    "@types/node": "^22.0.0",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@types/node": "^25.2.3",
+    "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
-    "tree-sitter-wasms": "^0.1.13",
+    "tree-sitter-wasms": "0.1.13",
     "tsup": "^8.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.56.0",
-    "vitest": "^3.0.0"
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=18.0.0"

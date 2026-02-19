@@ -135,7 +135,7 @@ export const ProjectSchema = z.object({
 export const CompletionRequestSchema = z.object({
   systemPrompt: z.string(),
   userPrompt: z.string(),
-  responseSchema: z.any(),
+  responseSchema: z.any().optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().positive().optional(),
 });

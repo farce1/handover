@@ -31,7 +31,7 @@ export const HandoverConfigSchema = z.object({
       concurrency: z.number().int().positive().default(4),
       staticOnly: z.boolean().default(false),
     })
-    .default({}),
+    .default({ concurrency: 4, staticOnly: false }),
   project: z
     .object({
       name: z.string().optional(),
@@ -47,7 +47,7 @@ export const HandoverConfigSchema = z.object({
       pin: z.array(z.string()).default([]),
       boost: z.array(z.string()).default([]),
     })
-    .default({}),
+    .default({ pin: [], boost: [] }),
   costWarningThreshold: z.number().positive().optional(),
 });
 
