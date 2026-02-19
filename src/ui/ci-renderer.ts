@@ -73,9 +73,7 @@ export class CIRenderer implements Renderer {
   }
 
   onRenderStart(state: DisplayState): void {
-    console.log(
-      `${this.timestamp()} [render] Rendering ${state.completionDocs || state.renderedDocs.length} documents...`,
-    );
+    console.log(`${this.timestamp()} [render] Rendering ${state.completionDocs} documents...`);
   }
 
   onRenderDone(state: DisplayState): void {
@@ -92,7 +90,11 @@ export class CIRenderer implements Renderer {
       } else if (rd.status === 'done') {
         const tokenStr = rd.tokens !== undefined ? formatTokens(rd.tokens) : '';
         const costStr = !state.isLocal && rd.cost !== undefined ? formatCost(rd.cost) : '';
-        const details = [tokenStr, costStr].filter(Boolean).join(', ');
+        const savingsStr =
+          rd.cacheSavingsTokens && rd.cacheSavingsTokens > 0 && rd.cacheSavingsPercent !== undefined
+            ? `${formatTokens(rd.cacheSavingsTokens)} saved (${Math.round(rd.cacheSavingsPercent * 100)}%)`
+            : '';
+        const details = [tokenStr, costStr, savingsStr].filter(Boolean).join(', ');
         console.log(
           `${this.timestamp()} [round-${rd.roundNumber}] ${rd.name} complete${details ? ` (${details})` : ''}`,
         );

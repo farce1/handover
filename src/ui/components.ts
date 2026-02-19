@@ -122,14 +122,6 @@ export function renderRoundSavings(
 }
 
 /**
- * Render the aggregate render start/done lines.
- * Per locked decision: "Rendering N documents..." then done — no per-doc status.
- */
-export function renderRenderProgress(docCount: number): string {
-  return `${pc.dim(SYMBOLS.running)} Rendering ${docCount} documents...`;
-}
-
-/**
  * Render the file coverage line shown before AI rounds begin.
  *
  * Format: `◆ 142 files · 104 analyzing · 10 ignored`

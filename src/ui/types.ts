@@ -73,8 +73,6 @@ export interface DisplayState {
   renderedDocs: string[];
   completionDocs: number;
   errors: ErrorInfo[];
-  /** Running total of tokens across all completed + current rounds (for "(X total)" display). */
-  cumulativeTokens?: number;
   /** File coverage breakdown from context packing, shown before AI rounds. */
   fileCoverage?: { analyzing: number; ignored: number; total: number };
   /** Whether streaming token output indicator is visible (opt-in via --stream flag). */
