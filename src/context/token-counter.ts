@@ -37,9 +37,7 @@ export function computeTokenBudget(
   const outputReserve = options?.outputReserve ?? 4096;
   const safetyMargin = options?.safetyMargin ?? 0.9;
 
-  const fileContentBudget = Math.floor(
-    (maxTokens - promptOverhead - outputReserve) * safetyMargin,
-  );
+  const fileContentBudget = Math.floor((maxTokens - promptOverhead - outputReserve) * safetyMargin);
 
   return {
     total: maxTokens,
