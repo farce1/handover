@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v3.0 Robustness — Phase 9 in progress (Plan 3 complete)
+**Current focus:** v3.0 Robustness — Phase 10 in progress (Plan 2 complete)
 
 ## Current Position
 
-Phase: 9 of 11 (Code Hardening and Pure Function Tests — In Progress)
-Plan: 4 of N (Phase 9 Plan 03 complete — schema, registry, and step unit tests)
+Phase: 10 of 11 (Algorithm and Validation Tests — In Progress)
+Plan: 2 of N (Phase 10 Plan 02 complete — DAGOrchestrator and TokenUsageTracker unit tests)
 Status: In progress
-Last activity: 2026-02-19 — Phase 9 Plan 03 complete (53 unit tests for HandoverConfigSchema, resolveSelectedDocs, computeRequiredRounds, createStep)
+Last activity: 2026-02-19 — Phase 10 Plan 02 complete (45 unit tests: 21 DAGOrchestrator + 24 TokenUsageTracker)
 
-Progress: [██████████░░░░░░░░░░] 58% (11/18 plans complete across all milestones)
+Progress: [███████████░░░░░░░░░] 61% (13/18 plans complete across all milestones)
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Progress: [██████████░░░░░░░░░░] 58% (11
 | Phase 09-code-hardening P01      | 3 min    | 2 tasks | 10 files |
 | Phase 09-pure-function-tests P02 | 3 min    | 2 tasks | 3 files  |
 | Phase 09-pure-function-tests P03 | 5 min    | 2 tasks | 3 files  |
+| Phase 10-algorithm-tests P02     | 3 min    | 2 tasks | 2 files  |
 
 ## Accumulated Context
 
@@ -82,6 +83,9 @@ All v1.0 and v2.0 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 09-02]: SCORE_TEST_PENALTY used in assertion via Math.max(SCORE_MIN, 0 - SCORE_TEST_PENALTY) to satisfy no-unused-vars
 - [Phase 09]: computeRequiredRounds expansion is one-level (ROUND_DEPS pre-expresses transitive deps)
 - [Phase 09]: HandoverError.fix field contains 'Valid aliases' text - tested via caught error inspection
+- [Phase 10-02]: New DAGOrchestrator instance per test — stateful steps Map would pollute tests if reused
+- [Phase 10-02]: Diamond/fan-out parallel ordering not asserted — JS Promise resolution is non-deterministic
+- [Phase 10-02]: Large budgetTokens in cost tests suppress logger.warn stdout noise (acceptable)
 
 ### Pending Todos
 
@@ -91,7 +95,7 @@ None.
 
 **Phase 8 flag (still open):** Before finalizing `makeAnthropicToolResponse()` and `makeOpenAIToolResponse()` mock factories, read `src/providers/anthropic.ts` and `src/providers/openai-compat.ts` to verify which response fields are actually consumed. Mock shape must match actual consumption, not just the SDK type definition.
 
-**Phase 10 flag:** Confirm during execution whether `loadConfig()` uses `node:fs` or `node:fs/promises` for existence checks — determines correct `vi.spyOn` target.
+**Phase 10 flag:** Confirm during execution whether `loadConfig()` uses `node:fs` or `node:fs/promises` for existence checks — determines correct `vi.spyOn` target. (Phase 10-02 did not require loadConfig tests; flag remains for remaining Phase 10 plans.)
 
 External setup still required from v1.0:
 
@@ -103,5 +107,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 09-03-PLAN.md (schema, registry, step unit tests — 53 tests passing)
-Resume file: .planning/phases/09-code-hardening-and-pure-function-tests/ (next plan in Phase 9)
+Stopped at: Completed 10-02-PLAN.md (DAGOrchestrator + TokenUsageTracker unit tests — 45 tests, 131 total)
+Resume file: .planning/phases/10-algorithm-and-validation-tests/ (next plan in Phase 10)
