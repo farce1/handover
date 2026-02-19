@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 8 of 11 (CI Fix and Test Infrastructure)
-Plan: — (ready to plan)
-Status: Ready to plan
-Last activity: 2026-02-19 — Roadmap created for v3.0 Robustness milestone
+Plan: 2 of 3 (ready for 08-02-scorecard-hardening)
+Status: In progress
+Last activity: 2026-02-19 — Phase 8 Plan 01 complete (CI fixed, Dependabot merged, 0.x pinned)
 
-Progress: [████████░░░░░░░░░░░░] 39% (7/18 plans complete across all milestones)
+Progress: [████████░░░░░░░░░░░░] 44% (8/18 plans complete across all milestones)
 
 ## Performance Metrics
 
@@ -44,6 +44,7 @@ Progress: [████████░░░░░░░░░░░░] 39% (7/
 | Phase 06-context-efficiency P02 | 4 min    | 2 tasks | 6 files  |
 | Phase 06-context-efficiency P03 | 4 min    | 2 tasks | 5 files  |
 | Phase 07-cache-savings-fix P01  | 3 min    | 2 tasks | 6 files  |
+| Phase 08-ci-fix P01             | 9 min    | 2 tasks | 9 files  |
 
 ## Accumulated Context
 
@@ -57,6 +58,10 @@ All v1.0 and v2.0 decisions archived in PROJECT.md Key Decisions table.
 - Use `memfs` (not `mock-fs`) — mock-fs is unmaintained, breaks WASM loading. (research SUMMARY.md)
 - Tests colocated with source files (`src/**/*.test.ts`) — not in separate `tests/unit/` directory. (research SUMMARY.md)
 - Cover the 80% threshold only after Phase 11 has a real test suite — enforcing it in Phase 8 would fail every CI run. (research SUMMARY.md)
+- [Phase 08-01]: vitest --passWithNoTests added to test script so CI passes before test files exist (Phase 11)
+- [Phase 08-01]: Zod v4 object .default() requires full value not empty object; fixed in config/schema.ts
+- [Phase 08-01]: responseSchema in CompletionRequestSchema made optional - passed separately to provider.complete()
+- [Phase 08-01]: zodToJsonSchema cast to any: zod-to-json-schema@3.x imports from zod/v3 compat layer
 
 ### Pending Todos
 
@@ -78,5 +83,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-ci-fix-scorecard-hardening-and-test-infrastructure/08-CONTEXT.md
+Stopped at: Completed 08-01-PLAN.md (CI fixed, Dependabot PRs merged, 0.x deps pinned)
+Resume file: .planning/phases/08-ci-fix-scorecard-hardening-and-test-infrastructure/08-02-PLAN.md
