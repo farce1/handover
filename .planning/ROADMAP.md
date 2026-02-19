@@ -110,11 +110,11 @@ Plans:
 3. `compressRoundOutput()` tests verify field extraction and token budget enforcement from fixture round outputs
 4. Renderer utility tests for `buildTable()`, `codeRef()`, and `sectionIntro()` pass — all produce correct string output
 5. CI reports at least 80% coverage after WASM exclusions — the threshold gate passes on every subsequent `npm test` run
-   **Plans**: TBD
+   **Plans:** 2 plans in 2 waves
 
 Plans:
 
-- [ ] 11-01: Write executeRound, validateFileClaims, and compressRoundOutput tests
+- [ ] 11-01: Write executeRound, validateFileClaims, compressRoundOutput, and retryWithBackoff tests
 - [ ] 11-02: Write renderer utility tests and enforce CI coverage gate
 
 ## Progress
