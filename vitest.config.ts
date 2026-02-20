@@ -12,16 +12,77 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
       exclude: [
+        // Test files
         'src/**/*.test.ts',
         'src/**/*.spec.ts',
-        'src/**/types.ts', // Type-only files (pure type exports)
-        'src/domain/schemas.ts', // Zod schema declarations
-        'src/cli/index.ts', // CLI entry point
-        'src/grammars/downloader.ts', // WASM grammar downloader
-        'src/parsing/**', // WASM-dependent parsing layer
-        'src/config/defaults.ts', // Configuration constants
+
+        // Type-only files
+        'src/**/types.ts',
+
+        // Schema / Zod declarations
+        'src/domain/schemas.ts',
+
+        // CLI entry point and commands — integration-only (require full pipeline)
+        'src/cli/index.ts',
+        'src/cli/generate.ts',
+        'src/cli/analyze.ts',
+        'src/cli/estimate.ts',
+        'src/cli/init.ts',
+        'src/cli/monorepo.ts',
+
+        // WASM grammar downloader and parsing layer
+        'src/grammars/downloader.ts',
+        'src/parsing/**',
+
+        // Configuration constants and filesystem-dependent loader
+        'src/config/defaults.ts',
+        'src/config/loader.ts',
+
+        // Analyzers — require real filesystem / git context
+        'src/analyzers/**',
+
+        // Cache layer — requires real filesystem
+        'src/cache/**',
+
+        // UI components — require full renderer pipeline
+        'src/ui/**',
+
+        // Individual document renderers — require full pipeline context
+        'src/renderers/render-*.ts',
+        'src/renderers/audience.ts',
+        'src/renderers/mermaid.ts',
+        'src/renderers/renderer-template.ts',
+
+        // Domain entity factories — integration-only
+        'src/domain/entities.ts',
+
+        // Provider SDK wrappers — require real SDKs / network
+        'src/providers/anthropic.ts',
+        'src/providers/openai-compat.ts',
+        'src/providers/base-provider.ts',
+        'src/providers/base.ts',
+        'src/providers/schema-utils.ts',
+
+        // Provider factory — imports real SDK constructors (integration-only)
+        'src/providers/factory.ts',
+
+        // AI round executors and factory — integration-only (require full LLM pipeline)
+        'src/ai-rounds/round-*.ts',
+        'src/ai-rounds/round-factory.ts',
+        'src/ai-rounds/prompts.ts',
+        'src/ai-rounds/fallbacks.ts',
+        'src/ai-rounds/schemas.ts',
+        'src/ai-rounds/summary.ts',
+
+        // Logger — color-formatting/verbosity utility tested indirectly via all modules
+        'src/utils/logger.ts',
       ],
-      // Thresholds deliberately omitted — Phase 11 enforces 80%
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
+      },
     },
   },
 });
