@@ -1,282 +1,342 @@
 # Project Research Summary
 
-**Project:** handover-cli v3.0 — Testing and Robustness Milestone
-**Domain:** Brownfield test-infrastructure addition to a TypeScript CLI with LLM integrations
-**Researched:** 2026-02-19
+**Project:** MCP Server with Semantic Search & Embeddings for handover CLI
+**Domain:** TypeScript CLI with MCP server, semantic search, vector embeddings, and SQLite vector storage
+**Researched:** 2026-02-20
 **Confidence:** HIGH
 
 ## Executive Summary
 
-handover-cli is a mature, 99-file TypeScript CLI that orchestrates multi-round LLM analysis of codebases. The v3.0 milestone is a quality and robustness milestone — no user-visible features. The codebase has 0 unit tests against an already-configured 80% Vitest coverage threshold, 8+ silent catch blocks, hardcoded magic numbers in scoring and pricing logic, and missing early input validation for the `--only` flag. The research confirms this is a well-understood problem domain: adding retroactive unit tests to a mature TypeScript project with LLM SDK dependencies and a DAG orchestrator has documented patterns, documented pitfalls, and a clear dependency order.
+This milestone extends the existing handover CLI with four new capabilities: (1) MCP server exposing documentation via Model Context Protocol, (2) semantic search over generated docs using embeddings, (3) vector similarity search with SQLite-based storage, and (4) LLM-powered Q&A using RAG patterns. The recommended approach treats these as additive layers that consume handover's existing outputs rather than modifying core analysis logic.
 
-The recommended approach is a layered build-up: start with pure-function tests that need no mocking infrastructure, then stateful class tests, then environment-dependent tests, and finally mock-boundary tests for the LLM provider interface. Only two new dev dependencies are justified (`memfs` for in-memory filesystem mocking, `vitest-mock-extended` for type-safe interface mocks). All existing stack choices are correct and settled. The critical architectural decision is to mock at the `LLMProvider` interface boundary — not at the Anthropic or OpenAI SDK level — which protects tests from SDK churn while still exercising application logic.
+The architecture is well-proven: Use @modelcontextprotocol/sdk for MCP server implementation (26,405+ npm dependents, production-ready), better-sqlite3 with sqlite-vec extension for vector storage (zero-config, portable), and OpenAI text-embedding-3-small for embeddings ($0.02/1M tokens, industry standard). The integration pattern is clean - new components read from `.handover/` output directory and cache, expose via MCP protocol, and store vectors in separate `.handover/search.db` database. This keeps the MCP server as a stateless consumer of handover's output with no coupling to core DAG orchestration.
 
-The primary risks are infrastructure mistakes made before any tests are written: incorrect ESM import extensions breaking CI, wrong LLM mock response shapes producing false-passing tests, and WASM-dependent parser files dragging coverage below threshold. All three are preventable in a single infrastructure setup phase that must come before any test files are authored. Once that foundation is correct, the test-writing phases follow well-established patterns documented in official Vitest sources with no novel research required.
-
----
+The primary risks are (1) stdout corruption from console.log() breaking stdio transport, (2) embedding dimension mismatches causing search failures after model changes, and (3) naive chunk splitting losing critical context. All are preventable with proper architecture: enforce stderr-only logging, store embedding metadata in schema with startup validation, and implement markdown-aware chunking that respects code blocks and headers. Following the recommended phased approach (storage foundation, then search engine, then MCP layer, then advanced features) mitigates integration complexity and allows quality validation at each step.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing test runner (Vitest 3.x with V8 coverage at 80% thresholds) and all production dependencies are correct and unchanged. Only two new dev dependencies are justified:
+The stack builds on handover's existing infrastructure with three core additions: @modelcontextprotocol/sdk (official TypeScript SDK with full MCP spec support), better-sqlite3 + sqlite-vec (fastest synchronous SQLite with pure C vector extension), and OpenAI embeddings API (already integrated via existing openai dependency). These choices align with handover's single-binary, zero-config ethos - everything runs in-process with no separate services required.
 
 **Core technologies:**
 
-- `memfs@4.56.10` — in-memory filesystem mock — explicitly recommended by Vitest official docs; `vol.reset()` provides per-test isolation; actively maintained (last release Jan 2026); replaces unmaintained `mock-fs`
-- `vitest-mock-extended@3.1.0` — type-safe interface mocks — generates full mocks satisfying TypeScript interface contracts; required for the `LLMProvider` interface with 3 typed methods; compatible with Vitest ≥ 3.0.0
-- `vi.useFakeTimers()` (Vitest built-in) — timer control — needed for `retryWithBackoff` (30s base delay) without 30-second test waits; `advanceTimersByTimeAsync` variant required for Promise-safe advancement
-- `vi.hoisted()` (Vitest built-in) — mock factory scoping — required pattern for any variable referenced inside `vi.mock()` factory functions in ESM projects
-- `npx npm-check-updates` (on-demand workflow tool, not a project dependency) — dependency audit — run once before milestone to surface stale packages
+- **@modelcontextprotocol/sdk ^1.26.0**: MCP server implementation — Official SDK from Anthropic with built-in stdio/HTTP transports and tool/resource/prompt primitives. Industry standard with production-ready v1.x.
+- **better-sqlite3 ^12.6.2**: SQLite database driver — Fastest synchronous SQLite library for Node.js with 10,000+ ops/sec performance. Single-file DB perfect for CLI tools. Compatible with Node 20/22.
+- **sqlite-vec ^0.1.7-alpha.2**: Vector search extension — Pure C vector search that runs anywhere SQLite runs. Brute-force search competitive with FAISS/DuckDB for <100K vectors. Declared stable/production-ready despite alpha tag.
+- **OpenAI text-embedding-3-small**: Embeddings generation — Already integrated via existing openai@6.22.0 dependency. Best cost/performance at $0.02/1M tokens with 1536 dimensions. Supports batch API for 50% cost savings.
 
-**Critical anti-stack finding:** MSW and nock cannot intercept `@anthropic-ai/sdk` or `openai` HTTP traffic. Both SDKs use `undici` as their HTTP transport, which bypasses the `node:http`/`node:https` layer that MSW and nock intercept. Do not add MSW. Mock at the `LLMProvider` module boundary using `vi.mock()` instead.
+**Critical version compatibility:**
 
-**Installation:** `npm install -D memfs vitest-mock-extended`
+- MCP SDK v2 breaking changes expected Q1 2026 (6 months support for v1.x after ship)
+- better-sqlite3 requires Node.js v20 or v22 (v22/v24 have 57% performance regression - recommend locking to v20)
+- sqlite-vec auto-loads platform-specific prebuilt extensions (darwin-x64, linux-x64, windows-x64)
 
-See `.planning/research/STACK.md` for full integration patterns, `vi.hoisted()` examples, and version compatibility matrix.
+**Reuse existing infrastructure:**
+
+- Zod schemas for embeddings/vector validation
+- Content-hash caching to avoid redundant embedding generation
+- BaseProvider pattern extended for embedding API with retry/rate-limit logic
+- RateLimiter from existing providers for OpenAI API calls
+- vitest test suite extended for vector search tests
 
 ### Expected Features
 
-This milestone adds no user-visible features. All work is internal quality infrastructure targeting the four identified gaps: 0 unit tests, 8+ silent catch blocks, hardcoded magic numbers, and missing early `--only` validation.
+Research shows clear feature tiers for MCP servers with semantic search. Table stakes are MCP stdio transport, resources for generated docs, semantic search via embeddings, sqlite-vec storage, document chunking, and K-nearest neighbor search. Users expect these as baseline functionality - missing any makes the product feel incomplete.
 
-**Must have (table stakes — establishes minimum regression protection):**
+**Must have (table stakes):**
 
-- Mock LLM provider factory (`tests/helpers/mock-provider.ts`) — foundation for all round tests; implements `LLMProvider` interface using `vi.fn()`; shared across all test files to prevent mock definition duplication
-- Unit tests for `scoreFiles()` — deterministic algorithm with 6 weighted factors; highest-churn logic; table-driven with `test.each()`; no mocking needed
-- Unit tests for `computeTokenBudget()` and `estimateTokens()` — pure math used for billing accuracy; zero setup required
-- Unit tests for `resolveSelectedDocs()` and `computeRequiredRounds()` — CLI input path with documented throw; covers unknown alias, group expansion, INDEX-always behavior, transitive round dependency expansion
-- Named constants for scoring weights — prerequisite for scorer tests; extract 6 inline magic numbers to named exports with `as const`; no behavior change
-- Empty catch block audit — 8+ silent catches in `git-history.ts`, `env-scanner.ts`, `doc-analyzer.ts`, `round-cache.ts`; each needs either a comment explaining the intentional swallow or a `logger.debug()` call
+- MCP server stdio transport — All AI coding tools (Claude Desktop, Cursor, VSCode) expect this standard pattern
+- MCP resources for generated docs — Core MCP primitive; users expect to access 14 existing markdown documents as resources
+- Semantic search via embeddings — Primary use case; "search my docs" is why users want this feature
+- Basic vector database with sqlite-vec — Lightweight, portable vector storage that fits handover's single-binary ethos
+- Document chunking for embeddings — Required due to token limits; fixed-size (500-1000 tokens) with 10-20% overlap outperforms complex semantic chunking
+- K-nearest neighbor search — Standard vector search pattern returning top-k most similar chunks
+- Auto-detect missing docs on startup — Don't fail silently; guide users to run `handover` first if docs missing
+- MCP client configuration docs — Users need to know how to add server to Claude Desktop/Cursor/VSCode config files
 
-**Should have (differentiators — algorithmic correctness coverage):**
+**Should have (competitive advantages):**
 
-- Unit tests for `packFiles()` context packing — complex 6-tier greedy algorithm with budget boundary conditions; mock `getFileContent` via `vi.fn()` (already an injected callback)
-- Unit tests for `validateProviderConfig()` — 5 explicit throw paths; `vi.stubEnv()` for env var isolation; assert `ProviderError.code` values
-- `--only` flag validation moved earlier in `generate.ts` — reorder 3 lines so `resolveSelectedDocs()` call runs before `validateProviderConfig()`; no new logic; improves error UX
-- Unit tests for `generateSignatureSummary()` — pure AST-to-text transformation; fixture-based; asserts output string format
+- Dual-mode query: fast search + LLM synthesis — Users choose speed (semantic search) vs quality (RAG with LLM synthesis)
+- LLM-powered Q&A with RAG — Conversational answers synthesized from multiple doc chunks; better UX than raw search results
+- Reuse existing LLM provider abstraction — Leverage handover's 8 existing providers for Q&A; no vendor lock-in
+- Incremental reindexing — Only re-embed changed documents; track doc hashes using existing SHA-256 cache system
+- MCP prompts for common workflows — Pre-built prompts guide users: "Explain architecture", "Find security concerns"
+- Raw analysis data as MCP resources — Expose file tree, dependency graph, git history as structured data for advanced users
+- Hybrid search: semantic + metadata filters — Combine vector similarity with filters (file type, domain, recency) for precision
 
-**Defer (P3 — orchestration layer, adds depth not breadth):**
+**Defer (v2+):**
 
-- Unit tests for `DAGOrchestrator` — mock steps as `vi.fn()`; assert ordering, cycle detection, skip propagation
-- Unit tests for `compressRoundOutput()` — inter-round context compressor; fixture round outputs; token budget enforcement
-- Error factory method tests for all defined `HandoverError` and `ProviderError` codes
+- Remote regeneration via MCP tool — Complex async execution model; unclear if users want this vs CLI workflow
+- Streaming MCP responses — Marginal UX gain; optimize query latency first with better chunking/caching
+- Multimodal embeddings — Handover generates markdown text only; defer until visual artifacts exist
+- GraphQL/REST API alongside MCP — Scope creep; handover is CLI tool, not web service
 
-**Anti-features explicitly rejected:**
+**Critical anti-features to avoid:**
 
-- Real LLM API calls in tests — cost money on every CI run, are flaky, test API reliability not application logic
-- Snapshot testing for markdown renderer output — breaks on every intentional content change; trains developers to blindly update snapshots
-- 100% code coverage mandate — chasing 100% on 99 files produces quantity over quality; existing 80% threshold is correct
-- Testing `--help` CLI output — Commander generates it deterministically; testing adds maintenance with zero bug prevention
-
-See `.planning/research/FEATURES.md` for full prioritization matrix, feature dependency graph, and anti-feature rationale.
+- Real-time document watching with auto-reindex — Drains battery, race conditions with git operations; use explicit `handover reindex` instead
+- Full semantic chunking with embedding-based boundaries — 3-5x more vectors, minimal accuracy gain per 2026 FloTorch benchmark
+- Custom vector search implementation — Poor performance; use sqlite-vec's SIMD-accelerated cosine similarity
 
 ### Architecture Approach
 
-Unit tests belong colocated with source files (`src/**/*.test.ts`) rather than in a separate `tests/unit/` directory. Vitest's existing `include` pattern already matches this with no config changes. The separation between unit and integration tests is structural: `src/` contains colocated unit tests; `tests/integration/` contains subprocess-based tests that require a built CLI binary. This separation must be preserved.
+The architecture integrates cleanly with handover's existing DAG orchestrator, parallel analyzers, and document rendering pipeline by treating MCP/search as new data flows that consume existing outputs. New components read from `.handover/` output directory and cache, expose via MCP protocol, and store in separate `.handover/search.db` vector database. This additive integration (not invasive modification) keeps the MCP server as a stateless consumer with no coupling to core analysis logic.
 
-**Major components and test seams:**
+**Major components:**
 
-1. `DAGOrchestrator` (`src/orchestrator/dag.ts`) — pure orchestration logic with no I/O; inject `vi.fn()` as step `execute` callbacks; test observable behavior (ordering, skip propagation, cycle detection) not internal state
-2. `LLMProvider` interface (`src/providers/base.ts`) — the primary mock boundary for all AI round tests; `makeMockProvider(overrides?)` factory pattern; mock at interface level, never at SDK level
-3. Pure function layer (`scorer.ts`, `token-counter.ts`, `packer.ts`, `registry.ts`) — no mocking needed; construct minimal fixture objects; use `test.each()` for tabular inputs
-4. Config schema (`src/config/schema.ts`) — Zod schemas are pure functions over their input; call `safeParse()` directly; no mocking; assert `.success`, `.data`, `.error.issues[0].path`
-5. Fixture helpers — colocated `__fixtures__/` directories adjacent to primary consumers; `AnalysisContext`, `StaticAnalysisResult`, `RenderContext` factories; added to coverage `exclude` in vitest config
-6. WASM-dependent parsers (`src/parsing/`) — explicitly excluded from unit test coverage; covered by existing integration tests; mixing WASM loading and `memfs` mocking causes incompatible failures
+1. **MCP Server** (`src/mcp/server.ts`) — Standalone entry point exposing handover docs via stdio/HTTP transport. Registers tools (semantic_search), resources (document access), and prompts (workflow templates). Separated from CLI so crashes don't affect analysis pipeline.
+2. **Document Indexer** (`src/search/indexer.ts`) — Parses `.handover/*.md`, chunks text (512 tokens with recursive character split), detects changes via content hash. Triggered in render step's onComplete hook. Implements incremental indexing using existing AnalysisCache hash pattern.
+3. **Embedding Provider** (`src/search/embeddings.ts`) — Extends handover's BaseProvider pattern for OpenAI embeddings API. Reuses retry logic, rate limiting, and token estimation. Implements batching (up to 2048 texts per request) to avoid slow sequential embedding.
+4. **Vector Store** (`src/search/vector-store.ts`) — SQLite with sqlite-vec extension. CRUD operations on chunks/embeddings. Uses vec0 virtual table for cosine similarity queries. Stores document metadata including content hash and embedding model version.
+5. **Query Engine** (`src/search/query-engine.ts`) — Search orchestration combining vector similarity with optional metadata filters. Returns top-k results with scores, supports hybrid text + vector search.
 
-**4-layer test build order (from fewest to most dependencies):**
+**Key architectural patterns:**
 
-- Layer 0: Zod schemas, error classes, pure factory functions, math functions — no mocks, no async
-- Layer 1: DAGOrchestrator, config loader, pure analyzers, TokenUsageTracker — stateful classes, no external deps
-- Layer 2: Scorer, validators, registry, provider factory — use Layer 0 type fixtures; no LLM mocking
-- Layer 3: Packer, AI round runner, renderers — require mock `LLMProvider` interface and `getFileContent`
+- **MCP as separate entry point**: Server runs independently via `handover serve`, reads from shared `.handover/` directory. Clean separation prevents IPC complexity and supports both local (stdio) and remote (HTTP) deployment.
+- **Incremental indexing with content hash**: Reuse existing AnalysisCache pattern. Only reindex chunks from modified `.md` files. Hash each document's content (SHA-256), compare to stored hash, skip unchanged files.
+- **Embedding provider extends BaseProvider**: Consistent error handling, retry backoff, and rate limiting across all LLM calls. Minimal new code by reusing existing provider infrastructure.
+- **SQLite vector storage with sqlite-vec**: No external dependencies, runs in-process. ACID transactions, WAL mode for write concurrency. Suitable for <100K vectors (handover docs are <10K chunks maximum).
 
-**6 core patterns documented in ARCHITECTURE.md:** LLM provider interface mocking, DAG step injection, Zod schema direct testing, pure analyzer fixture testing, renderer RenderContext fixture testing, and context packer injected I/O.
+**Integration points:**
 
-See `.planning/research/ARCHITECTURE.md` for full colocated test topology, 6 anti-patterns to avoid, and integration point details.
+- Modified existing components: CLI entry for `handover serve` command, generate command for post-render indexing hook, config schema for mcp/search objects
+- External dependencies: @modelcontextprotocol/server (MCP SDK), sqlite-vec (vector extension), OpenAI API (embeddings)
+- Reuse patterns: content-hash caching, BaseProvider retry/rate-limit, Zod validation, vitest testing
 
 ### Critical Pitfalls
 
-1. **`vi.mock()` factory functions referencing top-level test variables** — Vitest hoists `vi.mock()` before variable initialization in ESM; referenced variables are `undefined` at factory execution time, producing silent wrong behavior rather than errors. Prevention: always use `vi.hoisted()` for any variable referenced inside a `vi.mock()` factory. Establish this as the project standard in a shared utilities file before any test is written.
+Research identified 10 critical pitfalls with specific prevention strategies. The top five that will break the implementation if not addressed:
 
-2. **LLM mock response shape mismatches produce false-passing tests** — `AnthropicProvider` reads `content.find(block => block.type === 'tool_use')?.input`; a mock returning `{ type: 'text' }` exercises the fallback path silently while the test passes green. Prevention: build typed mock factories using `satisfies Anthropic.Message`; TypeScript catches shape mismatches at compile time rather than silently at runtime.
+1. **stdout corruption in stdio-based MCP servers** — Using console.log() completely breaks JSON-RPC message stream over stdio transport. Replace all console.log() with console.error() (stderr), add linter rule to ban console.log() in MCP server code. Address in Phase 1 before writing any server logic.
 
-3. **WASM-dependent files drag coverage below threshold** — `src/parsing/` files require `TreeSitter.init()` before any test can exercise them; without exclusion they show 0% coverage and may cause the global 80% threshold to fail even with extensive unit tests elsewhere. Prevention: add WASM-dependent files to `vitest.config.ts` coverage `exclude` list in the infrastructure setup phase, before running coverage for the first time.
+2. **Embedding dimension mismatch causing search failures** — Database initialized with one dimension (1536) but later embeddings use different dimension (3072). All vector operations fail. Store embedding model name and dimension in schema metadata, verify on startup, fail fast if mismatch detected. Address in Phase 2 with dimension validation before bulk indexing.
 
-4. **Silent catch blocks produce false-passing tests** — 8+ catch blocks swallow errors; a test exercising a catch path passes while covering only the fallback, not verifying what happened. Coverage marks the catch as green. Prevention: for every catch block test, assert both (a) the expected fallback return value AND (b) `vi.spyOn(logger, 'warn')` was called; green coverage alone is not sufficient.
+3. **Reusing LLM completion rate limiter for embeddings** — Existing BaseProvider has 4 concurrent limit for completions, but embeddings need higher concurrency (10-50) and batching (96+ texts per request). Implement separate rate limiter for embeddings with batch support. Address in Phase 2 before bulk indexing.
 
-5. **ESM import extension omission breaks CI silently** — `NodeNext` module resolution requires `.js` extensions on all local TypeScript imports; `tsx` in local development may mask this; CI fails with `Cannot find module`. Prevention: add `import/extensions: always` ESLint rule; fix the existing broken import; establish the convention before any test files are written.
+4. **Naive chunk boundary splitting loses context** — Fixed 512-token splitting breaks markdown in middle of code blocks, tables, lists. Semantic search retrieves half a code example. Use markdown-aware chunking: split at headers, keep code blocks intact, preserve parent context. Address in Phase 3 with test suite before bulk indexing.
 
-Additional moderate pitfalls: mocking at the SDK level instead of the `LLMProvider` interface (brittle to SDK updates), importing `src/cli/index.ts` in unit tests (triggers Commander.js `process.exit()`), and chasing 80% coverage with easy utility tests while leaving `src/providers/` uncovered.
+5. **SQLite Node.js version performance regression** — Node.js v22/v24 have 57% slower SQLite performance than v20. Lock to Node.js v20 in package.json engines field, add runtime check on startup. Address in Phase 1 before implementation starts.
 
-See `.planning/research/PITFALLS.md` for complete pitfall catalog with recovery strategies, phase-to-pitfall mapping, and "looks done but isn't" checklist.
+**Additional high-risk pitfalls:**
 
----
+- Cosine similarity threshold not portable across queries (use top-k instead of global threshold)
+- In-memory cache not invalidated on document regeneration (implement generation ID metadata)
+- MCP server exposes unbounded resources without pagination (always paginate with cursor-based approach)
+- LLM synthesis hallucinates from weak context (implement relevance filtering, add refusal mechanism)
+- Session IDs exposed in resource URIs (never put session IDs in URIs; use MCP session context)
 
 ## Implications for Roadmap
 
-The milestone naturally decomposes into 4 sequential phases with hard dependencies between them. Phases 2-4 cannot safely begin without Phase 1's infrastructure foundation in place. The phase structure is derived from the feature dependency graph (FEATURES.md) and the pitfall-to-phase mapping (PITFALLS.md).
+Based on research, a 4-phase approach is recommended. This ordering respects dependency chains (storage before search, search before MCP), validates quality at each step (CLI search before MCP exposure), and defers nice-to-haves until core is stable (prompts/advanced features in Phase 4).
 
-### Phase 1: Test Infrastructure Setup
+### Phase 1: Vector Storage Foundation
 
-**Rationale:** Three critical pitfalls (ESM import extensions, WASM coverage inflation, `vi.mock()` hoisting) are infrastructure mistakes that corrupt every subsequent test if not addressed first. This phase contains no test-writing — it is purely configuration, conventions, and mock utilities establishment.
+**Rationale:** Establish data layer before building query/MCP layers. Allows testing chunking and embedding quality independently without protocol overhead. Addresses critical pitfalls (stdout logging conventions, Node.js version lock, dimension validation) before they become embedded in codebase.
 
-**Delivers:**
+**Delivers:** Running `handover generate` automatically indexes changed docs into `search.db`. Document chunking, embedding generation, and vector storage work end-to-end.
 
-- `vitest.config.ts` updated: WASM-dependent files in coverage `exclude`; fixture directories in coverage `exclude`; per-describe timeout config documented
-- ESLint `import/extensions: always` rule enforced; existing broken import fixed with `.js` extension
-- `__mocks__/fs.cjs` and `__mocks__/fs/promises.cjs` for `memfs` module mock integration
-- `src/providers/__fixtures__/mock-factories.ts` with `createMockProvider()` and `makeAnthropicToolResponse()` using `satisfies Anthropic.Message`
-- `vi.hoisted()` pattern documented as project test convention; no top-level variables inside `vi.mock()` factories anywhere in the test suite
+**Addresses features:**
 
-**Addresses:** `memfs` integration (STACK.md); colocated test placement convention (ARCHITECTURE.md)
+- Basic vector database with sqlite-vec (table stakes)
+- Document chunking for embeddings (table stakes)
+- Incremental reindexing (competitive advantage)
 
-**Avoids:** Pitfall 1 (vi.mock hoisting), Pitfall 3 (WASM coverage), Pitfall 8 (CI import extensions), Pitfall 11 (WASM threshold failure)
+**Implements architecture:**
 
-**Research flag:** Standard patterns — all configuration documented in official Vitest docs and Vitest GitHub issues. No further research needed.
+- VectorStore (SQLite + sqlite-vec schema)
+- DocumentIndexer (chunking + change detection)
+- EmbeddingProvider (OpenAI API wrapper extending BaseProvider)
+- Post-render indexing hook in generate.ts
+- Config schema extensions (mcp/search objects)
 
----
+**Avoids pitfalls:**
 
-### Phase 2: Code Hardening and Pure Function Tests
+- Embedding dimension mismatch (store metadata in schema, validate on startup)
+- Naive chunking (markdown-aware splitting with test suite)
+- Rate limiter reuse (separate batched embedding rate limiter)
+- Node.js version regression (lock to v20, add runtime check)
 
-**Rationale:** These tasks have no dependencies on mocking infrastructure beyond the factory from Phase 1 and deliver the highest return per unit of effort. Named constants must precede scorer tests because tests should reference `ENTRY_POINT_SCORE` not `30`. The empty catch block audit must precede catch-path tests so authors know which silences are intentional versus oversight. Both hardening tasks (constants extraction, catch documentation) are code changes that affect test assertability, not the tests themselves.
+**Research needs:** STANDARD — sqlite-vec and OpenAI embeddings are well-documented with established patterns. Skip research-phase.
 
-**Delivers:**
+### Phase 2: Query Engine + CLI Search
 
-- Named constants extracted from `scorer.ts` scoring weights and `presets.ts` pricing (all with `as const`); snapshot test for `scoreFile()` output on fixed fixture before and after extraction
-- Snapshot test for pricing constants (verifies future changes to pricing values are intentional)
-- Empty catch block audit complete: all 8+ catches have either a comment or `logger.debug()` call
-- Unit tests: `scoreFiles()` (table-driven with `test.each()`), `computeTokenBudget()`, `estimateTokens()`, `resolveSelectedDocs()`, `computeRequiredRounds()`, `HandoverConfigSchema`, `createStep()`
-- `--only` flag validation reordered to fire before `validateProviderConfig()` in `generate.ts`
+**Rationale:** Validates search quality before exposing via MCP. Easier to debug/iterate without protocol overhead. Establishes relevance scoring and filtering patterns that MCP layer will reuse. Proves the value proposition ("search my docs") before investing in MCP infrastructure.
 
-**Addresses:** All P1 table stakes features (FEATURES.md); Layer 0 test build order (ARCHITECTURE.md)
+**Delivers:** `handover search "query"` CLI command returns relevant chunks from docs. Search quality validated, chunking boundaries verified, embedding model working correctly.
 
-**Avoids:** Pitfall 4 (silent catch testing), Pitfall 6 (constants extraction widens types), Pitfall 12 (pricing staleness), Pitfall 7 (coverage chasing easy files over critical paths)
+**Addresses features:**
 
-**Research flag:** Standard patterns — pure function testing with `test.each()`, Zod `safeParse()` assertions, and `as const` extraction are well-documented. The TypeScript `as const` requirement is documented by TypeScript issue #43333.
+- Semantic search via embeddings (table stakes)
+- K-nearest neighbor search (table stakes)
 
----
+**Implements architecture:**
 
-### Phase 3: Algorithm and Validation Tests
+- QueryEngine (search orchestration)
+- CLI search command in src/cli/index.ts
+- Result formatting/display
 
-**Rationale:** These tests require the mock provider factory from Phase 1 and the named constants from Phase 2. `packFiles()` uses scoring output as input. `validateProviderConfig()` tests require understanding the error type hierarchy established in Phase 2. The DAG orchestrator tests are structurally independent but build on patterns established in Phase 2 test files.
+**Avoids pitfalls:**
 
-**Delivers:**
+- Global similarity threshold (use top-k + scores, not threshold filtering)
+- Hallucinations from weak context (implement relevance filtering before LLM integration)
 
-- Unit tests for `packFiles()` — all 6 tiers, budget boundary conditions, oversized file handling, small-project optimization; mock `getFileContent` via `vi.fn()` (existing injected callback seam)
-- Unit tests for `validateProviderConfig()` — all 5 throw paths (unknown provider, Ollama without model, Azure without baseUrl, missing API key, custom without baseUrl); `vi.stubEnv()` for env var isolation; assert `ProviderError.code`
-- Unit tests for `generateSignatureSummary()` — fixture `ParsedFile` inputs; assert output string format
-- Unit tests for `DAGOrchestrator` — step ordering, cycle detection, skip propagation on step failure, parallel execution tracking
-- Unit tests for `TokenUsageTracker` — stateful class with no external deps; accounting correctness
+**Research needs:** STANDARD — Cosine similarity search with SQLite is well-documented. Skip research-phase.
 
-**Addresses:** P2 differentiator features (FEATURES.md); Layers 1-3 test build order (ARCHITECTURE.md)
+### Phase 3: MCP Server (Tools + Resources)
 
-**Avoids:** Pitfall 5 (version constraint tightening during dependency review), Pitfall 9 (mocking at SDK level instead of interface level), Pitfall 10 (CLI import triggering Commander.js process.exit)
+**Rationale:** Builds on proven search engine from Phase 2. MCP layer is thin adapter over existing functionality. stdio transport is well-specified in MCP spec. Resources map directly to existing `.handover/*.md` files. Tools wrap existing QueryEngine.search() method.
 
-**Research flag:** Standard patterns — DAG orchestration testing via step injection, `vi.stubEnv()`, and `vi.fn()` for injected callbacks are all documented in official Vitest API docs. No further research needed.
+**Delivers:** Claude Desktop can connect to handover MCP server via stdio transport, search docs with semantic_search tool, and read full documents via handover://docs/{id} resources.
 
----
+**Addresses features:**
 
-### Phase 4: AI Round Tests and Coverage Enforcement
+- MCP server stdio transport (table stakes)
+- MCP resources for generated docs (table stakes)
+- Auto-detect missing docs on startup (table stakes)
+- MCP client configuration docs (table stakes)
 
-**Rationale:** AI round tests (`executeRound()`, `validateFileClaims()`, `checkRoundQuality()`) require the full typed mock provider infrastructure from Phase 1 and understanding of graceful degradation behavior documented in Phase 3's DAG tests. The retry/backoff tests require `vi.useFakeTimers()` which requires understanding of the async timer patterns established in Phase 3. Coverage threshold enforcement becomes meaningful only once enough tests exist to have real coverage numbers.
+**Implements architecture:**
 
-**Delivers:**
+- src/mcp/server.ts (stdio/HTTP transport)
+- src/mcp/tools.ts (semantic_search tool)
+- src/mcp/resources.ts (document access)
+- CLI serve command
 
-- Unit tests for `executeRound()` — happy path with mock provider (typed tool_use response shape), degraded result on provider throw, retry behavior with `vi.useFakeTimers()` advancing past 30s backoff
-- Unit tests for `validateFileClaims()` — pure function; drop-rate thresholds; fixture `StaticAnalysisResult`
-- Unit tests for `checkRoundQuality()` — quality gate threshold assertions
-- Unit tests for `compressRoundOutput()` — fixture round outputs; field extraction; token budget enforcement
-- Renderer utility tests: `buildTable()`, `codeRef()`, `sectionIntro()` — pure string functions
-- One renderer integration test: `renderOverview()` with minimal `RenderContext` fixture
-- CI coverage gate verified: 80% threshold now has real tests to measure against; WASM exclusions confirm no false threshold failures
+**Avoids pitfalls:**
 
-**Addresses:** P3 deferred features (FEATURES.md); Layers 3-4 test build order (ARCHITECTURE.md)
+- stdout corruption (enforce stderr logging, add linter rule)
+- Unbounded resources (implement pagination from start)
+- Session IDs in URIs (use MCP session context, not URI params)
+- Cache invalidation failure (implement generation-ID metadata)
 
-**Avoids:** Pitfall 2 (mock response shape mismatch — use `satisfies Anthropic.Message`), Pitfall 4 (silent catch assertions on round runner error paths), Pitfall 11 (WASM files inflating coverage gap)
+**Research needs:** MEDIUM — MCP protocol is new (2025 spec) but well-documented. May need research-phase for advanced MCP features (prompts, sampling) if implementing beyond basic tools/resources. Core stdio transport + tools/resources is standard.
 
-**Research flag:** Needs verification during execution — the Anthropic `tool_use` response shape and the OpenAI `choices[0].message.tool_calls[0].function.arguments` shape must be verified against the current provider source files (`src/providers/anthropic.ts`, `src/providers/openai-compat.ts`) before the mock factories in Phase 1 are finalized. The `satisfies` guard catches shape mismatches only if the type annotation is correct to begin with. Read the provider source first.
+### Phase 4: Prompts + Advanced Features
 
----
+**Rationale:** Deferred nice-to-haves until core functionality is stable. Prompt templates require understanding actual user workflows (discovered via Phase 3 usage). Hybrid search and metadata filters are valuable but not essential for launch. LLM-powered Q&A builds on proven search from Phase 2 with RAG synthesis layer.
+
+**Delivers:** Full-featured MCP server with prompt templates for common workflows ("Explain architecture"), hybrid search combining semantic + metadata filters, LLM-powered Q&A with RAG pattern, and explicit reindexing command.
+
+**Addresses features:**
+
+- MCP prompts for common workflows (competitive advantage)
+- Dual-mode query: fast search + LLM synthesis (competitive advantage)
+- LLM-powered Q&A with RAG (competitive advantage)
+- Hybrid search: semantic + metadata filters (competitive advantage)
+- Raw analysis data as MCP resources (competitive advantage)
+
+**Implements architecture:**
+
+- src/mcp/prompts.ts (prompt templates)
+- Hybrid search (text + vector with WHERE clauses)
+- Metadata filters (by document type, section)
+- Reindexing CLI command (handover reindex)
+- RAG orchestration (retrieve chunks, augment query, synthesize with LLM)
+
+**Avoids pitfalls:**
+
+- LLM hallucinations (relevance threshold, refusal instructions in system prompt)
+
+**Research needs:** LOW for prompts/hybrid search (standard patterns). MEDIUM for RAG Q&A (multiple approaches exist, need to choose pattern). May benefit from research-phase for RAG implementation specifically.
 
 ### Phase Ordering Rationale
 
-- **Infrastructure before any tests:** Pitfalls 1, 3, and 8 are "corrupt everything" problems if addressed retroactively across a large test suite. Fixing them first costs one phase and prevents cascading rework across phases 2-4.
-- **Named constants before scorer tests:** Tests that reference `30` (a magic number) instead of `ENTRY_POINT_SCORE` require dual updates when the weight changes — in source and in tests. Extract constants first; tests inherit the names.
-- **Silent catch audit before catch-path tests:** An undocumented `catch {}` leaves test authors uncertain whether to assert silence or a log warning. Documenting intent first enables assertive tests rather than coverage-filling placeholders.
-- **DAGOrchestrator before round runner:** The round runner depends on the DAG's step lifecycle. Understanding DAG behavior via tests in Phase 3 makes Phase 4 round runner assertions more precise about what is orchestrator behavior vs. runner behavior.
-- **Coverage enforcement in Phase 4:** Enforcing the 80% threshold in Phase 1 would make every CI run fail until Phase 4. Enable it in Phase 4 when the test suite is substantial enough for the threshold to be meaningful.
+- **Storage before search**: Can't query vectors without storage layer. Testing chunking/embedding quality requires persisted data.
+- **Search before MCP**: Validates core value proposition (semantic search) before protocol complexity. MCP is just an interface over working search engine.
+- **CLI before MCP**: Easier to debug search quality with CLI output than JSON-RPC protocol messages. Faster iteration cycle.
+- **Core before advanced**: Prompts/hybrid search/RAG build on proven search foundation. Deferring allows user feedback to inform feature design.
+
+**Dependency chain:**
+
+```
+Phase 1 (Storage) → Phase 2 (Search) → Phase 3 (MCP) → Phase 4 (Advanced)
+     ↓                   ↓                  ↓                ↓
+  embeddings         top-k search      stdio transport   RAG synthesis
+  chunking           cosine sim        tools/resources   hybrid search
+  sqlite-vec         relevance         pagination        prompts
+```
 
 ### Research Flags
 
-Phases needing verification during execution:
+**Phases needing deeper research during planning:**
 
-- **Phase 4 (AI round mock response shapes):** Anthropic tool_use response shape and OpenAI tool_calls response shape must be verified against current provider source before typed mock factories are finalized in Phase 1. The `satisfies Anthropic.Message` TypeScript guard provides compile-time safety only if the factory type annotation is correctly specified.
+- **Phase 4 (RAG Q&A)**: Multiple RAG patterns exist (simple context injection, agentic retrieval, iterative refinement). Need research-phase to choose pattern based on handover's specific use case (documentation Q&A with 8 LLM providers).
 
-Phases with standard patterns (proceed without further research):
+**Phases with standard patterns (skip research-phase):**
 
-- **Phase 1:** Vitest config, memfs `__mocks__` setup, ESLint `import/extensions` rule — all in official docs with HIGH confidence.
-- **Phase 2:** Pure function testing, `as const` extraction, Zod `safeParse()` assertions, `test.each()` tables — textbook patterns with no novel elements.
-- **Phase 3:** DAG step injection, `vi.stubEnv()`, `vi.fn()` injected callbacks — standard Vitest patterns, all in official API docs.
-
----
+- **Phase 1 (Storage)**: sqlite-vec integration and OpenAI embeddings are well-documented with official guides. Chunking strategies have established benchmarks (fixed-size with overlap outperforms semantic).
+- **Phase 2 (Search)**: Cosine similarity with top-k retrieval is standard pattern. No novel approaches needed.
+- **Phase 3 (MCP Server)**: stdio transport and basic tools/resources are specified in MCP docs with TypeScript SDK examples. Pagination is utility pattern in MCP spec.
 
 ## Confidence Assessment
 
-| Area         | Confidence | Notes                                                                                                                                                                                                                             |
-| ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stack        | HIGH       | All recommendations verified against official docs and npm registry; memfs and vitest-mock-extended versions confirmed current; MSW/undici limitation documented by MSW maintainers and confirmed via GitHub issue #2165          |
-| Features     | HIGH       | Based on direct codebase audit of all 99 source files; gaps are observable facts (0 unit tests, 8+ empty catch blocks), not inferences; feature prioritization derived from first-party source reading                            |
-| Architecture | HIGH       | All patterns grounded in direct source reading of all major modules; Vitest colocated test pattern confirmed against existing `vitest.config.ts` include patterns; no speculation                                                 |
-| Pitfalls     | HIGH       | Critical pitfalls verified against official Vitest GitHub issues, TypeScript issue tracker, and real-world Backstage post-mortem; codebase-specific pitfalls from direct source inspection of providers, scorer, and catch blocks |
+| Area         | Confidence | Notes                                                                                                                                                                                                                       |
+| ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stack        | HIGH       | All recommendations verified against official sources (npm packages, GitHub repos, API docs). Version compatibility confirmed via package metadata and CI configs.                                                          |
+| Features     | HIGH       | Feature tiers derived from MCP spec (official), multiple MCP server implementations (reference), and RAG/semantic search research (Weaviate, Pinecone, AWS 2026 guides).                                                    |
+| Architecture | MEDIUM     | Integration patterns verified via MCP SDK docs and sqlite-vec guides. Handover-specific integration based on existing codebase analysis. Incremental indexing pattern inferred from existing cache system.                  |
+| Pitfalls     | HIGH       | All critical pitfalls sourced from official docs (MCP security best practices, SQLite performance guides), community postdocs (NearForm MCP tips, Medium technical guides), or verified via multiple corroborating sources. |
 
 **Overall confidence:** HIGH
 
-The research domain is well-covered. The existing codebase was read directly, eliminating speculation about what is already built. All new library additions are verified against npm registry and official documentation. The only area requiring execution-time verification is the LLM SDK response shapes for typed mock factories — this is a source-reading task, not a research gap.
+The core technology choices (MCP SDK, sqlite-vec, OpenAI embeddings) are production-ready with extensive documentation. The architecture patterns (separate MCP entry point, incremental indexing, BaseProvider extension) align with existing handover patterns and are verifiable. The primary uncertainty is RAG pattern selection for Phase 4, which is deferrable and can be addressed with research-phase when needed.
 
 ### Gaps to Address
 
-- **`fast-glob` + `memfs` interaction:** PITFALLS.md flags that `fast-glob` may use its own filesystem access that bypasses `vi.mock('node:fs')`. Verify during Phase 1 when memfs is configured whether affected analyzer tests need `fast-glob` mocked separately or whether they should move to the integration test suite.
+**Embedding model selection for offline use:**
 
-- **`loadConfig()` spy target:** ARCHITECTURE.md recommends `vi.spyOn(fs, 'existsSync')` for config loader tests. Confirm at Phase 3 implementation whether `loadConfig()` uses `node:fs` or `node:fs/promises` for existence checks — this determines which spy target is correct.
+- Research shows Ollama support for local embeddings (nomic-embed-text, all-minilm) but 10-20x slower with lower quality
+- Handover already has Ollama provider for completions; extending to embeddings is architecturally straightforward
+- Gap: Cost/benefit tradeoff for offline embeddings unclear. Defer to user feedback during Phase 1-2 rollout.
+- **Handle by:** Document OpenAI requirement in Phase 1. If users request offline support, add Ollama embeddings in Phase 4.
 
-- **Coverage threshold achievability before WASM exclusion:** After Phase 1's vitest config update, run `vitest --coverage --reporter=json` on the 0-test suite to get the actual denominator (the set of non-excluded source lines). This reveals whether 80% is achievable without testing every module or whether additional exclusions are needed before Phase 4's coverage enforcement.
+**MCP HTTP transport deployment:**
 
-- **Provider mock response shape pre-verification:** Before finalizing the `makeAnthropicToolResponse()` and `makeOpenAIToolResponse()` factories in Phase 1, read `src/providers/anthropic.ts` and `src/providers/openai-compat.ts` to confirm which response fields are actually accessed. The mock shape must match the actual consumption pattern, not the SDK type definition.
+- Research covers stdio (local) and HTTP (remote) transports. HTTP requires authentication, TLS, rate limiting not needed for CLI use case.
+- Gap: Unclear if users want remote MCP server deployment. stdio covers all AI coding tools (Claude Desktop, Cursor, VSCode).
+- **Handle by:** Implement stdio only in Phase 3. If users request remote access, add HTTP transport in future phase with proper security (JWT auth, TLS, rate limits).
 
----
+**Hybrid search metadata schema:**
+
+- Research shows partition-based indexes outperform pure HNSW for filtered queries, but specific metadata columns depend on handover's document types
+- Gap: Which metadata fields are most valuable for filtering (file path, doc type, section, recency)?
+- **Handle by:** Implement basic metadata (filename, doc_type, indexed_at) in Phase 1 schema. Add filters in Phase 4 based on Phase 2-3 user feedback about common queries.
+
+**Chunking quality validation:**
+
+- Research shows fixed-size (500-1000 tokens) with 10-20% overlap outperforms semantic chunking, but optimal size/overlap depends on document structure
+- Gap: Handover generates diverse doc types (architecture, API reference, file tree, dependencies). One chunk size may not fit all.
+- **Handle by:** Test with sample of all 14 doc types in Phase 1. Implement per-doc-type chunking strategy if quality issues found. Start with 512 tokens / 10% overlap as baseline.
 
 ## Sources
 
 ### Primary (HIGH confidence)
 
-- [Vitest File System Mocking](https://vitest.dev/guide/mocking/file-system) — memfs integration, `__mocks__` setup, `vol.reset()` pattern
-- [Vitest Mocking Requests](https://vitest.dev/guide/mocking/requests) — MSW guidance; undici limitation caveat
-- [MSW Limitations](https://mswjs.io/docs/limitations/) — undici bypass of `http.ClientRequest` interception
-- [Vitest Mocking Modules](https://vitest.dev/guide/mocking/modules) — `vi.mock()` ESM hoisting, `vi.hoisted()` API
-- [Vitest `vi.useFakeTimers()`](https://vitest.dev/guide/mocking/timers) — `advanceTimersByTimeAsync` for async-safe timer control
-- [Vitest Mock Functions API](https://vitest.dev/api/mock) — `vi.fn()`, `vi.spyOn()`, partial mocking
-- [Vitest `vi.stubEnv()`](https://vitest.dev/api/vi.html) — auto-restored environment variable mocking
-- [Vitest Issue #3228](https://github.com/vitest-dev/vitest/issues/3228) — `vi.hoisted()` origin; hoisting problem documentation
-- [Vitest Coverage v8 ESM issues](https://github.com/vitest-dev/vitest/issues/6380) — V8 coverage limitations with ESM/TypeScript
-- [TypeScript Issue #43333](https://github.com/microsoft/TypeScript/issues/43333) — `as const` requirement for extracted literal constants
-- [Backstage Issue #20436](https://github.com/backstage/backstage/issues/20436) — `mock-fs` maintenance breakage post-mortem
-- [MSW GitHub issue #2165](https://github.com/mswjs/msw/issues/2165) — undici interception not supported; confirmed by MSW maintainers
-- [memfs npm](https://www.npmjs.com/package/memfs) — v4.56.10, last release Jan 2026
-- [vitest-mock-extended npm](https://www.npmjs.com/package/vitest-mock-extended) — v3.1.0, Vitest ≥ 3.0.0 requirement
-- [npm-check-updates npm](https://www.npmjs.com/package/npm-check-updates) — v19.4.0
-- Direct codebase audit: all 99 source files, `vitest.config.ts`, `package.json`, `tests/integration/setup.ts` — first-party source
+- [@modelcontextprotocol/sdk npm](https://www.npmjs.com/package/@modelcontextprotocol/sdk) — MCP SDK version, v2 roadmap
+- [MCP TypeScript SDK GitHub](https://github.com/modelcontextprotocol/typescript-sdk) — Official implementation
+- [Model Context Protocol Specification](https://modelcontextprotocol.io/specification/2025-03-26) — Transport specs, security best practices
+- [better-sqlite3 GitHub](https://github.com/WiseLibs/better-sqlite3) — Version 12.6.2, Node 20/22 compatibility
+- [sqlite-vec GitHub](https://github.com/asg017/sqlite-vec) — v0.1.0 stable release, JavaScript integration guide
+- [OpenAI Embeddings API](https://platform.openai.com/docs/api-reference/embeddings) — Pricing, models, batch API
+- [OpenAI Batch API](https://developers.openai.com/api/docs/guides/batch/) — 50K limit, 50% discount
 
 ### Secondary (MEDIUM confidence)
 
-- [Vitest table-driven tests](https://oliviac.dev/blog/introduction-to-table-driven-tests-in-vitest/) — `test.each()` patterns for pure functions
-- [TypeScript error handling in catch blocks](https://kentcdodds.com/blog/get-a-catch-block-error-message-with-typescript) — `unknown` type enforcement, `useUnknownInCatchVariables`
-- [Zod Testing Patterns — Steve Kinney](https://stevekinney.com/courses/full-stack-typescript/testing-zod-schema) — schema test patterns consistent with official Zod docs
-- [Stack Overflow Blog: Coverage and code quality](https://stackoverflow.blog/2025/12/22/making-your-code-base-better-will-make-your-code-coverage-worse/) — coverage as lagging indicator for quality
-- [The Pitfalls of Code Coverage (David Burns, 2024)](https://www.theautomatedtester.co.uk/blog/2024/the-pitfalls-of-code-coverage/) — catch block coverage correctness problem
-- [openai-node GitHub issue #638](https://github.com/openai/openai-node/issues/638) — correct `vi.mock` pattern for OpenAI SDK default export
-- [How to Rapidly Introduce Tests When There Is No Test Coverage](https://medium.com/swlh/how-to-rapidly-introduce-tests-when-there-is-no-test-coverage-8bb07930a3ee) — priority ordering for retroactive test addition
+- [MCP Implementation Tips & Pitfalls | Nearform](https://nearform.com/digital-community/implementing-model-context-protocol-mcp-tips-tricks-and-pitfalls/) — stdout corruption, session handling
+- [MCP Security Guide](https://www.redhat.com/en/blog/model-context-protocol-mcp-understanding-security-risks-and-controls) — Resource URI security, authentication
+- [The 2026 RAG Performance Paradox](https://ragaboutit.com/the-2026-rag-performance-paradox-why-simpler-chunking-strategies-are-outperforming-complex-ai-driven-methods/) — Fixed-size chunking benchmark
+- [Chunking Strategies for RAG | Weaviate](https://weaviate.io/blog/chunking-strategies-for-rag) — Markdown-aware splitting patterns
+- [Embedding Models Comparison 2026](https://research.aimultiple.com/embedding-models/) — OpenAI vs Voyage vs Cohere benchmarks
+- [SQLite Performance Optimization 2026](https://forwardemail.net/en/blog/docs/sqlite-performance-optimization-pragma-chacha20-production-guide) — WAL mode, Node.js version issues
+- [Better RAG Retrieval — Similarity with Threshold](https://meisinlee.medium.com/better-rag-retrieval-similarity-with-threshold-a6dbb535ef9e) — Top-k vs threshold filtering
+- [MCP Pagination Utility](https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination) — Cursor-based pagination pattern
+
+### Tertiary (LOW confidence - needs validation)
+
+- [Best Embedding Models 2026](https://elephas.app/blog/best-embedding-models) — Voyage AI performance claims (not verified with official Voyage docs)
+- [MCP Streaming Performance Benchmark](https://www.tmdevlab.com/mcp-server-performance-benchmark.html) — Single-source benchmark, not corroborated
 
 ---
 
-_Research completed: 2026-02-19_
+_Research completed: 2026-02-20_
 _Ready for roadmap: yes_

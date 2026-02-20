@@ -1,524 +1,396 @@
 # Pitfalls Research
 
-**Domain:** Adding comprehensive unit tests and hardening to an existing TypeScript CLI (99 files, 0 unit tests, 19 integration tests)
-**Researched:** 2026-02-19
-**Confidence:** HIGH — ESM/Vitest pitfalls verified against official docs and open issues; TypeScript hardening patterns from direct codebase analysis; LLM mock shape pitfalls from SDK source inspection
-
----
+**Domain:** Adding MCP Server, Semantic Search, Embeddings, and SQLite Vector Storage to Existing TypeScript CLI
+**Researched:** 2026-02-20
+**Confidence:** HIGH
 
 ## Critical Pitfalls
 
-### Pitfall 1: vi.mock Factory Functions Cannot Reference Top-Level Test Variables
+### Pitfall 1: stdout Corruption in Stdio-Based MCP Servers
 
 **What goes wrong:**
-Vitest hoists `vi.mock()` calls to the top of the file before any imports execute. This means factory functions passed to `vi.mock()` cannot reference variables defined in the test file's outer scope — those variables don't exist yet when the mock factory runs. The result is either a `ReferenceError` at runtime or, more dangerously, `undefined` mock implementations that silently produce wrong behavior without throwing.
-
-This is especially harmful when mocking the Anthropic or OpenAI SDKs. A pattern like:
-
-```typescript
-const mockComplete = vi.fn().mockResolvedValue(mockResponse);
-vi.mock('@anthropic-ai/sdk', () => ({
-  default: class {
-    messages = { create: mockComplete };
-  },
-}));
-```
-
-...fails because `mockComplete` is not yet initialized when the factory runs.
+Using `console.log()` in an MCP server running over stdio transport completely breaks the server. The JSON-RPC messages get corrupted because stdout is the communication channel between client and server, and logging output mixes with protocol messages.
 
 **Why it happens:**
-Vitest's ESM hoisting is required for mock registration to work before module evaluation. Developers copy patterns from Jest (which runs in CommonJS and has different hoisting semantics) or write what looks logically correct without understanding the ESM execution order.
+Developers habitually use `console.log()` for debugging without realizing that stdio-based MCP servers use stdout as the protocol transport layer. Standard logging practices that work everywhere else will silently corrupt the message stream.
 
 **How to avoid:**
-Use `vi.hoisted()` for variables referenced inside `vi.mock()` factory functions. Variables declared inside `vi.hoisted()` callbacks are initialized before both static imports and `vi.mock()` factories execute:
 
-```typescript
-const { mockComplete } = vi.hoisted(() => ({
-  mockComplete: vi.fn(),
-}));
-
-vi.mock('@anthropic-ai/sdk', () => ({
-  default: class Anthropic {
-    messages = { create: mockComplete };
-  },
-}));
-```
-
-Alternatively: define the mock shape entirely inside the factory and access the mock function via `vi.mocked()` after import.
+- Replace all `console.log()` calls with `console.error()` (writes to stderr instead of stdout)
+- Use a logging library configured to write to stderr or files, never stdout
+- Add a linter rule to ban `console.log()` in MCP server code
+- For HTTP-based MCP servers, stdout logging is safe since HTTP responses are separate
 
 **Warning signs:**
 
-- `ReferenceError: Cannot access 'X' before initialization` in test output
-- Mock function is `undefined` when inspected inside a test body
-- Tests pass in isolation but fail when run together (order dependency from hoisting)
-- Behavior changes when mock factory is inline versus extracted to a variable
+- Client complains about "malformed messages" or "unexpected JSON"
+- Server that worked suddenly fails after adding logging
+- Intermittent connection errors that correlate with log statements
+- Client timeout errors when server is actually running
 
 **Phase to address:**
-Unit test foundation phase, before any provider mocks are written. Establish the `vi.hoisted()` pattern as the project standard in a test utilities file.
+Phase 1 (MCP Server Foundation) - Establish logging conventions before writing any server logic. Document this prominently in development guidelines.
 
 ---
 
-### Pitfall 2: LLM Mock Response Shape Mismatches SDK Internal Structure
+### Pitfall 2: Embedding Dimension Mismatch Causing Vector Search Failures
 
 **What goes wrong:**
-The Anthropic and OpenAI SDKs have deeply nested response types with specific discriminator fields. The Anthropic provider in this codebase (`src/providers/anthropic.ts`) depends on the `tool_use` block pattern — it looks for `content.find(block => block.type === 'tool_use')` and accesses `block.input` as the structured result. A mock that returns `{ content: [{ type: 'text', text: '{}' }] }` instead of the tool_use shape causes the provider to find no tool_use block and either throw or silently degrade to fallback. The test passes (no exception), but what was tested is the fallback path, not the happy path.
-
-Similarly, the OpenAI-compatible path in `src/providers/openai-compat.ts` expects `choices[0].message.tool_calls[0].function.arguments` as a JSON string. A mock returning `choices[0].message.content` (the chat completion shape) produces wrong behavior that looks like a passing test.
+SQLite vector database is initialized with one embedding dimension (e.g., 1536 for text-embedding-ada-002), but later embeddings are generated with a different dimension (e.g., 768 for different model or 3072 for text-embedding-3-large). All vector operations fail with dimension mismatch errors, requiring complete reindexing.
 
 **Why it happens:**
-Developers mock "what the API conceptually does" rather than "the exact object shape the SDK delivers." The SDK type definitions are complex (300+ line union types). Without reading the actual provider implementation, it's easy to mock the wrong discriminant.
+The existing LLM provider interface (`LLMProvider`) has no `embeddings()` method - only `complete()` for chat completions. When adding embeddings support, developers may:
+
+- Use a different provider's embedding API than the completion API
+- Switch embedding models without updating the database schema
+- Assume all models from same provider use same dimensions
+- Not realize different API versions return different dimensions
 
 **How to avoid:**
-Read the provider source (`src/providers/anthropic.ts`, `src/providers/openai-compat.ts`) before writing any mock. Build mock factories that return shapes validated against the actual TypeScript types:
 
-```typescript
-// Anthropic tool_use response — matches what AnthropicProvider.doComplete() actually reads
-function makeAnthropicToolResponse<T>(data: T): Anthropic.Message {
-  return {
-    id: 'msg_test',
-    type: 'message',
-    role: 'assistant',
-    model: 'claude-opus-4-6',
-    stop_reason: 'tool_use',
-    usage: { input_tokens: 100, output_tokens: 50 },
-    content: [
-      {
-        type: 'tool_use',
-        id: 'tool_test',
-        name: 'structured_response',
-        input: data,
-      },
-    ],
-  } satisfies Anthropic.Message;
-}
-```
-
-Using `satisfies` ensures TypeScript catches shape mismatches at compile time, not silently at runtime.
+- Extend the `LLMProvider` interface with explicit embedding methods that declare dimension size
+- Store embedding model name and dimension in SQLite schema metadata table
+- On startup, verify current embedding model matches stored metadata or fail fast
+- Implement migration path: detect dimension change, warn user, offer to rebuild index
+- Add integration tests that verify embedding dimension consistency across restarts
 
 **Warning signs:**
 
-- Provider tests pass 100% but the actual happy path (tool_use block extraction) is never hit
-- Coverage shows `provider.doComplete()` is covered but `block.input` access is never reached
-- Changing the mock to return empty content still passes the test
-- Integration tests fail for reasons that unit tests should have caught
+- "Vector dimension does not match" errors from SQLite
+- Search returns no results after changing provider configuration
+- Database operations succeed but queries fail
+- Inconsistent results across different queries
 
 **Phase to address:**
-Provider mock setup — before any AI round tests are written. Create typed mock factories in a shared test utilities module (`tests/helpers/provider-mocks.ts`) and enforce their use across all provider-touching tests.
+Phase 2 (Embeddings Integration) - Design provider interface extensions before implementing embeddings. Add dimension validation as first step of vector storage implementation.
 
 ---
 
-### Pitfall 3: Testing File System Analyzers With Real Temporary Files Instead of In-Memory State
+### Pitfall 3: Reusing LLM Completion Interface for Embeddings Without Rate Limiting
 
 **What goes wrong:**
-The file system analyzers (`src/analyzers/file-tree.ts`, `src/analyzers/dependency-graph.ts`, `src/analyzers/todo-scanner.ts`, etc.) read real files via `node:fs`. Teams faced with testing these either: (a) use `mock-fs` to intercept `fs` module calls, or (b) create real temporary directories. Both have severe problems.
+Existing `BaseProvider` class has rate limiting for completion requests (4 concurrent by default), but embeddings require different concurrency patterns. Embedding 1000+ document chunks sequentially takes hours, but naive parallelization hits rate limits and costs spike dramatically.
 
-`mock-fs` intercepts Node's internal `fs` bindings, which are not stable API. It breaks with Node.js major updates, does not support all `fs/promises` methods, and silently corrupts dynamic `require()` paths (causing tree-sitter WASM loading to fail mid-test). The `backstage` project had to replace `mock-fs` across their entire test suite due to maintenance breakage.
-
-Creating real temporary directories works but makes tests slow, creates cleanup requirements that fail under parallel execution, and produces flaky failures on CI when the temp directory is on a slow filesystem or when cleanup races with the next test's setup.
+**Why it happens:**
+Completion requests are expensive, long-running, and benefit from aggressive caching. Embeddings are cheap, fast, and typically done in bulk (hundreds of documents at once). The existing rate limiter isn't designed for batch workloads.
 
 **How to avoid:**
-Use `memfs` (in-memory fs reimplementation with 1-to-1 `fs` API coverage) for unit tests of individual analyzers. Import swap at the module level using `vi.mock()`:
 
-```typescript
-vi.mock('node:fs/promises', async () => {
-  const { fs } = await import('memfs');
-  return fs.promises;
-});
-```
-
-For the integration tests that already run the full CLI against real fixtures (the existing pattern in `tests/integration/`), keep using real temp dirs — the integration tests are already structured correctly. Unit tests of individual analyzers should use `memfs`. Keep these roles clearly separated: unit tests verify logic in isolation, integration tests verify the full pipeline.
-
-Critically: do not attempt to mock `node:fs` for any test that also loads tree-sitter WASM. WASM loading requires real filesystem access to the grammar cache directory. Separate WASM-using analyzers from pure-logic analyzers.
+- Implement separate rate limiter for embedding operations with higher concurrency (10-50)
+- Add batching support: combine multiple embeddings into single API call (many providers support up to 96 texts per request)
+- Track embedding-specific costs separately (different pricing than completions)
+- Implement exponential backoff specific to embedding rate limits (different from completion limits)
+- Add progress tracking for bulk embedding operations (unlike single completions)
 
 **Warning signs:**
 
-- Tests fail in CI but pass locally (temp directory cleanup timing)
-- `Error: ENOENT` when `mock-fs` intercepts a path tree-sitter needs
-- Node.js version upgrade breaks all fs-mocked tests simultaneously
-- `afterEach` cleanup fails occasionally under parallel test execution
+- Embedding 1000 documents takes multiple hours
+- API rate limit errors during bulk indexing
+- Cost unexpectedly high compared to estimations
+- Timeout errors on embedding requests that should be fast
+- Progress appears stalled but no errors shown
 
 **Phase to address:**
-Unit test foundation phase. Establish `memfs` as the standard before writing any analyzer unit tests. Document the rule: unit tests use `memfs`, integration tests use real temp dirs.
+Phase 2 (Embeddings Integration) - Design embedding-specific API wrapper before bulk indexing. Benchmark with 100 documents before rolling out full indexing.
 
 ---
 
-### Pitfall 4: Silent Catch Blocks Make Tests Pass When They Should Fail
+### Pitfall 4: Naive Chunk Boundary Splitting Loses Critical Context
 
 **What goes wrong:**
-This codebase has 8 silent or near-silent `catch` blocks (e.g., `src/analyzers/coordinator.ts`, `src/analyzers/ast-analyzer.ts`, the integration test cleanup in `tests/integration/setup.ts`). When unit tests exercise code paths that hit these catch blocks, the test passes (no exception thrown) while the actual behavior is wrong. Coverage shows the catch block as "covered" but what happened was error swallowing, not correct error handling.
-
-This manifests concretely: testing `ASTAnalyzer.analyze()` with a bad input produces `{ success: false, data: EMPTY_AST }` instead of throwing. A test that only checks `result.success === false` passes whether the correct error was swallowed OR the analyzer genuinely failed gracefully. The two behaviors are not distinguished by the test.
+Fixed-size chunking (split every 512 tokens) breaks markdown documents in the middle of code blocks, tables, or bullet lists. Semantic search retrieves half a code example or partial table row, making LLM synthesis impossible and generating hallucinated answers.
 
 **Why it happens:**
-The graceful degradation pattern (every analyzer returns empty result on failure rather than throwing) is correct for the production pipeline but hostile to testing. It means "this function never throws" and tests can't use `expect().toThrow()`. Teams write happy-path tests and assume catch blocks are tested because coverage marks them green.
+The existing codebase has sophisticated AST parsing for TypeScript/Python/Rust/Go, creating the false impression that document chunking is similar. But markdown semantic boundaries (headers, code blocks, lists) aren't in an AST - they're text patterns. Developers default to token-count-based splitting without respecting markdown structure.
 
 **How to avoid:**
-For each silent catch block, write two separate test cases: (1) verify the fallback result is the expected empty/default shape, AND (2) verify `logger.warn()` was called with a message matching the error condition. The second assertion distinguishes "correctly handled" from "silently swallowed." Use `vi.spyOn(logger, 'warn')` before the call and assert the spy was called.
 
-When hardening catch blocks (converting them from silent to logged), add the logger assertion to the test in the same commit. This prevents silent-catch behavior from being re-introduced by future changes.
+- Use markdown-aware chunking: split at header boundaries (`## `, `### `) first
+- Keep code blocks (`\`\`\`...\`\`\``) intact within single chunks
+- Preserve parent context: include parent headers in chunk metadata
+- Implement "overlap" between chunks (last 50 tokens of previous chunk prepended to next)
+- Test chunking on actual generated docs (`handover/*.md`) before implementing
+- Measure: chunks should "make sense without surrounding context to a human"
 
 **Warning signs:**
 
-- Coverage shows 100% on a catch block but there's no assertion about what the catch block did
-- The same test passes whether the mocked dependency throws or succeeds
-- `logger.warn` is never asserted in any test that covers error paths
-- A test that deliberately passes bad input gets a "success: false" result but no verification of the error message
+- Semantic search returns code snippets missing critical imports/context
+- LLM answers reference "the above code" that isn't in retrieved context
+- Search results contain half a table or incomplete list
+- Users report "answers don't make sense" or "missing important details"
+- Chunks shorter than 100 tokens or longer than 2000 tokens (likely boundary failures)
 
 **Phase to address:**
-Silent catch audit phase. Before testing any module that contains a catch block, write the warn-assertion test pattern. Failing to do this means the hardening work (converting silent catches to logged catches) has no test coverage.
+Phase 3 (Document Indexing) - Implement chunking logic with test suite before bulk indexing. Validate on sample of generated docs with manual inspection.
 
 ---
 
-### Pitfall 5: Tightening 0.x Version Constraints Causes Lock-Step Upgrade Failure
+### Pitfall 5: SQLite Node.js Version Performance Regression
 
 **What goes wrong:**
-The `package.json` currently uses `^` constraints (e.g., `"@anthropic-ai/sdk": "^0.39.0"`). Changing these to exact pins or `~` constraints for "safety" without running `npm install` and verifying the resulting `package-lock.json` can cause CI to fail in unexpected ways. More critically: tightening a 0.x package (e.g., `"^0.39.0"` → `"0.39.0"`) may pin a version that is itself incompatible with another dependency's transitive requirement.
-
-For `openai@^5.23.2` and `@anthropic-ai/sdk@^0.39.0`, both SDKs are in active development. Pinning to exact versions means that when a security advisory requires an update, every consumer of the published package must manually update their `package.json` instead of getting the patch automatically. This is the wrong tradeoff for a published npm package.
+On Node.js v22 or v24, SQLite vector operations perform 57% slower than v20. What should take seconds takes minutes. Developers blame the vector extension or database design when it's the Node.js runtime.
 
 **Why it happens:**
-"Exact pins are safer" is true for application deployments, but this project is a published npm CLI tool (`handover-cli`). For published packages, tight constraints create dependency hell downstream. The `^` convention for published packages is correct — restrict minor/major, allow patches.
+Node.js v22 and v24 introduced a performance regression in native module bindings. better-sqlite3 (synchronous SQLite for Node.js) is heavily affected. This is well-documented but developers don't check Node.js version when debugging "slow database" issues.
 
 **How to avoid:**
-For the published package: use `^` for all production dependencies (this is already correct). Do not tighten to exact versions or `~`. For dev dependencies (test runners, type packages), exact pins or `~` are acceptable and reduce flakiness in CI.
 
-When adding version constraints, verify: (1) `npm install` with the new constraints does not change `package-lock.json` for any production dependency, and (2) `npm audit` passes after the change. Do not confuse "reproducible CI builds" (achieved via `npm ci` + committed lockfile) with "narrow version constraints."
+- **Lock to Node.js v20** in `package.json` engines field
+- Add runtime check in CLI startup: warn if running on v22/v24, suggest downgrade
+- Document Node.js v20 requirement prominently in README
+- CI/CD should test on Node.js v20 specifically
+- Monitor Node.js release notes for regression fixes before updating
 
 **Warning signs:**
 
-- `npm install` after tightening constraints changes `package-lock.json` for a transitive dependency
-- A test dependency version change breaks a production build due to a transitive version conflict
-- `npm ci` fails in a fresh environment after tightening constraints
-- A peer dependency warning appears that was absent before the constraint change
+- Vector searches that should take <100ms taking seconds
+- SQLite queries 2-5x slower than benchmarks
+- Performance inconsistent across different machines (different Node versions)
+- CPU usage unexpectedly high during database operations
 
 **Phase to address:**
-Dependency hardening phase. Audit constraints last, after tests are written and passing. Verify that `npm ci` produces an identical install in three environments: macOS, Linux (CI), and a clean Docker container.
+Phase 1 (MCP Server Foundation) - Enforce Node.js version requirement before any implementation. Add to project setup checklist.
 
 ---
 
-### Pitfall 6: Extracting Hardcoded Values Changes Semantics When Type Inference Narrows
+### Pitfall 6: Cosine Similarity Threshold Not Portable Across Queries
 
 **What goes wrong:**
-Extracting magic numbers and strings to named constants seems safe but can silently change TypeScript type inference. When a value like `'tool_use'` is hardcoded inline, TypeScript infers the narrow literal type `'tool_use'`. When the same value is extracted to `const BLOCK_TYPE = 'tool_use'`, TypeScript infers the wider type `string` (unless `as const` is used). Code that type-checks correctly with the literal inline may fail to compile or produce incorrect behavior after extraction without `as const`.
-
-For this codebase: the scoring weights in `src/context/scorer.ts` and the model pricing in `src/providers/presets.ts` use numeric literals in arithmetic. Extracting these to named constants without verifying the arithmetic produces identical results (especially with floating-point math) can introduce precision differences that change which files are included in context packing.
+Developer sets global threshold of 0.75 for "relevant" search results. Some queries return zero results (too strict), others return hundreds of irrelevant results (too loose). Users get inconsistent search quality and lose trust in semantic search.
 
 **Why it happens:**
-Extraction is treated as a pure rename. Developers do not check TypeScript inference after extraction, do not verify numeric output equality, and do not run the full test suite to confirm no behavioral change. The type narrowing issue is especially subtle because the code often still compiles — it just no longer satisfies an `as const` enum or discriminated union constraint.
+Cosine similarity scores (0.0 to 1.0) are not normalized across different queries. A score of 0.8 might mean "highly relevant" for one query but "tangentially related" for another. This is fundamental to how embeddings work but not obvious to developers used to normalized metrics.
 
 **How to avoid:**
-Always append `as const` to extracted string and numeric literal constants:
 
-```typescript
-// Wrong — infers type 'string'
-const STOP_REASON = 'tool_use';
-
-// Correct — infers type 'tool_use' (literal)
-const STOP_REASON = 'tool_use' as const;
-```
-
-For numeric scoring weights: after extraction, run the existing integration tests to verify output documents are identical to the baseline. Specifically, context packing (which uses the scoring weights) must produce the same file selection order. Capture a snapshot of `scorer.scoreFile()` output on a fixed input before extracting, and verify it matches after.
-
-For model pricing: write a test that asserts `calculateCost(1_000_000, model)` returns the exact same number before and after extraction.
+- **Don't use global similarity thresholds** - document this as anti-pattern
+- Instead: return top-k results (e.g., top 5) with scores, let LLM filter relevance
+- For filtering, use adaptive thresholds: compare to score distribution of current query
+- Implement "Cosine Adapter" pattern: transform scores into interpretable confidence levels
+- Add "no relevant results" detection: if top result < 0.5, consider query unanswerable
+- Surface scores to users: show why results were returned ("87% match")
 
 **Warning signs:**
 
-- TypeScript compilation fails after extraction with "Argument of type 'string' is not assignable to type 'tool_use'"
-- Context packing selects different files in integration tests after scoring weight extraction
-- A cost estimate changes by a small amount (floating-point precision) after extraction
-- `as const` is missing from any newly extracted string or numeric constant
+- User complaints about "search returns nothing" for reasonable queries
+- Users say "search returns too much irrelevant stuff"
+- Developers keep tweaking global threshold without improvement
+- Different users need different thresholds (query distribution varies)
 
 **Phase to address:**
-Constants extraction phase. Write a snapshot test for `scoreFile()` output before touching any constants. Add this to the test suite, then extract constants, and verify the snapshot is unchanged.
+Phase 4 (Semantic Search) - Design search API to return top-k + scores, not threshold-filtered results. Test with diverse query types before exposing to users.
 
 ---
 
-### Pitfall 7: Coverage Threshold at 80% Causes Wrong Files to Be Tested First
+### Pitfall 7: In-Memory Cache Not Invalidated on Document Regeneration
 
 **What goes wrong:**
-The `vitest.config.ts` sets coverage thresholds at 80% for lines, functions, branches, and statements globally. When retroactively adding 100+ tests to a codebase with 0 unit tests, teams chase the 80% threshold by testing the easiest files first — utility functions, simple transforms, type guards. This is the wrong priority order. The files that most need tests are the ones most likely to have bugs: the 8 silent catch blocks, the scoring/pricing arithmetic, the CLI argument validation. These are harder to test but higher value.
-
-High global coverage with low coverage on critical paths produces false safety. A codebase at 85% coverage where `src/providers/anthropic.ts` is at 20% and `src/utils/logger.ts` is at 100% is worse than 50% coverage with critical paths covered.
+User runs `handover generate` (regenerates docs), then queries MCP server - gets results from old docs. Cache invalidation strategy assumes files change individually (like code edits), but `handover generate` replaces entire output directory atomically. Stale embeddings persist in memory until server restart.
 
 **Why it happens:**
-The threshold enforces a number, not a location. Tests are written wherever they're easiest to write, not wherever they're most needed. The metric drives the behavior.
+Caching strategy likely mirrors existing `RoundCache` pattern (from `src/cache/round-cache.ts`), which uses content hashes or file mtimes. But regeneration can produce docs with similar content hashes or same mtimes (bulk write), defeating hash-based invalidation.
 
 **How to avoid:**
-Override coverage thresholds per-file for critical modules. In `vitest.config.ts`, add `perFile: true` or use the `include` pattern to enforce stricter thresholds on specific directories:
 
-```typescript
-coverage: {
-  thresholds: {
-    lines: 80,         // global minimum
-    functions: 80,
-    branches: 80,
-    statements: 80,
-  },
-}
-```
-
-For this milestone, explicitly prioritize test order:
-
-1. Critical: `src/providers/anthropic.ts`, `src/providers/openai-compat.ts` (LLM interface — most likely to break)
-2. Critical: `src/context/scorer.ts`, `src/context/token-counter.ts` (arithmetic used for billing)
-3. High: `src/ai-rounds/validator.ts`, `src/ai-rounds/quality.ts` (quality gates with no existing tests)
-4. High: `src/cli/index.ts` argument validation paths (currently missing validation)
-5. Medium: Individual analyzers with silent catch blocks
-6. Low: Renderers, formatters, logger utility
+- Implement "generation ID" metadata: store monotonic counter in `handover/.meta.json`
+- On MCP server startup: load generation ID, invalidate cache if changed
+- On document regeneration: increment generation ID, optionally notify running MCP servers
+- Add TTL-based expiration (e.g., 1 hour) as backup to hash/ID-based invalidation
+- Implement `--clear-cache` flag for MCP server
+- Watch output directory for file changes and invalidate proactively
 
 **Warning signs:**
 
-- 80% global coverage achieved but `src/providers/` has < 40% coverage
-- Every test added was for a file under 50 lines
-- The CI green check passes but no test covers the tool_use response parsing path
-- Test count is 100+ but no test has ever caused a test failure that wasn't immediately obvious
+- Search results don't reflect recent documentation changes
+- Restarting MCP server "fixes" search quality
+- Users report needing to "wait a while" before seeing updates
+- Cache hit rate suspiciously high (99%+) even after known doc changes
 
 **Phase to address:**
-Unit test foundation phase. Define the test priority order before writing any tests. Track per-module coverage from the start, not just global coverage.
+Phase 3 (Document Indexing) - Design invalidation strategy as part of indexing logic. Test with regeneration workflow before declaring indexing complete.
 
 ---
 
-### Pitfall 8: Missing Import in CI Is Symptom of ESM/Build Artifacts Problem, Not a Simple Fix
+### Pitfall 8: MCP Server Exposes Unbounded Resources Without Pagination
 
 **What goes wrong:**
-The project currently has a broken CI import. In ESM projects with `moduleResolution: NodeNext`, every local import must include the `.js` extension even for `.ts` source files. Missing this extension compiles fine with `tsc` locally (which is lenient) but fails at runtime when Node.js resolves the module. CI runs the compiled output, which surfaces the error; local development with `tsx` may not surface it because `tsx` rewrites extensions.
-
-If the broken import is "fixed" by adding `.js` without understanding why the pattern occurred, the same mistake will be repeated in every new test file that imports from `src/`. A test file that imports `'../src/providers/anthropic'` instead of `'../src/providers/anthropic.js'` will fail in CI but may pass locally.
+MCP server exposes `handover://documents` resource, client requests it, server attempts to return all 14 documents with all chunks (thousands of objects) in single response. Client times out, server OOMs, or response takes 30+ seconds.
 
 **Why it happens:**
-The `NodeNext` module resolution convention requires `.js` extensions in TypeScript source imports — this is counterintuitive and differs from every other TypeScript configuration. Test files written by developers unfamiliar with this convention will omit the extension and pass locally with `tsx` (which handles the rewriting) but fail in CI.
+MCP Resources API makes it easy to expose data as URIs, but documentation examples show simple cases (single file, small dataset). Developers implement naive "return everything" approach without considering scale. The existing CLI has no concept of pagination - it processes everything in memory.
 
 **How to avoid:**
-Add the TypeScript ESLint rule `@typescript-eslint/consistent-type-imports` and configure it to enforce `.js` extensions. Add `import/extensions` rule from `eslint-plugin-import` set to `always` for `.ts` files. Run `eslint --fix` on all test files before the CI check.
 
-In `vitest.config.ts`, add `resolve.extensions` configuration to allow Vitest to resolve both `.ts` and `.js` imports during test runs, matching the `tsx` behavior in local development. This prevents the "passes locally, fails in CI" class of failures.
+- **Always paginate MCP resources** - make this a hard requirement
+- Use cursor-based pagination (not page numbers): opaque tokens representing position
+- Default page size: 20-50 items (not 100, not 1000)
+- Return metadata: `has_more`, `next_cursor`, `total_count` (if cheap to compute)
+- For semantic search: paginate results, not chunks (user sees "5 more results" not "500 more chunks")
+- Test with 1000+ documents before calling pagination "done"
 
 **Warning signs:**
 
-- `Cannot find module '../providers/anthropic'` in CI but not locally
-- Tests that import from `src/` use mixed extension conventions (some `.js`, some bare)
-- Any test file added by a developer who primarily works with non-`NodeNext` projects
-- ESLint has no rule enforcing `.js` extensions on local imports
+- MCP client shows loading spinner for 10+ seconds
+- Server memory usage spikes to 1GB+ when serving resources
+- Timeout errors when querying documentation
+- Network payload size in MB range (should be KB)
+- Server becomes unresponsive after resource request
 
 **Phase to address:**
-Test infrastructure setup — the very first task, before any tests are written. Fix the broken import, add the ESLint rule, and establish the convention in a test utilities file that every other test imports.
+Phase 5 (MCP Resources) - Implement pagination as core requirement before exposing any resources. Design pagination into resource schema from the start.
 
 ---
 
-## Moderate Pitfalls
-
-### Pitfall 9: Mocking the LLM Provider Interface Instead of the SDK Class
+### Pitfall 9: LLM Synthesis Hallucinates When Retrieval Returns Irrelevant Context
 
 **What goes wrong:**
-There are two valid places to mock LLM calls: (1) mock the `LLMProvider` interface (the internal abstraction in `src/providers/base.ts`), or (2) mock the external SDK (`@anthropic-ai/sdk`, `openai`). Teams that mock the SDK are writing tests that depend on the SDK's internal implementation — if the SDK changes how it structures its response objects, all SDK-level mocks break simultaneously. Teams that mock `LLMProvider.complete()` are testing the application logic without SDK coupling.
-
-For testing AI round logic (`src/ai-rounds/round-*.ts`, `src/ai-rounds/runner.ts`), the correct mock target is the `LLMProvider` interface. The round logic calls `provider.complete(request, schema)` — mock that. SDK-level mocks are only appropriate when specifically testing `AnthropicProvider` or `OpenAICompatProvider` themselves.
+Semantic search returns 5 chunks with similarity 0.6-0.75 (none highly relevant), LLM receives them as context, generates confident but incorrect answer citing "documentation" that doesn't support the claim. User trusts answer because it came from "documentation search," creates bug based on hallucinated information.
 
 **Why it happens:**
-Mocking at the SDK level feels "more complete." Developers want to verify the full call chain. But this produces tests that are brittle to SDK updates and slow to write (requires constructing valid SDK response shapes).
+RAG pattern assumes retrieved context is relevant, but semantic search can return tangentially related chunks when no good answer exists. LLMs are trained to be helpful and will synthesize answers from weak context. The existing completion interface has no "refuse to answer" mechanism.
 
 **How to avoid:**
-Establish a shared `createMockProvider()` helper that returns a typed mock of `LLMProvider`:
 
-```typescript
-export function createMockProvider(response: unknown): LLMProvider {
-  return {
-    name: 'mock',
-    complete: vi
-      .fn()
-      .mockResolvedValue({ data: response, usage: { inputTokens: 10, outputTokens: 20 } }),
-    estimateTokens: vi.fn().mockReturnValue(100),
-    maxContextTokens: vi.fn().mockReturnValue(200_000),
-  };
-}
-```
-
-Use this for all AI round tests. Use SDK-level mocks only in `src/providers/*.test.ts` where the provider implementation is what's under test.
+- Implement relevance filtering: if top result < 0.5 similarity, return "no relevant docs found"
+- Add system prompt instruction: "If context doesn't answer question, say 'I don't have information about that in the documentation'"
+- Return search scores to user: "Found 3 results (confidence: medium)"
+- Implement "verified answer cache" for common questions (human-curated)
+- Log questions with low-confidence answers for review
+- Add user feedback: "Was this answer helpful?" to detect hallucinations
 
 **Warning signs:**
 
-- AI round tests import from `@anthropic-ai/sdk`
-- Provider mock requires constructing a 20-field SDK response object
-- An SDK minor version update breaks 50+ tests simultaneously
+- Users report "documentation says X" but you can't find X in docs
+- Answers cite specific details not present in source chunks
+- Different phrasings of same question produce contradictory answers
+- Users complain about "made up information"
+- Search returns results but answer quality is poor
 
 **Phase to address:**
-Unit test foundation phase — create `tests/helpers/provider-mocks.ts` before any round tests are written.
+Phase 6 (Q&A with LLM) - Implement relevance filtering and refusal mechanism before exposing Q&A feature. Test with adversarial questions (unanswerable from docs).
 
 ---
 
-### Pitfall 10: CLI Argument Validation Tests Require Build Before Running
+### Pitfall 10: MCP Security: Session IDs Exposed in Resource URIs
 
 **What goes wrong:**
-The existing integration tests run the compiled CLI (`dist/index.js`) via `execFileSync`. Adding unit tests for CLI argument validation in `src/cli/index.ts` requires either: (a) running through the built binary (slow, requires `npm run build` first), or (b) importing the CLI module directly in unit tests. Direct import of `src/cli/index.ts` triggers Commander.js to register commands at import time, which may call `process.exit()` if the test environment doesn't provide expected arguments.
-
-Teams that try to unit-test Commander.js command handlers directly often hit this issue: importing `index.ts` starts the Commander.js program immediately, which may attempt to parse `process.argv`, find unexpected arguments (Vitest's own args), and exit.
+Developer implements resource URIs like `handover://documents?session=abc123` to track context across requests. Session IDs leak in logs, get shared in screenshots, or persist in client caches. Attacker uses stolen session ID to access other users' documentation queries or inject malicious context.
 
 **Why it happens:**
-Commander.js is designed for direct execution, not import-and-test. The top-level execution in `src/cli/index.ts` calls `program.parseAsync()` or `program.parse()` at import time.
+Web development habits (session IDs in cookies, not URLs) don't transfer to MCP protocol design. The MCP spec has "sessions" for context tracking, but they're not authentication - developers conflate the two. Resource URIs feel like HTTP URLs, encouraging similar patterns.
 
 **How to avoid:**
-Separate the Commander.js setup from execution. The command handlers (`runGenerate`, `runAnalyze`, `runEstimate`, `runInit`) are already importable separately. Unit-test those handler functions directly, passing mock config and mock providers. Do not attempt to unit-test the Commander.js wiring — that's already covered by the integration tests.
 
-For argument validation specifically: if validation logic is added to handlers, test the handler functions directly. If validation is inline in the Commander.js option definitions (e.g., `.argParser()`), test those parser functions in isolation.
+- **Never put session IDs in resource URIs** - they're not secret
+- Sessions are for context tracking, not authentication (document this clearly)
+- If multi-user: tie sessions to user identity, validate on server side
+- For CLI context: sessions are per-process, no need for IDs in URIs
+- Use MCP's built-in session context, don't reinvent authentication
+- Validate all resource requests: check permissions before serving data
 
 **Warning signs:**
 
-- Test file that imports `src/cli/index.ts` causes `process.exit()` to be called during test setup
-- Tests require `npm run build` before `npm test`
-- `vitest` reports "process exited with code 1" for a test that imports the CLI module
+- Resource URIs contain `session=`, `user=`, `token=` parameters
+- Session identifiers visible in client logs or UI
+- No access control on resource requests (anyone can request any URI)
+- Session state persists across CLI process restarts
 
 **Phase to address:**
-CLI validation phase. Ensure all validation logic is in testable handler functions before writing any validation tests. Add a note to the test file: "Do not import `src/cli/index.ts` in unit tests — test the handlers directly."
-
----
-
-### Pitfall 11: Coverage Shows WASM Code Paths As Uncovered and Inflates the Gap
-
-**What goes wrong:**
-The tree-sitter parsing code in `src/parsing/parser-service.ts` and the extractors (`typescript.ts`, `python.ts`, etc.) require WASM initialization (`TreeSitter.init()`) before any test can exercise them. Running these in a unit test environment either requires real WASM files (making tests slow and environment-dependent) or produces module load errors. Coverage reporting then marks these files as 0% covered, dragging the global average below the 80% threshold even though the files are tested via integration tests.
-
-**Why it happens:**
-V8 coverage (what `vitest --coverage` uses) counts lines across all included files regardless of whether they were reachable in the test environment. WASM-dependent modules cannot be exercised in a pure unit test environment.
-
-**How to avoid:**
-Add the WASM-dependent files to coverage `exclude` patterns for unit test runs:
-
-```typescript
-coverage: {
-  exclude: [
-    'src/parsing/parser-service.ts',
-    'src/parsing/extractors/typescript.ts',
-    'src/parsing/extractors/python.ts',
-    'src/parsing/extractors/rust.ts',
-    'src/parsing/extractors/go.ts',
-    'src/grammars/downloader.ts',
-    // ...
-  ],
-}
-```
-
-These files are covered by the existing integration tests. The unit test coverage report should only measure files that can actually be unit-tested. Mixing integration-covered files into unit-test coverage metrics produces a misleading number in both directions.
-
-**Warning signs:**
-
-- Global coverage is far below 80% but every non-WASM file is above 90%
-- `parser-service.ts` shows 0% in coverage even though parsing works in integration tests
-- `npm test` consistently fails the coverage threshold even with extensive unit tests
-
-**Phase to address:**
-Test infrastructure setup — configure `vitest.config.ts` coverage exclusions before running coverage for the first time.
-
----
-
-### Pitfall 12: Extracting Pricing Constants Makes Stale Data Harder to Find
-
-**What goes wrong:**
-The current hardcoded pricing in `src/providers/presets.ts` is visible and easy to find. Extracting it to a named constant file (`src/providers/pricing-constants.ts`) does not solve the staleness problem — it just moves the hardcoded values to a different file. Teams extracting the constants assume the extraction makes them easier to update, but without a mechanism to detect staleness (a test that validates against a current API, or a documented update procedure), the constants become more buried, not more maintainable.
-
-More specifically: the pricing data for 7 providers across ~15 models is time-sensitive. Anthropic has repriced multiple times in 2024-2025. If a cost estimate is wrong by 10x (e.g., using claude-sonnet pricing for claude-opus), users may significantly over-run their budget.
-
-**Why it happens:**
-Extraction is conflated with verification. Moving hardcoded values to a constants file is a code-organization improvement but does not address the underlying problem of staleness.
-
-**How to avoid:**
-After extracting pricing constants, add a test that documents the expected values and will fail when someone changes them:
-
-```typescript
-it('pricing constants match documented values', () => {
-  expect(PROVIDER_PRESETS.anthropic.pricing['claude-opus-4-6']).toStrictEqual({
-    inputPerMillion: 15,
-    outputPerMillion: 75,
-  });
-  // ... etc for all models
-});
-```
-
-This test does not verify the values are current — it verifies that future changes to the constants are intentional and reviewed. Add a comment at the top of the constants file: "Last verified: [date]. Source: [URL]. Update this date when prices are verified."
-
-**Warning signs:**
-
-- Pricing constants are extracted to a new file but no test covers the expected values
-- Cost estimate shown in `handover estimate` differs from the actual API invoice by > 20%
-- The pricing constants file has not been updated in 12+ months
-
-**Phase to address:**
-Constants extraction phase. Write the snapshot test for pricing data before extracting the constants. The test makes the extraction safe (future accidental changes are caught) and documents the expected values.
+Phase 5 (MCP Resources) - Design resource URI schema with security review. Document authentication vs. session distinction in MCP context.
 
 ---
 
 ## Technical Debt Patterns
 
-Shortcuts that seem reasonable during a test-addition sprint but create long-term problems.
+Shortcuts that seem reasonable but create long-term problems.
 
-| Shortcut                                                       | Immediate Benefit                   | Long-term Cost                                                                       | When Acceptable                                                                        |
-| -------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| Test the integration entry point instead of individual modules | Less mocking required, tests "work" | Tests are slow, flaky, don't isolate failure location                                | Never for logic that has unit-testable boundaries                                      |
-| Mock `LLMProvider` at SDK level instead of interface level     | Tests "the real thing"              | Brittle to SDK updates, complex response construction                                | Only in provider implementation tests (`src/providers/*.test.ts`)                      |
-| Use `mock-fs` for file system testing                          | Easy to set up                      | Breaks on Node.js major updates, incompatible with WASM loading                      | Never — use `memfs` or real temp dirs                                                  |
-| Chase 80% coverage with easy utility tests                     | Fast coverage gain                  | Critical paths (providers, validators) remain untested                               | Never — coverage order must follow risk order                                          |
-| Extract constants without `as const`                           | Faster refactor                     | TypeScript widens literal types; discriminated unions break                          | Never — always use `as const` for extracted literal constants                          |
-| Skip `vi.hoisted()` and use `vi.doMock()` instead              | Avoids hoisting complexity          | `vi.doMock()` requires dynamic imports in tests, making them harder to read          | Acceptable for single-use mocks; not for shared mock infrastructure                    |
-| Leave silent catch blocks unchanged while writing tests        | Tests pass faster                   | Tests cover the catch path without verifying what happened (logged? returned empty?) | Never — add warn assertions to every catch path test                                   |
-| Pin dev dependency versions exactly                            | CI reproducibility                  | Blocks security patches from auto-applying to CI                                     | Acceptable for dev dependencies only; never for production deps in a published package |
+| Shortcut                                               | Immediate Benefit                                | Long-term Cost                                                      | When Acceptable                                  |
+| ------------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------ |
+| Using same rate limiter for embeddings and completions | Reuse existing code, ship faster                 | Slow bulk indexing (hours vs minutes), poor UX, wasted API costs    | Never - embeddings need different concurrency    |
+| Fixed-size token chunking (ignore markdown structure)  | Simple implementation, no markdown parser needed | Poor search quality, context loss, hallucinations, user trust lost  | Only for MVP testing with <10 documents          |
+| Global cosine similarity threshold                     | Easy to implement, single config value           | Inconsistent results, user confusion, constant tweaking             | Never - fundamentally wrong approach             |
+| No pagination on MCP resources                         | Simpler API, works with small datasets           | Server OOM, timeouts, poor performance at scale                     | Never - pagination is table stakes               |
+| Storing only embeddings, not source chunk text         | Smaller database, faster queries                 | Can't show source context, must re-parse docs, debugging impossible | Never - chunk text is essential                  |
+| In-memory cache only (no SQLite persistence)           | Faster than disk, simpler code                   | Slow restarts (re-embed everything), wasted API costs               | Acceptable for development, never for production |
+| Synchronous embedding (no batching)                    | Simple linear code, easy to debug                | 10-100x slower than batched, rate limit waste                       | Acceptable for <50 documents in MVP              |
+| No embedding model version in schema                   | Simpler schema, no migration logic               | Silent dimension mismatch, broken search after model change         | Never - model version is metadata requirement    |
 
 ---
 
 ## Integration Gotchas
 
-Common mistakes when adding tests to specific integration points in this codebase.
+Common mistakes when connecting to external services.
 
-| Integration                                 | Common Mistake                                                                                          | Correct Approach                                                                                                                 |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `AnthropicProvider` + `vi.mock`             | Mocking `@anthropic-ai/sdk` default export as a plain object                                            | Mock as a class with `messages.create` method; Anthropic SDK uses class instantiation pattern                                    |
-| `OpenAICompatProvider` + `vi.mock`          | Returning `choices[0].message.content` instead of `choices[0].message.tool_calls[0].function.arguments` | Read `openai-compat.ts` source to understand which response field is read                                                        |
-| `fileTreeAnalyzer` + `memfs`                | Using `memfs` but forgetting to also mock `fast-glob` (which uses its own fs access)                    | Mock `fast-glob` separately or use the real filesystem via temp dirs for analyzer tests                                          |
-| `scorer.scoreFile()` + constants extraction | Running scorer tests before and after extraction assuming results will match                            | Floating-point arithmetic with extracted constants may differ by epsilon; use `toBeCloseTo()` not `toBe()` for float comparisons |
-| `DAGOrchestrator` + failed steps            | Testing only the happy path; no test for dependency skip on step failure                                | Add a test where a step throws and verify all dependent steps are marked `skipped`                                               |
-| `logger` + silent catch blocks              | Using `console.spy` instead of `vi.spyOn(logger, 'warn')`                                               | `logger.ts` wraps `console` — spy on the logger methods, not the underlying console                                              |
-| CLI argument validation + Commander.js      | Importing `src/cli/index.ts` directly in unit tests                                                     | Import only the handler functions (`runGenerate`, `runAnalyze`) — never import the CLI entry point in unit tests                 |
-| Coverage + WASM files                       | Including `src/parsing/**` in coverage configuration                                                    | Exclude all WASM-dependent files from unit test coverage; they are covered by integration tests                                  |
+| Integration                     | Common Mistake                                               | Correct Approach                                                                                |
+| ------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Anthropic/OpenAI embedding APIs | Assuming completion and embedding use same API client        | Use separate API clients - embeddings have different rate limits, batching support, pricing     |
+| better-sqlite3 with sqlite-vec  | Assuming extension auto-loads like built-in functions        | Explicitly load extension: `sqliteVec.load(db)` at initialization, check platform compatibility |
+| MCP stdio transport             | Using `console.log()` for debugging (corrupts protocol)      | Always use `console.error()` or file logging, never stdout                                      |
+| SQLite WAL mode                 | Using default rollback mode (slower, single writer)          | Enable WAL mode for vector workloads: `PRAGMA journal_mode=WAL`                                 |
+| Embedding model switching       | Changing model in config, restarting server                  | Must rebuild index - embeddings from different models incompatible                              |
+| MCP client timeout              | Using default HTTP timeout (30s) for large resource requests | Increase timeout for paginated resources, or reduce page size                                   |
 
 ---
 
 ## Performance Traps
 
-Patterns that make the test suite slow, flaky, or hard to maintain at 100+ tests.
+Patterns that work at small scale but fail as usage grows.
 
-| Trap                                                            | Symptoms                                               | Prevention                                                                                         | When It Breaks                                               |
-| --------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Running all tests with `testTimeout: 120_000`                   | Slow test suite; failures take 2 minutes to surface    | Set short timeouts (5s) for unit tests; keep 120s only for integration tests that actually need it | From the first test run — unit tests should complete in < 1s |
-| Creating real temp directories in unit tests                    | Flaky failures on cleanup; slow on network filesystems | Use `memfs` for unit tests; only create real temp dirs in integration tests                        | Under parallel execution or slow CI filesystems              |
-| Shared mock state between tests via module-level `vi.fn()`      | Tests pass in isolation but fail when run together     | Use `beforeEach` to reset mock return values; never rely on mock state set in one test for another | When test files run in parallel                              |
-| Importing `src/cli/generate.ts` (1000+ line file) in unit tests | Long module load times; Commander.js side effects      | Import only the specific function being tested, not the entire module                              | Immediately — each additional export increases load time     |
+| Trap                                                    | Symptoms                                  | Prevention                                                    | When It Breaks                                       |
+| ------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------- |
+| Loading all embeddings into memory on startup           | Works fine with 100 docs, instant search  | Lazy-load embeddings, use SQLite disk cache, paginate results | >1000 documents (>1.5GB RAM for 1536-dim embeddings) |
+| Re-embedding unchanged documents on every index rebuild | Fast with 10 docs, feels thorough         | Hash-based deduplication: skip embedding if content unchanged | >500 documents (10+ minutes rebuild)                 |
+| Synchronous vector similarity search                    | <100ms with 100 docs, acceptable          | Index embeddings in SQLite with vec0 virtual table            | >10,000 documents (>1s search time)                  |
+| Single-threaded markdown chunking                       | Imperceptible with 14 docs                | Parallelize chunking across documents                         | >100 documents (>10s processing time)                |
+| No query result caching                                 | Fresh results, simple code                | Cache search results with TTL (5 min), invalidate on reindex  | >1000 queries/day (repeated work, API cost)          |
+| Rebuilding entire index when one doc changes            | Simple logic, works for full regeneration | Incremental indexing: detect changed files, update embeddings | >100 documents (minutes to rebuild vs seconds)       |
 
 ---
 
 ## Security Mistakes
 
-Security-specific issues that arise when adding validation and error handling.
+Domain-specific security issues beyond general web security.
 
-| Mistake                                                                       | Risk                                                 | Prevention                                                                             |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Logging CLI argument values in error messages                                 | API keys passed via `--api-key` appear in error logs | Redact any argument that matches `/(key\|token\|secret\|password)/i` before logging    |
-| Validation error messages that echo user input verbatim                       | Path traversal attempts visible in logs              | Sanitize displayed paths to repo-root-relative; never log absolute user-supplied paths |
-| Adding `console.log` debug statements in catch blocks during test development | Debug output in production builds                    | Use `logger.warn()` exclusively; add ESLint rule `no-console` with `error` severity    |
-| Error messages that expose internal file paths                                | File structure information leakage                   | Use repo-root-relative paths in all user-facing error messages                         |
+| Mistake                                           | Risk                                                                               | Prevention                                                                 |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Exposing internal file paths in MCP resource URIs | Information disclosure: attacker learns codebase structure, finds sensitive files  | Use opaque identifiers (`handover://doc/abc123`), map to paths server-side |
+| No rate limiting on MCP endpoints                 | DoS: attacker spams embedding requests, exhausts API quota                         | Implement per-client rate limiting (even for stdio transport)              |
+| Embedding user input without sanitization         | Prompt injection: malicious input in embeddings influences semantic search results | Sanitize: remove markdown, limit length, validate UTF-8                    |
+| Storing API keys in SQLite database               | Credential theft: if database file leaked, API keys compromised                    | Never store keys in DB - read from env vars, document as requirement       |
+| MCP server runs with elevated privileges          | Privilege escalation: vulnerability in server code grants filesystem access        | Run with minimal permissions, chroot if possible, document least privilege |
+| No input validation on MCP tool arguments         | Injection attacks: path traversal, SQL injection (if dynamic queries)              | Validate all inputs: whitelist patterns, reject suspicious characters      |
+
+---
+
+## UX Pitfalls
+
+Common user experience mistakes in this domain.
+
+| Pitfall                                                       | User Impact                                                          | Better Approach                                                                                 |
+| ------------------------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| No feedback during bulk embedding (silent progress)           | User thinks CLI is frozen, kills process, wastes progress            | Show progress: "Embedding documents: 45/200 (22%)" with ETA                                     |
+| Unclear error when embedding model unavailable                | "Vector dimension mismatch" is cryptic, user doesn't know how to fix | "Embedding model changed. Run `handover reindex --clear` to rebuild."                           |
+| Search returns chunks without source document context         | User sees code snippet, doesn't know which doc/section it's from     | Include metadata: "From 03-ARCHITECTURE.md, section 'Database Layer'"                           |
+| No distinction between "no results" and "low quality results" | User doesn't know if search failed or docs don't cover topic         | "No relevant results found (top match: 23% confidence)" vs "Found 3 results (confidence: high)" |
+| MCP server startup delay not communicated                     | User runs query immediately, gets timeout, blames search quality     | Show: "Initializing embeddings... ready" before accepting queries                               |
+| Regenerating docs invalidates index silently                  | User gets stale results, doesn't realize reindexing needed           | Detect: "Documentation updated. Run `handover reindex` to refresh search."                      |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-Things that appear complete during this testing/hardening milestone but are missing critical properties.
+Things that appear complete but are missing critical pieces.
 
-- [ ] **Provider mocks:** Mock response shape verified against `satisfies` TypeScript type — not just "test passes"
-- [ ] **Silent catch blocks:** Every catch block test includes a `logger.warn` assertion — coverage alone is insufficient
-- [ ] **Constants extraction:** All extracted string literals include `as const` — verified by TypeScript compilation in strict mode
-- [ ] **Pricing snapshot test:** A test exists that will fail if any model pricing value changes accidentally
-- [ ] **Scoring snapshot test:** A test exists that verifies `scoreFile()` output on a fixed fixture before and after extraction
-- [ ] **ESM import extensions:** All test files use `.js` extensions on local imports — verified by ESLint rule
-- [ ] **Coverage exclusions:** WASM-dependent files excluded from unit test coverage — verified by running `vitest --coverage` and confirming no WASM files appear in the gap
-- [ ] **CLI argument validation:** Tests exercise the handler functions directly, not via the built binary — no `npm run build` required for `npm test`
-- [ ] **Dependency version changes:** `npm ci` verified to produce identical install on a clean Linux environment — not just the developer's machine
+- [ ] **MCP Server**: Demo works over stdio, but HTTP transport untested — verify both transports work, document which to use when
+- [ ] **Embeddings**: Works with Anthropic, but other providers untested — verify embedding support for all existing providers (OpenAI, Ollama, etc.)
+- [ ] **Vector Search**: Queries work, but no benchmarks — verify <100ms search latency with 1000+ documents, profile slow queries
+- [ ] **Document Chunking**: Splits at boundaries, but no overlap — verify chunk overlap implemented (context continuity), test with code examples
+- [ ] **Cache Invalidation**: Detects file changes, but not regeneration — verify generation-ID-based invalidation works, test with `handover generate`
+- [ ] **Pagination**: Returns next_cursor, but cursor validation missing — verify invalid/expired cursors return proper errors, test pagination edge cases
+- [ ] **Error Handling**: Returns errors, but no user-friendly messages — verify error messages explain how to fix issue, not just what went wrong
+- [ ] **Resource URIs**: Works with happy path, but no malformed URI handling — verify rejects invalid URIs with clear errors, test with fuzzing
+- [ ] **Rate Limiting**: Limits concurrent requests, but no backoff on failures — verify exponential backoff on rate limit errors, test with API limit
+- [ ] **Embedding Batching**: Batches 96 texts, but no handling of batch failures — verify partial batch retry (don't re-embed successful items), test with API errors
 
 ---
 
@@ -526,53 +398,109 @@ Things that appear complete during this testing/hardening milestone but are miss
 
 When pitfalls occur despite prevention, how to recover.
 
-| Pitfall                                                          | Recovery Cost | Recovery Steps                                                                                                                   |
-| ---------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| vi.mock hoisting failures across many test files                 | MEDIUM        | Find all uses of top-level variables inside `vi.mock()` factory; replace with `vi.hoisted()` pattern; one-time migration         |
-| Wrong SDK response shape in provider mocks                       | LOW           | Add `satisfies Anthropic.Message` to mock factory; TypeScript immediately surfaces all mismatches                                |
-| mock-fs breaking on Node.js update                               | HIGH          | Replace all `mock-fs` usage with `memfs`; isolate WASM-using tests to integration suite; likely requires rewriting 20+ tests     |
-| 80% threshold met but critical paths untested                    | MEDIUM        | Add per-file coverage thresholds for `src/providers/`, `src/context/`; gap is immediately visible in coverage report             |
-| Constants extracted without `as const`; TypeScript errors appear | LOW           | Add `as const` to each extracted constant; compiler immediately shows all affected callsites                                     |
-| CI broken import never fixed properly                            | LOW           | Fix with `.js` extension; add `import/extensions: always` ESLint rule; run `eslint --fix` on all files                           |
-| Silent catch blocks tested but warn not asserted                 | MEDIUM        | Add `vi.spyOn(logger, 'warn')` assertion to each catch path test; missing assertions don't require test rewrites, just additions |
+| Pitfall                                | Recovery Cost      | Recovery Steps                                                                                                                                                           |
+| -------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Embedding dimension mismatch           | MEDIUM (30-60 min) | 1. Delete SQLite database file<br>2. Update provider config with correct model<br>3. Run `handover reindex`<br>4. Add dimension validation to prevent recurrence         |
+| stdout corruption in MCP server        | LOW (5-10 min)     | 1. Search codebase for `console.log(`<br>2. Replace with `console.error(`<br>3. Restart MCP server<br>4. Test with client to verify messages parse                       |
+| Global similarity threshold too strict | LOW (1-2 min)      | 1. Remove threshold from search logic<br>2. Return top-k results instead<br>3. Let LLM filter relevance<br>4. Document as anti-pattern                                   |
+| Naive chunking breaks context          | HIGH (2-4 hours)   | 1. Implement markdown-aware chunker<br>2. Add unit tests with sample docs<br>3. Rebuild index with new chunks<br>4. Manually verify quality on 10+ docs                  |
+| No pagination causes OOM               | MEDIUM (1-2 hours) | 1. Add cursor-based pagination to resource handler<br>2. Set page size to 20-50<br>3. Update resource schema with metadata<br>4. Test with large dataset (>100 pages)    |
+| Cache not invalidated on regeneration  | MEDIUM (30-60 min) | 1. Implement generation-ID metadata<br>2. Add invalidation check on startup<br>3. Increment ID in generate command<br>4. Document cache clearing for users               |
+| SQLite performance on Node v22/24      | LOW (5-10 min)     | 1. Check Node.js version: `node --version`<br>2. Downgrade to Node.js v20 (via nvm or package manager)<br>3. Add version check to CLI<br>4. Document in README           |
+| Hallucinations from weak context       | MEDIUM (1-2 hours) | 1. Add relevance threshold (0.5 minimum)<br>2. Update system prompt with refusal instructions<br>3. Test with unanswerable questions<br>4. Add user feedback mechanism   |
+| Session IDs in resource URIs           | MEDIUM (1-2 hours) | 1. Redesign URI schema without session params<br>2. Use MCP session context for state<br>3. Audit for other leaked identifiers<br>4. Security review by second developer |
+| Slow bulk embedding (no batching)      | LOW (30 min)       | 1. Implement batch embedding (96 texts per request)<br>2. Add progress tracking<br>3. Benchmark before/after<br>4. Document expected performance                         |
 
 ---
 
 ## Pitfall-to-Phase Mapping
 
-How roadmap phases for this milestone should address these pitfalls.
+How roadmap phases should address these pitfalls.
 
-| Pitfall                                | Prevention Phase           | Verification                                                                                            |
-| -------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
-| vi.mock hoisting / `vi.hoisted()`      | Test infrastructure setup  | `vi.hoisted()` pattern present in shared test utilities; no top-level vars inside `vi.mock()` factories |
-| LLM mock response shape mismatch       | Provider mock utilities    | `makeAnthropicToolResponse()` uses `satisfies Anthropic.Message`; TypeScript compiles with strict       |
-| mock-fs breaking WASM loading          | Test infrastructure setup  | WASM-dependent tests explicitly excluded from unit test suite; `memfs` used for fs mocks                |
-| Silent catch blocks not verified       | Silent catch audit phase   | Every catch block test includes `vi.spyOn(logger, 'warn')` assertion                                    |
-| 0.x version tightening risks           | Dependency hardening phase | `npm ci` verified on clean Linux; `npm audit` passes; no new peer dependency warnings                   |
-| Constants extraction widens types      | Constants extraction phase | `as const` on all extracted constants; TypeScript compilation passes in strict mode                     |
-| Coverage chasing wrong files           | Unit test foundation       | Per-module coverage tracked; `src/providers/` and `src/context/` covered first                          |
-| CI broken import pattern repeats       | Test infrastructure setup  | ESLint `import/extensions: always` rule enforced; `eslint src tests` passes with 0 warnings             |
-| CLI arg validation tests require build | CLI validation phase       | Handler functions tested directly; no `execFileSync` in unit test files                                 |
-| WASM files inflate coverage gap        | Test infrastructure setup  | WASM-dependent files in `vitest.config.ts` coverage `exclude` list                                      |
-| Pricing constants become stale         | Constants extraction phase | Snapshot test for pricing values exists; test comment documents last-verified date and source URL       |
+| Pitfall                          | Prevention Phase                | Verification                                                             |
+| -------------------------------- | ------------------------------- | ------------------------------------------------------------------------ |
+| stdout corruption (console.log)  | Phase 1: MCP Server Foundation  | Run server over stdio, add debug logs, verify client receives valid JSON |
+| Embedding dimension mismatch     | Phase 2: Embeddings Integration | Test provider switching, verify error on dimension change                |
+| Rate limiter reuse               | Phase 2: Embeddings Integration | Benchmark embedding 100 docs, verify <2 min with batching                |
+| Naive chunking                   | Phase 3: Document Indexing      | Manually inspect 10 chunks, verify boundaries respect markdown           |
+| Node.js version regression       | Phase 1: MCP Server Foundation  | CI test on v20/v22/v24, verify performance requirements                  |
+| Global similarity threshold      | Phase 4: Semantic Search        | Test diverse queries, verify no threshold config exists                  |
+| Cache invalidation failure       | Phase 3: Document Indexing      | Run generate + query, verify fresh results without restart               |
+| Unbounded resources              | Phase 5: MCP Resources          | Request resource with >100 items, verify pagination works                |
+| Hallucinations from weak context | Phase 6: Q&A with LLM           | Test 10 unanswerable questions, verify refusal responses                 |
+| Session IDs in URIs              | Phase 5: MCP Resources          | Security review of URI schema, verify no sensitive data                  |
 
 ---
 
 ## Sources
 
-- [Vitest Mocking Modules — Official Documentation](https://vitest.dev/guide/mocking/modules) — HIGH confidence (official source; `vi.hoisted()` behavior, factory function hoisting constraints)
-- [Vitest Issue #3228: Introduce vi.hoisted to run code before imports](https://github.com/vitest-dev/vitest/issues/3228) — HIGH confidence (official GitHub; documents the hoisting problem and the `vi.hoisted()` solution)
-- [Backstage Issue #20436: Replacing mock-fs in tests](https://github.com/backstage/backstage/issues/20436) — HIGH confidence (real-world post-mortem; `mock-fs` maintenance breakage at scale)
-- [memfs npm](https://www.npmjs.com/package/memfs) — HIGH confidence (actively maintained; 1-to-1 `fs/promises` compatibility)
-- [Stack Overflow Blog: Making your code base better will make your code coverage worse (Dec 2025)](https://stackoverflow.blog/2025/12/22/making-your-code-base-better-will-make-your-code-coverage-worse/) — MEDIUM confidence (practitioner analysis; coverage metric as lagging indicator)
-- [The Pitfalls of Code Coverage (David Burns, 2024)](https://www.theautomatedtester.co.uk/blog/2024/the-pitfalls-of-code-coverage/) — MEDIUM confidence (practitioner; coverage does not measure catch block correctness)
-- [TypeScript Issue #43333: Type narrowing lost after 'extract to constant' refactoring](https://github.com/microsoft/TypeScript/issues/43333) — HIGH confidence (TypeScript core team; `as const` requirement for extracted literals)
-- [Vitest Coverage v8 incorrect branch coverage issues](https://github.com/vitest-dev/vitest/issues/6380) — HIGH confidence (official GitHub issue; V8 coverage limitations with ESM/TypeScript)
-- [How to Rapidly Introduce Tests When There Is No Test Coverage (Medium/Startup)](https://medium.com/swlh/how-to-rapidly-introduce-tests-when-there-is-no-test-coverage-8bb07930a3ee) — MEDIUM confidence (practitioner; priority ordering for retroactive test addition)
-- [The Dangers of Using Empty Catch Blocks in TypeScript (WebDevTutor)](https://www.webdevtutor.net/blog/typescript-empty-catch-block) — MEDIUM confidence (practitioner; silent failure modes in catch blocks)
-- Codebase direct analysis: `src/providers/anthropic.ts`, `src/providers/openai-compat.ts`, `src/providers/presets.ts`, `src/context/scorer.ts`, `src/context/token-counter.ts`, `src/ai-rounds/validator.ts`, `src/ai-rounds/quality.ts`, `vitest.config.ts`, `package.json`, `tests/integration/setup.ts` — HIGH confidence (first-party source)
+### MCP Server Implementation
+
+- [Implementing model context protocol (MCP): Tips, tricks and pitfalls | Nearform](https://nearform.com/digital-community/implementing-model-context-protocol-mcp-tips-tricks-and-pitfalls/)
+- [Model Context Protocol (MCP): Understanding security risks and controls](https://www.redhat.com/en/blog/model-context-protocol-mcp-understanding-security-risks-and-controls)
+- [Security Best Practices - Model Context Protocol](https://modelcontextprotocol.io/specification/draft/basic/security_best_practices)
+- [The MCP Security Survival Guide: Best Practices, Pitfalls, and Real-World Lessons | Towards Data Science](https://towardsdatascience.com/the-mcp-security-survival-guide-best-practices-pitfalls-and-real-world-lessons/)
+- [MCP Transport Protocols: stdio vs SSE vs StreamableHTTP | MCPcat](https://mcpcat.io/guides/comparing-stdio-sse-streamablehttp/)
+- [Build an MCP server - Model Context Protocol](https://modelcontextprotocol.io/docs/develop/build-server)
+
+### Semantic Search and Embeddings
+
+- [Tool search with embeddings](https://platform.claude.com/cookbook/tool-use-tool-search-with-embeddings)
+- [Semantic search with embeddings: index anything | by Romain Beaumont | Medium](https://rom1504.medium.com/semantic-search-with-embeddings-index-anything-8fb18556443c)
+- [Mixing embedding services? - API - OpenAI Developer Community](https://community.openai.com/t/mixing-embedding-services/707855)
+- [/embeddings | liteLLM](https://docs.litellm.ai/docs/embedding/supported_embedding)
+- [Choosing the Right Embedding Model: A Guide for LLM Applications | by Ryan Nguyen | Medium](https://medium.com/@ryanntk/choosing-the-right-embedding-model-a-guide-for-llm-applications-7a60180d28e3)
+
+### SQLite Vector Storage
+
+- [SQLite Performance Optimization - Guide 2026](https://forwardemail.net/en/blog/docs/sqlite-performance-optimization-pragma-chacha20-production-guide)
+- [How sqlite-vec Works for Storing and Querying Vector Embeddings | by Stephen Collins | Medium](https://medium.com/@stephenc211/how-sqlite-vec-works-for-storing-and-querying-vector-embeddings-165adeeeceea)
+- [How to Use SQLite in Node.js Applications](https://oneuptime.com/blog/post/2026-02-02-sqlite-nodejs/view)
+- [GitHub - WiseLibs/better-sqlite3: The fastest and simplest library for SQLite3 in Node.js.](https://github.com/WiseLibs/better-sqlite3)
+- [GitHub - asg017/sqlite-vec: A vector search SQLite extension that runs anywhere!](https://github.com/asg017/sqlite-vec)
+- [Using sqlite-vec in Node.js, Deno, and Bun | sqlite-vec](https://alexgarcia.xyz/sqlite-vec/js.html)
+
+### Document Chunking
+
+- [Chunking Strategies for LLM Applications | Pinecone](https://www.pinecone.io/learn/chunking-strategies/)
+- [Chunking for RAG: best practices | Unstructured](https://unstructured.io/blog/chunking-for-rag-best-practices)
+- [Chunking Strategies to Improve LLM RAG Pipeline Performance | Weaviate](https://weaviate.io/blog/chunking-strategies-for-rag)
+- [Best Chunking Strategies for RAG in 2025](https://www.firecrawl.dev/blog/best-chunking-strategies-rag-2025)
+- [Breaking up is hard to do: Chunking in RAG applications - Stack Overflow](https://stackoverflow.blog/2024/12/27/breaking-up-is-hard-to-do-chunking-in-rag-applications/)
+
+### Semantic Search Quality
+
+- [Better RAG Retrieval — Similarity with Threshold | by Meisin Lee | Medium](https://meisinlee.medium.com/better-rag-retrieval-similarity-with-threshold-a6dbb535ef9e)
+- [Rule of thumb cosine similarity thresholds? - API - OpenAI Developer Community](https://community.openai.com/t/rule-of-thumb-cosine-similarity-thresholds/693670)
+- [Mastering Semantic Search with Cosine Similarity](https://www.myscale.com/blog/implementing-cosine-similarity-semantic-search-step-by-step-guide/)
+- [Relevance Filtering for Embedding-based Retrieval](https://arxiv.org/html/2408.04887v1)
+
+### LLM Hallucinations
+
+- [Detecting hallucinations in large language models using semantic entropy | Nature](https://www.nature.com/articles/s41586-024-07421-0)
+- [How do I reduce hallucinations in LLM responses using semantic search?](https://milvus.io/ai-quick-reference/how-do-i-reduce-hallucinations-in-llm-responses-using-semantic-search)
+- [Reducing LLM Hallucinations: A Developer's Guide | Zep](https://www.getzep.com/ai-agents/reducing-llm-hallucinations/)
+- [Reducing hallucinations in LLM agents with a verified semantic cache using Amazon Bedrock Knowledge Bases | Artificial Intelligence](https://aws.amazon.com/blogs/machine-learning/reducing-hallucinations-in-llm-agents-with-a-verified-semantic-cache-using-amazon-bedrock-knowledge-bases/)
+
+### MCP Resources and Pagination
+
+- [Pagination - Model Context Protocol](https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination)
+- [15 Best Practices for Building MCP Servers in Production - The New Stack](https://thenewstack.io/15-best-practices-for-building-mcp-servers-in-production/)
+- [Designing MCP servers for wide schemas and large result sets](https://axiom.co/blog/designing-mcp-servers-for-wide-events)
+- [Handling Large Datasets with Pagination | GraphAcademy](https://graphacademy.neo4j.com/courses/genai-mcp-build-custom-tools-python/2-database-features/9-pagination/)
+
+### Cache Invalidation
+
+- [Caching in 2026: Fundamentals, Invalidation, and Why It Matters More Than Ever | by Lukas Niessen | Feb, 2026 | Medium](https://lukasniessen.medium.com/caching-in-2026-fundamentals-invalidation-and-why-it-matters-more-than-ever-867fee46e98b)
+- [Master Your System Design Interview: In-Depth Guide to Cache Invalidation Strategies](https://www.designgurus.io/blog/cache-invalidation-strategies)
+- [LLMOps Guide 2026: Build Fast, Cost-Effective LLM Apps](https://redis.io/blog/large-language-model-operations-guide/)
+
+### Vector Database Schema
+
+- [How to Fix the Common Gemini & LangChain Embedding Dimension Mismatch (768 vs. 3072) | by Henil Suhagiya | Medium](https://medium.com/@henilsuhagiya0/how-to-fix-the-common-gemini-langchain-embedding-dimension-mismatch-768-vs-3072-6eb1c468729b)
+- [Dealing with Vector Dimension Mismatch: My Experience with OpenAI Embeddings and Qdrant Vector Storage | by Evangelos Pappas | Medium](https://medium.com/@epappas/dealing-with-vector-dimension-mismatch-my-experience-with-openai-embeddings-and-qdrant-vector-20a6e13b6d9f)
 
 ---
 
-_Pitfalls research for: adding unit tests and hardening to handover TypeScript CLI (v3.0 milestone)_
-_Researched: 2026-02-19_
+_Pitfalls research for: Adding MCP Server + Semantic Search to handover CLI_
+_Researched: 2026-02-20_
