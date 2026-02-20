@@ -66,37 +66,39 @@ Deferred to future release. Tracked but not in current roadmap.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase | Status  |
-| ----------- | ----- | ------- |
-| STORE-01    | —     | Pending |
-| STORE-02    | —     | Pending |
-| STORE-03    | —     | Pending |
-| STORE-04    | —     | Pending |
-| STORE-05    | —     | Pending |
-| STORE-06    | —     | Pending |
-| SRCH-01     | —     | Pending |
-| SRCH-02     | —     | Pending |
-| SRCH-03     | —     | Pending |
-| SRCH-04     | —     | Pending |
-| MCP-01      | —     | Pending |
-| MCP-02      | —     | Pending |
-| MCP-03      | —     | Pending |
-| MCP-04      | —     | Pending |
-| MCP-05      | —     | Pending |
-| MCP-06      | —     | Pending |
-| MCP-07      | —     | Pending |
-| QA-01       | —     | Pending |
-| QA-02       | —     | Pending |
-| QA-03       | —     | Pending |
-| QA-04       | —     | Pending |
+| Requirement | Phase    | Status  |
+| ----------- | -------- | ------- |
+| STORE-01    | Phase 12 | Pending |
+| STORE-02    | Phase 12 | Pending |
+| STORE-03    | Phase 12 | Pending |
+| STORE-04    | Phase 12 | Pending |
+| STORE-05    | Phase 12 | Pending |
+| STORE-06    | Phase 12 | Pending |
+| SRCH-01     | Phase 13 | Pending |
+| SRCH-02     | Phase 13 | Pending |
+| SRCH-03     | Phase 13 | Pending |
+| SRCH-04     | Phase 13 | Pending |
+| MCP-01      | Phase 14 | Pending |
+| MCP-02      | Phase 14 | Pending |
+| MCP-03      | Phase 14 | Pending |
+| MCP-04      | Phase 14 | Pending |
+| MCP-05      | Phase 14 | Pending |
+| MCP-06      | Phase 15 | Pending |
+| MCP-07      | Phase 14 | Pending |
+| QA-01       | Phase 15 | Pending |
+| QA-02       | Phase 15 | Pending |
+| QA-03       | Phase 15 | Pending |
+| QA-04       | Phase 15 | Pending |
 
 **Coverage:**
 
 - v4.0 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21
+- Mapped to phases: 21
+- Unmapped: 0
+
+100% coverage validated.
 
 ---
 
 _Requirements defined: 2026-02-20_
-_Last updated: 2026-02-20 after initial definition_
+_Last updated: 2026-02-20 after roadmap creation_
