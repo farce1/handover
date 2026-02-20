@@ -51,7 +51,18 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ### Active
 
-(No active milestone — use `/gsd:new-milestone` to start next)
+## Current Milestone: v4.0 MCP Server & Semantic Search
+
+**Goal:** Make handover's generated documentation queryable by AI coding tools via an MCP server with semantic search, LLM-powered Q&A, raw analysis data access, and remote regeneration.
+
+**Target features:**
+
+- `handover serve` — MCP server exposing docs, analysis data, search, Q&A, and regeneration
+- Semantic search with embeddings from configured provider + SQLite vector cache
+- LLM-synthesized answers grounded in generated documentation
+- Raw analysis data (file tree, dependency graph, git history) as MCP resources
+- `handover reindex` — manual reindexing command
+- Auto-detect missing docs on startup with prompt to generate
 
 ### Out of Scope
 
@@ -69,6 +80,7 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - v1.0 OSS milestone shipped: 3 phases, 9 plans, community health, CI/CD, docs
 - v2.0 Performance milestone shipped: 4 phases, 8 plans, caching, streaming, incremental analysis, prompt caching
 - v3.0 Robustness milestone shipped: 4 phases, 10 plans, CI fix, scorecard hardening, 254 unit tests, 80% coverage gate
+- v4.0 MCP Server & Semantic Search: in progress
 - Architecture: DAG orchestrator, 8 static analyzers, 6 AI rounds, 14 document renderers, Zod-first domain model
 - CI runs on every PR; release-please automates versioning; OIDC publishes to npm with provenance
 - Codebase: ~24.8K LOC TypeScript across 90+ source files, 254 tests, 92%+ coverage
@@ -115,4 +127,4 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ---
 
-_Last updated: 2026-02-20 after v3.0 milestone_
+_Last updated: 2026-02-20 after v4.0 milestone started_
