@@ -5,29 +5,36 @@
 ## Languages
 
 **Primary:**
+
 - TypeScript 5.9 - All application code, including CLI, analyzers, providers, and rendering
 
 **Secondary:**
+
 - JavaScript (Node.js native modules) - WASM loaders and runtime bindings for tree-sitter
 
 ## Runtime
 
 **Environment:**
+
 - Node.js >= 18.0.0 (specified in `package.json` engines field)
 
 **Package Manager:**
+
 - npm (lockfile: `package-lock.json` present)
 
 ## Frameworks
 
 **Core CLI:**
+
 - Commander.js 13.1 - Command-line interface parsing and routing (`src/cli/index.ts`)
 
 **Testing:**
+
 - Vitest 3.2 - Test runner and assertion framework
 - Configuration: `vitest.config.ts` (globals enabled, 2-minute timeout for integration tests)
 
 **Build/Dev:**
+
 - tsup 8.5 - TypeScript bundler for ESM distribution
   - Configuration: `tsup.config.ts` (bundles to single entry point, splits vendor chunks)
 - tsx 4.21 - TypeScript executor for dev mode (`npm run dev`)
@@ -95,6 +102,7 @@
 ## Configuration
 
 **Environment:**
+
 - **ANTHROPIC_API_KEY** - Required for Anthropic provider (default provider)
 - **OPENAI_API_KEY** - Required for OpenAI provider
 - **GROQ_API_KEY** - Required for Groq provider
@@ -104,11 +112,13 @@
 - **Ollama** - No API key needed (runs locally at http://localhost:11434/v1/)
 
 **Config File:**
+
 - `.handover.yml` - Project-specific configuration (optional, zero-config mode supported)
 - Schema validation via Zod in `src/config/schema.ts`
 - Supports: provider selection, model override, output directory, file include/exclude patterns, project metadata, context window tuning
 
 **Build:**
+
 - `tsconfig.json` - TypeScript compiler options
   - Target: ES2022
   - Module: NodeNext (ESM)
@@ -129,21 +139,24 @@
 ## Platform Requirements
 
 **Development:**
+
 - Node.js >= 18.0.0
 - npm (or equivalent package manager)
 - TypeScript 5.9 (included as dev dependency)
 - WASM support (for tree-sitter parsing)
 
 **Production:**
+
 - Node.js >= 18.0.0
 - API key for selected LLM provider (Anthropic, OpenAI, Groq, Together, DeepSeek, Azure, or local Ollama)
 - No database or external file storage required
 
 **Published As:**
+
 - NPM package: `handover-cli` (0.1.0)
 - Entry point: `./dist/index.js` (executable via `npx handover-cli` or `handover` when globally installed)
 - Shebang: `#!/usr/bin/env node` (in `src/cli/index.ts`)
 
 ---
 
-*Stack analysis: 2026-02-18*
+_Stack analysis: 2026-02-18_

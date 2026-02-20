@@ -5,6 +5,7 @@
 ## APIs & External Services
 
 **LLM Providers (8 Supported):**
+
 - **Anthropic Claude** - Primary LLM provider
   - SDK: `@anthropic-ai/sdk` 0.39.0
   - Auth: `ANTHROPIC_API_KEY` environment variable
@@ -56,6 +57,7 @@
   - Configurable via `baseUrl` in `.handover.yml`
 
 **Provider Registry:**
+
 - Location: `src/providers/presets.ts`
 - Contains: 8 presets with default models, context windows, pricing, and timeouts
 - Factory pattern: `src/providers/factory.ts` - Instantiates correct provider based on config
@@ -63,23 +65,27 @@
 ## Data Storage
 
 **Databases:**
+
 - None - Handover is a stateless analysis tool
 - Input: Scans filesystem and reads source files
 - Output: Generates markdown documents to local filesystem
 
 **File Storage:**
+
 - Local filesystem only
 - Input discovery: `src/analyzers/file-discovery.ts` (uses `fast-glob` and `ignore`)
 - Output directory: Configurable via `output` field in `.handover.yml` (default: `./handover`)
 - Max file size: 2MB (larger files are skipped in analysis)
 
 **Caching:**
+
 - Client-side caching: `--no-cache` flag bypasses cached results
 - Cache location: Not exposed in configuration, likely in `.handover/` or runtime memory
 
 ## Git Integration
 
 **Git Operations:**
+
 - Library: `simple-git` 3.31.1
 - Purpose: Extract branch patterns, commit history, contributors, file ownership
 - Analyzer: `src/analyzers/git-history.ts`
@@ -94,11 +100,13 @@
 ## Configuration
 
 **Config File Format:**
+
 - File: `.handover.yml` (YAML)
 - Parsing: `yaml` package 2.8.2 via `src/config/loader.ts`
 - Validation: Zod schema `HandoverConfigSchema` in `src/config/schema.ts`
 
 **Configuration Schema:**
+
 ```yaml
 provider: anthropic|openai|ollama|groq|together|deepseek|azure-openai|custom
 model: string (optional, uses provider default if not specified)
@@ -127,6 +135,7 @@ costWarningThreshold: number (optional, USD)
 ```
 
 **Environment Variables Required:**
+
 - API key env var based on selected provider (see LLM Providers section)
 - No other environment variables required for operation
 - Secrets are never logged; `.env` files are not committed
@@ -134,6 +143,7 @@ costWarningThreshold: number (optional, USD)
 ## Analysis Input Formats
 
 **Supported Source Languages:**
+
 - TypeScript/JavaScript - Via `web-tree-sitter` AST parser
 - Python - Via `web-tree-sitter` AST parser
 - Go - Via `web-tree-sitter` AST parser
@@ -141,12 +151,14 @@ costWarningThreshold: number (optional, USD)
 - Regex fallback - For unsupported languages (pattern-based extraction)
 
 **Dependency Parsing:**
+
 - `package.json` (Node.js) - Direct JSON parsing
 - `Cargo.toml` (Rust) - TOML parsing via `smol-toml`
 - `pyproject.toml` (Python) - TOML parsing via `smol-toml`
 - Other formats detected but may fall back to regex extraction
 
 **Special Files Analyzed:**
+
 - `.gitignore` - Patterns applied to file discovery
 - `.env` files - Detected and listed (contents not exposed in output)
 - README files - Extracted for documentation
@@ -156,6 +168,7 @@ costWarningThreshold: number (optional, USD)
 ## Output Formats
 
 **Generated Documents:**
+
 - 14 Markdown files (`.md`)
 - YAML front-matter with metadata
 - Cross-referenced internal links
@@ -165,6 +178,7 @@ costWarningThreshold: number (optional, USD)
   - AI consumption (with `--audience ai` flag)
 
 **Output Location:**
+
 - Default: `./handover/` directory
 - Customizable via `output` field in `.handover.yml`
 - Files follow naming pattern: `00-INDEX.md`, `01-PROJECT-OVERVIEW.md`, etc.
@@ -172,14 +186,17 @@ costWarningThreshold: number (optional, USD)
 ## Webhooks & Callbacks
 
 **Incoming:**
+
 - None - Handover is a CLI-only tool
 
 **Outgoing:**
+
 - None - No webhooks or external callbacks
 
 ## Monitoring & Observability
 
 **Error Tracking:**
+
 - None - Errors logged to console only
 - Custom error types: `src/utils/errors.ts`
   - `ProviderError` - LLM provider failures
@@ -187,17 +204,20 @@ costWarningThreshold: number (optional, USD)
   - `ValidationError` - Schema validation failures
 
 **Logging:**
+
 - Framework: Console-based logging via `src/utils/logger.ts`
 - No external logging service
 - Verbose mode: `--verbose` flag for detailed output
 - Terminal colors: `picocolors` for readable output
 
 **Cost Estimation:**
+
 - Pre-flight cost calculator: `src/cli/estimate.ts`
 - Provider pricing lookup: `src/providers/presets.ts` (per-million-token rates)
 - Cost threshold warning: `costWarningThreshold` in config
 
 **Token Tracking:**
+
 - Token counter: `src/context/tracker.ts`
 - Tracks input/output tokens per LLM call
 - Reports total cost at end of analysis
@@ -205,19 +225,22 @@ costWarningThreshold: number (optional, USD)
 ## CI/CD & Deployment
 
 **Hosting:**
+
 - NPM Package Registry
 - Published as: `handover-cli@0.1.0`
 - Distribution: Installable via `npm install -g handover-cli` or `npx handover-cli`
 
 **CI Pipeline:**
+
 - GitHub Actions workflow (referenced in README badges)
 - Likely runs: build, test, lint on pull requests
 
 **Build Output:**
+
 - Single executable: `dist/index.js` (ESM format)
 - Type declarations: `dist/index.d.ts` (disabled in tsup config)
 - Source maps: Enabled for debugging
 
 ---
 
-*Integration audit: 2026-02-18*
+_Integration audit: 2026-02-18_

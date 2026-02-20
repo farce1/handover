@@ -5,14 +5,17 @@
 ## Test Framework
 
 **Runner:**
+
 - Vitest 3.0.0 (imported as `vitest`)
 - Config: `vitest.config.ts`
 - Globals enabled: `test`, `describe`, `it`, `expect`, `beforeEach`, `afterEach`, `beforeAll`, `afterAll` available without imports
 
 **Assertion Library:**
+
 - Vitest built-in `expect()` — no separate assertion library needed
 
 **Run Commands:**
+
 ```bash
 npm run test                    # Run all tests (uses vitest run)
 HANDOVER_INTEGRATION=1 npx vitest run tests/integration/generate.test.ts --timeout 600000  # Real-world validation
@@ -22,15 +25,18 @@ npm run typecheck              # Type checking (separate from tests)
 ## Test File Organization
 
 **Location:**
+
 - Integration tests: `tests/integration/*.test.ts` (separate directory from source)
 - No unit tests co-located in `src/` (all tests are integration-level)
 - Test utilities: `tests/integration/setup.ts`, `tests/integration/targets.ts`
 
 **Naming:**
+
 - Pattern: `{area}.test.ts` (e.g., `generate.test.ts`, `edge-cases.test.ts`, `monorepo.test.ts`, `performance.test.ts`)
 - File paths: absolute paths used throughout (e.g., `CLI_PATH = join(__dirname, '../../dist/index.js')`)
 
 **Structure:**
+
 ```
 tests/
 ├── integration/
@@ -86,12 +92,14 @@ describe('empty repository', () => {
 **Framework:** None used — tests run against real CLI executable
 
 **Approach:**
+
 - **No mocking of filesystem:** Real temporary directories created via `mkdtempSync()`
 - **No mocking of subprocess:** CLI runs as real Node.js subprocess via `execFileSync()`
 - **No mocking of LLM providers:** `--static-only` flag disables AI rounds to avoid API calls
 - **Real fixture creation:** Test utilities create actual files on disk for each test
 
 **Test Doubles:**
+
 - Fixtures created programmatically: empty repos, repos with enormous files, binary-only dirs
 - Environment variables overridden: `{ ...process.env, NO_COLOR: '1', ...options?.env }`
 - Timeouts configurable: `{ timeout?: 120_000 }` in test options
@@ -111,8 +119,9 @@ beforeEach(() => {
 });
 
 // Create fixture with normal and enormous files
-const normalContent = Array.from({ length: 50 }, (_, i) =>
-  `export function handler${i}(): string { return 'ok'; }`,
+const normalContent = Array.from(
+  { length: 50 },
+  (_, i) => `export function handler${i}(): string { return 'ok'; }`,
 ).join('\n');
 
 const enormousContent = 'x'.repeat(2.1 * 1024 * 1024);
@@ -124,11 +133,13 @@ fixtureDir = scope.createFixture(`enormous-file-${Date.now()}`, {
 ```
 
 **Location:**
+
 - Fixture utilities in `tests/integration/setup.ts`
 - Real-world target definitions in `tests/integration/targets.ts`
 - No separate factory files — utilities exported from setup.ts
 
 **Isolation:**
+
 - Each test gets unique temp directory (uses `mkdtempSync()` with Date.now() suffix)
 - Scope-based isolation: `createFixtureScope()` returns isolated cleanup function
 - Parallel-safe: each test file can run independently
@@ -138,6 +149,7 @@ fixtureDir = scope.createFixture(`enormous-file-${Date.now()}`, {
 **Requirements:** None enforced — no coverage thresholds in vitest.config.ts
 
 **View Coverage:**
+
 - No coverage command configured
 - All tests are integration-level (full CLI execution)
 - Success metric: "all 14 docs generated without crashes for each target codebase"
@@ -145,10 +157,12 @@ fixtureDir = scope.createFixture(`enormous-file-${Date.now()}`, {
 ## Test Types
 
 **Unit Tests:**
+
 - Not used in this codebase
 - Focus is on integration testing (full CLI pipeline)
 
 **Integration Tests:**
+
 - **Scope:** Run `handover generate` CLI as subprocess against real fixture projects
 - **Approach:** Create temporary directories with source files, run CLI, verify output files exist and contain valid content
 - **Examples:**
@@ -157,6 +171,7 @@ fixtureDir = scope.createFixture(`enormous-file-${Date.now()}`, {
   - Real-world validation: clones 5 diverse OSS repos, runs full pipeline (requires `HANDOVER_INTEGRATION=1`)
 
 **E2E Tests:**
+
 - **Framework:** Vitest with real subprocess execution (`execFileSync`)
 - **Real-world validation:** `tests/integration/generate.test.ts`
   - Clones actual repos (node, vite, zod, next.js, fastapi)
@@ -281,4 +296,4 @@ Tests execute the compiled CLI from `dist/index.js`, not source TypeScript. The 
 
 ---
 
-*Testing analysis: 2026-02-18*
+_Testing analysis: 2026-02-18_

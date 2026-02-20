@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An open source TypeScript CLI that generates comprehensive, AI-powered codebase documentation through multi-round LLM analysis. Ships with content-hash caching, streaming token output, incremental context packing, Anthropic prompt caching, and parallel rendering — making re-runs 2-5x faster and 50%+ cheaper on tokens.
+An open source TypeScript CLI that generates comprehensive, AI-powered codebase documentation through multi-round LLM analysis. Ships with content-hash caching, streaming token output, incremental context packing, Anthropic prompt caching, and parallel rendering — making re-runs 2-5x faster and 50%+ cheaper on tokens. Backed by 254 unit tests with 92%+ coverage enforced in CI.
 
 ## Core Value
 
@@ -43,23 +43,15 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - ✓ Per-round cache savings display (tokens, percentage, dollars) — v2.0
 - ✓ Parallel document rendering via Promise.allSettled — v2.0
 - ✓ BPE tokenization via gpt-tokenizer for OpenAI-family providers — v2.0
+- ✓ CI fixed (TypeScript errors, Zod v4 migration), 5 Dependabot PRs merged, 0.x deps pinned — v3.0
+- ✓ OpenSSF Scorecard: all Actions SHA-pinned, branch protection, CODEOWNERS, auto-merge — v3.0
+- ✓ Test infrastructure: createMockProvider() factory, memfs, vitest coverage exclusions — v3.0
+- ✓ Code hardening: SCORE\_\* named constants, logger.debug() in catch blocks, CLI validation reorder — v3.0
+- ✓ 254 unit tests (pure-function + algorithm + AI round) with 80% CI coverage gate — v3.0
 
 ### Active
 
-#### Current Milestone: v3.0 Robustness
-
-**Goal:** Harden the codebase with comprehensive unit tests, fix CI, merge blocked dependency updates, and eliminate validation gaps, hardcoded values, and silent error handling.
-
-**Target features:**
-
-- Comprehensive unit test suite targeting 60%+ coverage (~100+ tests)
-- Fix TypeScript error blocking CI on main
-- Merge 5 blocked Dependabot PRs
-- Input validation hardening (CLI args, config paths, API keys)
-- Error handling cleanup (document intentional catches, protect grammar downloader)
-- Extract hardcoded values (model pricing, scoring weights, batch sizes) to config
-- Tighten 0.x dependency version constraints
-- OpenSSF Scorecard hardening: pin actions to SHA, workflow permissions, branch protection, CODEOWNERS
+(No active milestone — use `/gsd:new-milestone` to start next)
 
 ### Out of Scope
 
@@ -76,9 +68,10 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - Handover is at v0.1.0, early stage but functional and published on npm
 - v1.0 OSS milestone shipped: 3 phases, 9 plans, community health, CI/CD, docs
 - v2.0 Performance milestone shipped: 4 phases, 8 plans, caching, streaming, incremental analysis, prompt caching
+- v3.0 Robustness milestone shipped: 4 phases, 10 plans, CI fix, scorecard hardening, 254 unit tests, 80% coverage gate
 - Architecture: DAG orchestrator, 8 static analyzers, 6 AI rounds, 14 document renderers, Zod-first domain model
 - CI runs on every PR; release-please automates versioning; OIDC publishes to npm with provenance
-- Codebase: ~20K LOC TypeScript across 90+ source files
+- Codebase: ~24.8K LOC TypeScript across 90+ source files, 254 tests, 92%+ coverage
 - External setup still needed: CODECOV_TOKEN, RELEASE_PLEASE_TOKEN (PAT), npm trusted publishing OIDC config, GitHub Sponsors enrollment
 
 ## Constraints
@@ -90,30 +83,36 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ## Key Decisions
 
-| Decision                                        | Rationale                                                              | Outcome |
-| ----------------------------------------------- | ---------------------------------------------------------------------- | ------- |
-| In-repo markdown over docs site                 | Lower maintenance, LLMs read markdown natively, can migrate later      | ✓ Good  |
-| Distill AGENTS.md + PRD.md into structured docs | Single-source-of-truth docs, retire monolithic files                   | ✓ Good  |
-| Keep README, add links and badges               | README was already good — additive changes only                        | ✓ Good  |
-| GitHub Sponsors over other funding              | Native GitHub integration, low friction                                | ✓ Good  |
-| Badges for social proof                         | npm downloads, CI status, license, coverage, security — 7 badges total | ✓ Good  |
-| llms.txt standard                               | Emerging standard for LLM-friendly project descriptions; 11 entries    | ✓ Good  |
-| release-please over semantic-release            | PR-based review gate before npm publish; manifest config               | ✓ Good  |
-| OIDC trusted publishing over NPM_TOKEN          | No long-lived secrets, provenance attestation included                 | ✓ Good  |
-| ESLint flat config + Prettier                   | Modern config format; Prettier as single formatting authority          | ✓ Good  |
-| Semicolons required (semi: true)                | Prettier enforces; AGENTS.md updated to match                          | ✓ Good  |
-| CodeQL + OpenSSF Scorecard                      | Security scanning + supply chain trust signal                          | ✓ Good  |
-| Dependabot grouped PRs                          | Production vs dev grouping reduces maintainer noise                    | ✓ Good  |
-| SHA-256 content hash over file size             | Same-size edits correctly invalidate cache; hashContent at call site   | ✓ Good  |
-| Cascade hash chain across rounds                | Round N key includes prior round hashes; upstream changes propagate    | ✓ Good  |
-| onToken optional in all signatures              | No callback = non-streaming path unchanged; backward compatible        | ✓ Good  |
-| Spinner-driven elapsed updates (80ms)           | onToken callback does NOT trigger re-renders; avoids 100 renders/sec   | ✓ Good  |
-| Separate analysis cache from round cache        | .handover/cache/analysis.json vs rounds/; no coupling                  | ✓ Good  |
-| Changed files fall through on budget exhaust    | Max coverage preserved; changed files not skipped when over budget     | ✓ Good  |
-| BPE model routing by prefix                     | gpt-4-/gpt-3.5- use cl100k_base; all others use o200k_base             | ✓ Good  |
-| Cache pricing multipliers as constants          | CACHE_READ_MULTIPLIER=0.1, CACHE_WRITE_MULTIPLIER=1.25                 | ✓ Good  |
-| Promise.allSettled for parallel rendering       | Error isolation per document; rejected docs don't abort others         | ✓ Good  |
+| Decision                                         | Rationale                                                              | Outcome |
+| ------------------------------------------------ | ---------------------------------------------------------------------- | ------- |
+| In-repo markdown over docs site                  | Lower maintenance, LLMs read markdown natively, can migrate later      | ✓ Good  |
+| Distill AGENTS.md + PRD.md into structured docs  | Single-source-of-truth docs, retire monolithic files                   | ✓ Good  |
+| Keep README, add links and badges                | README was already good — additive changes only                        | ✓ Good  |
+| GitHub Sponsors over other funding               | Native GitHub integration, low friction                                | ✓ Good  |
+| Badges for social proof                          | npm downloads, CI status, license, coverage, security — 7 badges total | ✓ Good  |
+| llms.txt standard                                | Emerging standard for LLM-friendly project descriptions; 11 entries    | ✓ Good  |
+| release-please over semantic-release             | PR-based review gate before npm publish; manifest config               | ✓ Good  |
+| OIDC trusted publishing over NPM_TOKEN           | No long-lived secrets, provenance attestation included                 | ✓ Good  |
+| ESLint flat config + Prettier                    | Modern config format; Prettier as single formatting authority          | ✓ Good  |
+| Semicolons required (semi: true)                 | Prettier enforces; AGENTS.md updated to match                          | ✓ Good  |
+| CodeQL + OpenSSF Scorecard                       | Security scanning + supply chain trust signal                          | ✓ Good  |
+| Dependabot grouped PRs                           | Production vs dev grouping reduces maintainer noise                    | ✓ Good  |
+| SHA-256 content hash over file size              | Same-size edits correctly invalidate cache; hashContent at call site   | ✓ Good  |
+| Cascade hash chain across rounds                 | Round N key includes prior round hashes; upstream changes propagate    | ✓ Good  |
+| onToken optional in all signatures               | No callback = non-streaming path unchanged; backward compatible        | ✓ Good  |
+| Spinner-driven elapsed updates (80ms)            | onToken callback does NOT trigger re-renders; avoids 100 renders/sec   | ✓ Good  |
+| Separate analysis cache from round cache         | .handover/cache/analysis.json vs rounds/; no coupling                  | ✓ Good  |
+| Changed files fall through on budget exhaust     | Max coverage preserved; changed files not skipped when over budget     | ✓ Good  |
+| BPE model routing by prefix                      | gpt-4-/gpt-3.5- use cl100k_base; all others use o200k_base             | ✓ Good  |
+| Cache pricing multipliers as constants           | CACHE_READ_MULTIPLIER=0.1, CACHE_WRITE_MULTIPLIER=1.25                 | ✓ Good  |
+| Promise.allSettled for parallel rendering        | Error isolation per document; rejected docs don't abort others         | ✓ Good  |
+| Mock at LLMProvider interface, not SDK level     | MSW/nock cannot intercept undici transport used by Anthropic/OpenAI    | ✓ Good  |
+| memfs over mock-fs                               | mock-fs unmaintained, breaks WASM loading; memfs actively maintained   | ✓ Good  |
+| Tests colocated with source (src/\*_/_.test.ts)  | Discoverable, no separate tests/ directory to maintain                 | ✓ Good  |
+| 80% coverage gate after Phase 11 (not Phase 8)   | Gate only meaningful with real test suite; early enforcement fails CI  | ✓ Good  |
+| Coverage exclusions for integration-only modules | factory.ts, logger.ts excluded — unit-testable surface only            | ✓ Good  |
+| vi.hoisted() pattern as test convention          | Clean mock setup, avoids temporal dead zone issues                     | ✓ Good  |
 
 ---
 
-_Last updated: 2026-02-19 after v3.0 milestone started_
+_Last updated: 2026-02-20 after v3.0 milestone_

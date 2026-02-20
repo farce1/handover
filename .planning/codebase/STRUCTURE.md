@@ -35,6 +35,7 @@ handover/
 ## Directory Purposes
 
 **`src/cli/`**
+
 - Purpose: Command-line interface layer
 - Contains: Command handlers for generate, analyze, estimate, init, monorepo
 - Key files:
@@ -46,6 +47,7 @@ handover/
   - `monorepo.ts` - Monorepo detection
 
 **`src/config/`**
+
 - Purpose: Configuration management
 - Contains: Zod schema, loader, defaults
 - Key files:
@@ -54,6 +56,7 @@ handover/
   - `defaults.ts` - Default values for zero-config mode
 
 **`src/orchestrator/`**
+
 - Purpose: DAG-based task scheduling
 - Contains: DAGOrchestrator class, step creation helpers
 - Key files:
@@ -62,6 +65,7 @@ handover/
   - `types.ts` - StepDefinition, StepContext, DAGEvents interfaces
 
 **`src/analyzers/`**
+
 - Purpose: Concurrent static analysis of codebase
 - Contains: 8 independent analyzers, coordinator, reporting
 - Key files:
@@ -81,6 +85,7 @@ handover/
   - `report.ts` - Markdown report formatting
 
 **`src/parsing/`**
+
 - Purpose: Multi-language symbol extraction
 - Contains: ParserService, language-specific extractors, language registry
 - Key files:
@@ -98,6 +103,7 @@ handover/
   - `utils/text-extract.ts` - Source text extraction helpers
 
 **`src/context/`**
+
 - Purpose: Token budget and context packing for AI rounds
 - Contains: File scoring, tiering, budget computation, tracking
 - Key files:
@@ -109,6 +115,7 @@ handover/
   - `tracker.ts` - TokenUsageTracker accumulates per-round tokens and cost
 
 **`src/ai-rounds/`**
+
 - Purpose: 6 sequential AI analysis rounds with validation and fallback
 - Contains: Round factories, execution engine, validation, quality checking
 - Key files:
@@ -125,10 +132,11 @@ handover/
   - `prompts.ts` - Prompt templates for all 6 rounds
   - `validator.ts` - validateRound() checks claims against static data
   - `quality.ts` - checkRoundQuality() metrics computation
-  - `fallbacks.ts` - buildFallback*() functions return static-only data
+  - `fallbacks.ts` - buildFallback\*() functions return static-only data
   - `summary.ts` - Validation summary reporting
 
 **`src/providers/`**
+
 - Purpose: LLM provider abstraction and implementations
 - Contains: Provider interface, API-specific implementations, utilities
 - Key files:
@@ -141,6 +149,7 @@ handover/
   - `schema-utils.ts` - toJsonSchema() for Zod → JSON Schema conversion
 
 **`src/renderers/`**
+
 - Purpose: Convert analysis data to 14 markdown documents
 - Contains: Document registry, 14 render functions, utilities
 - Key files:
@@ -166,6 +175,7 @@ handover/
   - `mermaid.ts` - Diagram generation utilities
 
 **`src/ui/`**
+
 - Purpose: Terminal rendering and progress display
 - Contains: Terminal renderer, CI fallback, components, formatters
 - Key files:
@@ -176,12 +186,14 @@ handover/
   - `types.ts` - DisplayState, Renderer interface, AnalyzerStatus
 
 **`src/cache/`**
+
 - Purpose: Caching of expensive AI round results
 - Contains: Round cache implementation
 - Key files:
   - `round-cache.ts` - RoundCache: Persist/load round results, --no-cache flag support
 
 **`src/domain/`**
+
 - Purpose: Domain types and unified data model
 - Contains: Zod schemas for all entity types, derived TS types
 - Key files:
@@ -190,6 +202,7 @@ handover/
   - `entities.ts` - Entity definitions (if needed)
 
 **`src/utils/`**
+
 - Purpose: Cross-cutting utilities
 - Contains: Logger, error handling, rate limiting
 - Key files:
@@ -198,12 +211,14 @@ handover/
   - `rate-limiter.ts` - RateLimiter for API calls
 
 **`src/grammars/`**
+
 - Purpose: Tree-sitter grammar management
 - Contains: Grammar downloader and manager
 - Key files:
   - `downloader.ts` - Download/cache tree-sitter WASM grammars
 
 **`tests/`**
+
 - Purpose: Test files
 - Contains: Unit and integration tests
 - Pattern: `*.test.ts` or `*.spec.ts` alongside source
@@ -211,64 +226,76 @@ handover/
 ## Key File Locations
 
 **Entry Points:**
+
 - `src/cli/index.ts` - Binary entry point, main CLI router
 
 **Configuration:**
+
 - `.handover.yml` - User configuration (if present)
 - `src/config/schema.ts` - Config schema definition
 - `src/config/loader.ts` - Config loading logic
 - `package.json` - npm dependencies, build scripts
 
 **Core Logic:**
+
 - `src/orchestrator/dag.ts` - DAG orchestrator (PIPE-01)
 - `src/analyzers/coordinator.ts` - Static analysis coordinator
 - `src/ai-rounds/runner.ts` - AI round execution engine
 - `src/renderers/registry.ts` - Document registry
 
 **Parsing:**
+
 - `src/parsing/index.ts` - Public API
 - `src/parsing/language-map.ts` - Language registry
 - `src/parsing/extractors/` - Language implementations
 
 **Output:**
+
 - Handover markdown files written to `./handover/` by default (configurable via `output` in .handover.yml)
 
 ## Naming Conventions
 
 **Files:**
+
 - Source: `kebab-case.ts` (e.g., `file-tree.ts`, `round-1-overview.ts`)
 - Tests: `{name}.test.ts` (e.g., `coordinator.test.ts`)
 - Directories: `kebab-case/` (e.g., `src/analyzers/`, `src/ai-rounds/`)
 
 **Functions:**
+
 - Exported: `camelCase` (e.g., `analyzeFileTree()`, `runGenerate()`)
 - Internal: `camelCase` (e.g., `buildPrompt()`)
 - Factories: `create*` prefix (e.g., `createParserService()`, `createStep()`)
 - Utilities: `*()` (e.g., `scoreFiles()`, `packFiles()`)
 
 **Variables:**
+
 - Constants: `UPPER_SNAKE_CASE` (e.g., `ANALYZER_NAMES`, `ROUND_NAMES`)
 - Regular: `camelCase` (e.g., `staticAnalysis`, `packedContext`)
 - Private class members: `#privateField` or `private field`
 
 **Types:**
+
 - Interfaces: `PascalCase` (e.g., `RenderContext`, `DocumentSpec`)
 - Types: `PascalCase` (e.g., `StepDefinition`, `LLMProvider`)
 - Schema types: `*Schema` suffix (e.g., `HandoverConfigSchema`)
 - Derived types: Use `z.infer<typeof SomeSchema>`
 
 **Classes:**
+
 - `PascalCase` (e.g., `DAGOrchestrator`, `TerminalRenderer`, `TokenUsageTracker`)
 
 ## Where to Add New Code
 
 **New Analyzer (static analysis):**
+
 - Create: `src/analyzers/{name}-analyzer.ts`
 - Implement: Function returning `AnalyzerResult<YourResultType>`
 - Register: Add to ANALYZER_NAMES array in `src/analyzers/coordinator.ts`
 - Schema: Define Zod schema in analyzer file or `src/analyzers/types.ts`
 
 **New AI Round:**
+
 - Create: `src/ai-rounds/round-{N}-{name}.ts`
 - Implement: `createRound{N}Step()` factory function with schema and prompts
 - Register: Import in `src/cli/generate.ts` and add to orchestrator
@@ -277,12 +304,14 @@ handover/
 - Schema: Define in `src/ai-rounds/schemas.ts`
 
 **New Document Renderer:**
+
 - Create: `src/renderers/render-{NN}-{name}.ts`
 - Implement: Function with signature `(ctx: RenderContext) => string`
 - Register: Add DocumentSpec entry to DOCUMENT_REGISTRY in `src/renderers/registry.ts`
 - Include: Front-matter via `renderTemplate()` from `src/renderers/render-template.ts`
 
 **New Language Support:**
+
 - Create: `src/parsing/extractors/{language}.ts`
 - Extend: `LanguageExtractor` base class
 - Implement: `extractFromSource(source: string): ExtractorResult`
@@ -290,12 +319,14 @@ handover/
 - Register in service: Modify factory in `src/parsing/index.ts`
 
 **New Provider:**
+
 - Create: `src/providers/{provider-name}.ts`
 - Implement: `LLMProvider` interface
 - Register: Add case in `factory.ts` createProvider() function
 - Add presets: Entry in PROVIDER_PRESETS in `src/providers/presets.ts`
 
 **Utilities:**
+
 - Shared helpers: `src/utils/{name}.ts`
 - Domain helpers: `src/{domain}/{name}.ts`
 - Layout helpers: `src/renderers/utils.ts`
@@ -303,25 +334,29 @@ handover/
 ## Special Directories
 
 **`dist/`:**
+
 - Purpose: Compiled JavaScript output
 - Generated: By `npm run build` (tsup)
 - Committed: No (in .gitignore)
 
 **`node_modules/`:**
+
 - Purpose: npm dependencies
 - Generated: By `npm install`
 - Committed: No (in .gitignore)
 
 **`.planning/`:**
+
 - Purpose: GSD phase documents and codebase analysis
 - Committed: Yes, tracked in git
 - Contains: Roadmap, phase plans, codebase documentation
 
 **`.claude/`:**
+
 - Purpose: Claude Code session context
 - Generated: By Claude Code IDE
 - Committed: No (in .gitignore)
 
 ---
 
-*Structure analysis: 2026-02-18*
+_Structure analysis: 2026-02-18_

@@ -33,3 +33,22 @@
 - Dead code cleanup and CI renderer document count fix
 
 ---
+
+## v3.0 Robustness (Shipped: 2026-02-20)
+
+**Phases completed:** 4 phases, 10 plans, 20 tasks
+**Tests:** 254 tests across 15 files, 0 failures
+**Coverage:** 92.21% stmts | 82.07% branches | 92.46% funcs | 92.69% lines
+**Timeline:** 4 days (2026-02-16 → 2026-02-20)
+**Git range:** feat(08-01) → feat(11-02)
+
+**Key accomplishments:**
+
+- Fixed CI (TypeScript errors, Zod v4 migration), merged 5 Dependabot PRs, pinned 0.x deps to exact versions
+- OpenSSF Scorecard hardening: all GitHub Actions SHA-pinned, branch protection on main, CODEOWNERS, auto-merge workflow
+- Test infrastructure: createMockProvider() typed factory at LLMProvider interface, memfs, vitest coverage exclusions
+- Code hardening: 11 SCORE\_\* named constants replacing magic numbers, logger.debug() in catch blocks, CLI validation reorder
+- 254 unit tests: 86 pure-function (scorer, token-counter, config, registry) + 78 algorithm (packer, DAG, tracker, provider) + 90 AI round (runner, validator, compressor, retry, renderer, errors)
+- 80% CI coverage gate enforced with WASM/integration-only exclusions scoping the denominator to unit-testable surface area
+
+---
