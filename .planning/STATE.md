@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v3.0 Robustness — Phase 10 in progress (Plans 01 and 02 complete)
+**Current focus:** v3.0 Robustness — Phase 11 in progress (Plan 01 complete)
 
 ## Current Position
 
-Phase: 10 of 11 (Algorithm and Validation Tests — In Progress)
-Plan: 3 of N (Phase 10 Plans 01+02 complete — packer/provider/DAG/TokenUsageTracker unit tests)
+Phase: 11 of 11 (AI Round Tests and Coverage Enforcement — In Progress)
+Plan: 2 of N (Phase 11 Plan 01 complete — executeRound/validator/compressor/rate-limiter unit tests)
 Status: In progress
-Last activity: 2026-02-20 — Phase 10 Plan 01 complete (33 unit tests: 25 packFiles/generateSignatureSummary + 8 validateProviderConfig)
+Last activity: 2026-02-20 — Phase 11 Plan 01 complete (42 unit tests: executeRound/validator/compressor/retryWithBackoff)
 
-Progress: [████████████░░░░░░░░] 64% (14/18 plans complete across all milestones)
+Progress: [█████████████░░░░░░░] 67% (15/18 plans complete across all milestones)
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [████████████░░░░░░░░] 64% (14
 | Phase 09-pure-function-tests P03 | 5 min    | 2 tasks | 3 files  |
 | Phase 10-algorithm-tests P01     | 6 min    | 2 tasks | 2 files  |
 | Phase 10-algorithm-tests P02     | 3 min    | 2 tasks | 2 files  |
+| Phase 11-ai-round-tests P01      | 6 min    | 2 tasks | 4 files  |
 
 ## Accumulated Context
 
@@ -90,6 +91,10 @@ All v1.0 and v2.0 decisions archived in PROJECT.md Key Decisions table.
 - [Phase 10-02]: New DAGOrchestrator instance per test — stateful steps Map would pollute tests if reused
 - [Phase 10-02]: Diamond/fan-out parallel ordering not asserted — JS Promise resolution is non-deterministic
 - [Phase 10-02]: Large budgetTokens in cost tests suppress logger.warn stdout noise (acceptable)
+- [Phase 11-01]: retryWithBackoff always throws ProviderError at end (source wraps non-ProviderError exits via ProviderError.rateLimited())
+- [Phase 11-01]: All-retries-exhausted test uses .catch() pattern to avoid unhandled rejection warning from fake-timer advancement racing
+- [Phase 11-01]: Happy path mock data must be rich (500+ chars, 3+ code refs, file paths) to pass Round 1 quality thresholds
+- [Phase 11-01]: Token budget enforcement test uses budget=80 (not 30) to allow min-1-finding rule while still forcing heavy truncation
 
 ### Pending Todos
 
@@ -111,5 +116,5 @@ External setup still required from v1.0:
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 10-01-PLAN.md (packFiles, generateSignatureSummary, validateProviderConfig unit tests — 33 tests, 164 total)
-Resume file: .planning/phases/10-algorithm-and-validation-tests/ (next plan in Phase 10)
+Stopped at: Completed 11-01-PLAN.md (executeRound/validator/compressor/retryWithBackoff unit tests — 42 tests)
+Resume file: .planning/phases/11-ai-round-tests-and-coverage-enforcement/ (next plan in Phase 11)
