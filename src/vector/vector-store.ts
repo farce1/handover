@@ -11,6 +11,16 @@ import { dirname } from 'node:path';
 import type { VectorStoreConfig, DocumentChunk, DocumentFingerprint } from './types.js';
 import { initSchema, validateEmbeddingDimensions } from './schema.js';
 
+export interface VectorSearchResult {
+  sourceFile: string;
+  sectionPath: string;
+  docType: string;
+  chunkIndex: number;
+  contentPreview: string;
+  content: string;
+  distance: number;
+}
+
 /**
  * VectorStore wraps SQLite + sqlite-vec for vector storage and retrieval.
  *
@@ -249,5 +259,69 @@ export class VectorStore {
       count: number;
     };
     return result.count;
+  }
+
+  /**
+   * Search document chunks by vector similarity.
+   * Returns deterministic top-k results ordered by distance then source position.
+   */
+  search(
+    queryEmbedding: number[],
+    options: {
+      topK: number;
+      docTypes?: string[];
+    },
+  ): VectorSearchResult[] {
+    if (!this.db) {
+      throw new Error('Database not open. Call open() first.');
+    }
+
+    if (!Number.isInteger(options.topK) || options.topK <= 0) {
+      throw new Error(`topK must be a positive integer. Received: ${options.topK}`);
+    }
+
+    const docTypes = (options.docTypes ?? []).map((docType) => docType.toLowerCase());
+    const whereClauses = ['embedding MATCH ?', 'k = ?'];
+    const params: Array<string | number> = [JSON.stringify(queryEmbedding), options.topK];
+
+    if (docTypes.length > 0) {
+      const placeholders = docTypes.map(() => '?').join(', ');
+      whereClauses.push(`doc_type IN (${placeholders})`);
+      params.push(...docTypes);
+    }
+
+    const rows = this.db
+      .prepare(
+        `SELECT
+           source_file,
+           section_path,
+           doc_type,
+           chunk_index,
+           content_preview,
+           content,
+           distance
+         FROM vec_chunks
+         WHERE ${whereClauses.join(' AND ')}
+         ORDER BY distance ASC, source_file ASC, chunk_index ASC`,
+      )
+      .all(...params) as Array<{
+      source_file: string;
+      section_path: string;
+      doc_type: string;
+      chunk_index: number;
+      content_preview: string;
+      content: string;
+      distance: number;
+    }>;
+
+    return rows.map((row) => ({
+      sourceFile: row.source_file,
+      sectionPath: row.section_path,
+      docType: row.doc_type,
+      chunkIndex: row.chunk_index,
+      contentPreview: row.content_preview,
+      content: row.content,
+      distance: row.distance,
+    }));
   }
 }
