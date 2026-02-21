@@ -81,6 +81,6 @@ v4.0 critical pitfalls to address:
 
 ## Session Continuity
 
-Last session: 2026-02-20
-Stopped at: v4.0 roadmap creation complete
-Resume file: None
+Last session: 2026-02-21
+Stopped at: Phase 12 context gathered
+Resume file: .planning/phases/12-vector-storage-foundation/12-CONTEXT.md
