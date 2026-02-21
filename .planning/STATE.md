@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 12 of 15 (Vector Storage Foundation)
-Plan: 2 of 3 (next: 12-02)
+Plan: 3 of 3 (next: 12-03)
 Status: Executing Phase 12 plans
-Last activity: 2026-02-21 — completed 12-01 (Vector Storage Foundation)
+Last activity: 2026-02-21 — completed 12-02 (Markdown-aware Document Chunker)
 
-Progress: [█████████████████░░░] 76% (28/37 total plans across all milestones)
+Progress: [█████████████████░░░] 78% (29/37 total plans across all milestones)
 
 ## Performance Metrics
 
@@ -41,13 +41,14 @@ Progress: [█████████████████░░░] 76% (28
 
 **v4.0 Velocity:**
 
-| Phase | Plan | Name                      | Duration | Date       |
-| ----- | ---- | ------------------------- | -------- | ---------- |
-| 12    | 01   | Vector Storage Foundation | 5 min    | 2026-02-21 |
+| Phase | Plan | Name                            | Duration | Date       |
+| ----- | ---- | ------------------------------- | -------- | ---------- |
+| 12    | 01   | Vector Storage Foundation       | 5 min    | 2026-02-21 |
+| 12    | 02   | Markdown-aware Document Chunker | 6 min    | 2026-02-21 |
 
-- Total plans completed: 1
-- Average duration: ~5 min/plan
-- Total execution time: ~5 min
+- Total plans completed: 2
+- Average duration: ~5.5 min/plan
+- Total execution time: ~11 min
 - Timeline: Started 2026-02-21
 
 ## Accumulated Context
@@ -70,6 +71,12 @@ v4.0 implementation decisions (12-01):
 - Embedding metadata in schema_metadata table (enables startup dimension validation)
 - JSON embedding serialization (sqlite-vec native format, easier debugging)
 - Full content in auxiliary columns (enables text retrieval from search results)
+
+v4.0 implementation decisions (12-02):
+
+- Sliding window approach over recursive splitting (predictable chunk sizes with natural boundaries)
+- Pure TypeScript chunker (avoided LangChain dependency - saved ~5MB for ~200 lines)
+- Created types.ts as blocking fix (plan 12-02 executed before 12-01 completion)
 
 ### Pending Todos
 
@@ -95,5 +102,5 @@ v4.0 critical pitfalls to address:
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 12-01-PLAN.md (Vector Storage Foundation)
-Resume file: .planning/phases/12-vector-storage-foundation/12-01-SUMMARY.md
+Stopped at: Completed 12-02-PLAN.md (Markdown-aware Document Chunker)
+Resume file: .planning/phases/12-vector-storage-foundation/12-02-SUMMARY.md
