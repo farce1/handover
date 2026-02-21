@@ -39,6 +39,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "0.76.0",
     "@clack/prompts": "^1.0.1",
+    "better-sqlite3": "^12.6.2",
     "commander": "^14.0.3",
     "fast-glob": "^3.3.3",
     "gpt-tokenizer": "^3.4.0",
@@ -48,6 +49,7 @@
     "simple-git": "^3.31.1",
     "sisteransi": "^1.0.5",
     "smol-toml": "^1.6.0",
+    "sqlite-vec": "^0.1.7-alpha.2",
     "web-tree-sitter": "0.26.5",
     "yaml": "^2.7.0",
     "zod": "^4.3.6",
@@ -56,6 +58,7 @@
   "devDependencies": {
     "@commitlint/cli": "^20.4.1",
     "@commitlint/config-conventional": "^20.4.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.2.3",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.0",
