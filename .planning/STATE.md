@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 12 of 15 (Vector Storage Foundation)
-Plan: Ready to plan Phase 12
-Status: Roadmap complete, ready to plan Phase 12
-Last activity: 2026-02-20 — v4.0 roadmap created with 4 phases
+Plan: 2 of 3 (next: 12-02)
+Status: Executing Phase 12 plans
+Last activity: 2026-02-21 — completed 12-01 (Vector Storage Foundation)
 
-Progress: [████████████████░░░░] 73% (27/37 total plans across all milestones)
+Progress: [█████████████████░░░] 76% (28/37 total plans across all milestones)
 
 ## Performance Metrics
 
@@ -41,8 +41,14 @@ Progress: [████████████████░░░░] 73% (27
 
 **v4.0 Velocity:**
 
-- Total plans completed: 0
-- Status: Ready to plan Phase 12
+| Phase | Plan | Name                      | Duration | Date       |
+| ----- | ---- | ------------------------- | -------- | ---------- |
+| 12    | 01   | Vector Storage Foundation | 5 min    | 2026-02-21 |
+
+- Total plans completed: 1
+- Average duration: ~5 min/plan
+- Total execution time: ~5 min
+- Timeline: Started 2026-02-21
 
 ## Accumulated Context
 
@@ -57,6 +63,13 @@ v4.0 architectural approach:
 - Embedding provider extends BaseProvider (consistent retry/rate-limit patterns)
 - SQLite + sqlite-vec for vector storage (zero-config, runs in-process)
 - Phase ordering: Storage → Search → MCP → Advanced (validates quality at each step)
+
+v4.0 implementation decisions (12-01):
+
+- better-sqlite3 over async drivers (synchronous API ideal for CLI tools)
+- Embedding metadata in schema_metadata table (enables startup dimension validation)
+- JSON embedding serialization (sqlite-vec native format, easier debugging)
+- Full content in auxiliary columns (enables text retrieval from search results)
 
 ### Pending Todos
 
@@ -82,5 +95,5 @@ v4.0 critical pitfalls to address:
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Phase 12 context gathered
-Resume file: .planning/phases/12-vector-storage-foundation/12-CONTEXT.md
+Stopped at: Completed 12-01-PLAN.md (Vector Storage Foundation)
+Resume file: .planning/phases/12-vector-storage-foundation/12-01-SUMMARY.md
