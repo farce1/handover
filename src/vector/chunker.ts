@@ -8,12 +8,7 @@
  * - Section context via metadata
  */
 
-import type {
-  DocumentChunk,
-  TextChunk,
-  ChunkOptions,
-  ChunkMetadata,
-} from './types.js';
+import type { DocumentChunk, TextChunk, ChunkOptions, ChunkMetadata } from './types.js';
 
 /** Default chunk size in tokens */
 const DEFAULT_CHUNK_SIZE = 512;
@@ -108,50 +103,9 @@ function buildSectionPath(headers: HeaderStack): string {
 }
 
 /**
- * Check if a text block is a code block
- */
-function isCodeBlock(text: string): boolean {
-  return text.trim().startsWith('```') && text.trim().endsWith('```');
-}
-
-/**
- * Check if a text block is a table
- */
-function isTable(text: string): boolean {
-  const lines = text.trim().split('\n');
-  return lines.length > 1 && lines.every((line) => line.trim().startsWith('|'));
-}
-
-/**
- * Split text by separator, respecting boundaries
- */
-function splitBySeparator(
-  text: string,
-  separator: string
-): string[] {
-  if (!separator) return [text];
-  const parts = text.split(separator);
-  const result: string[] = [];
-
-  for (let i = 0; i < parts.length; i++) {
-    if (i === 0) {
-      result.push(parts[i]);
-    } else {
-      result.push(separator + parts[i]);
-    }
-  }
-
-  return result.filter((p) => p.trim().length > 0);
-}
-
-/**
  * Split a large section into smaller chunks with overlap
  */
-function splitSection(
-  section: Section,
-  chunkSize: number,
-  chunkOverlap: number
-): TextChunk[] {
+function splitSection(section: Section, chunkSize: number, chunkOverlap: number): TextChunk[] {
   const content = section.content.trim();
   const tokens = estimateTokens(content);
 
@@ -236,10 +190,7 @@ function splitSection(
 /**
  * Chunk markdown into text chunks with metadata
  */
-export function chunkMarkdown(
-  markdown: string,
-  options?: ChunkOptions
-): TextChunk[] {
+export function chunkMarkdown(markdown: string, options?: ChunkOptions): TextChunk[] {
   if (!markdown || markdown.trim().length === 0) {
     return [];
   }
@@ -284,7 +235,7 @@ export function chunkDocument(
     sourceFile: string;
     docId: string;
     docType: string;
-  }
+  },
 ): DocumentChunk[] {
   const textChunks = chunkMarkdown(content);
 
