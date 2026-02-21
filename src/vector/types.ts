@@ -1,132 +1,148 @@
 /**
- * Type definitions for the vector storage subsystem.
+ * Vector storage type definitions
  *
- * This module defines all interfaces for document chunking, embedding storage,
- * and vector database configuration used throughout Phase 12-15 (v4.0).
+ * Defines interfaces for document chunks, embeddings, and vector storage configuration.
  */
 
 /**
- * Metadata about a document chunk's origin and context.
- * Used for filtering search results and displaying provenance.
+ * Metadata for a document chunk
  */
 export interface ChunkMetadata {
-  /** Absolute path to the source file */
+  /** Source file path */
   sourceFile: string;
-  /** Unique document identifier (typically content hash) */
+  /** Unique document identifier */
   docId: string;
-  /** Document type (e.g., 'typescript', 'markdown', 'python') */
+  /** Document type (e.g., 'architecture', 'readme') */
   docType: string;
-  /** Section path in the document (e.g., 'MyClass.myMethod') */
+  /** Section path (e.g., 'Introduction > Overview') */
   sectionPath: string;
-  /** Index of this chunk within the document (0-based) */
+  /** Zero-based chunk index within the document */
   chunkIndex: number;
-  /** H1 heading context (if inside a markdown heading) */
+  /** Top-level header text */
   h1?: string;
-  /** H2 heading context (if inside a markdown heading) */
+  /** Second-level header text */
   h2?: string;
-  /** H3 heading context (if inside a markdown heading) */
+  /** Third-level header text */
   h3?: string;
-  /** Number of tokens in this chunk */
+  /** Estimated token count for this chunk */
   tokenCount: number;
-  /** First 200 characters of content for preview */
+  /** First 200 characters of chunk content */
   contentPreview: string;
 }
 
 /**
- * A document chunk before embedding.
- * Created by the chunker, passed to the embedder.
+ * A document chunk with content and metadata
  */
 export interface DocumentChunk {
-  /** The actual text content to embed */
+  /** The actual text content of the chunk */
   content: string;
-  /** Metadata about the chunk's origin */
+  /** Metadata about the chunk */
   metadata: ChunkMetadata;
 }
 
 /**
- * A stored chunk retrieved from the vector database.
- * Extends DocumentChunk with database-specific fields.
+ * A text chunk with minimal metadata (used by chunkMarkdown)
+ */
+export interface TextChunk {
+  /** The actual text content of the chunk */
+  content: string;
+  /** Minimal metadata for text chunks */
+  metadata: {
+    /** Top-level header text */
+    h1?: string;
+    /** Second-level header text */
+    h2?: string;
+    /** Third-level header text */
+    h3?: string;
+    /** Section path (e.g., 'Introduction > Overview') */
+    sectionPath: string;
+  };
+}
+
+/**
+ * Options for chunking configuration
+ */
+export interface ChunkOptions {
+  /** Maximum size of each chunk in tokens (default: 512) */
+  chunkSize?: number;
+  /** Overlap between consecutive chunks in tokens (default: 75) */
+  chunkOverlap?: number;
+}
+
+/**
+ * A stored chunk with embedding and database ID
  */
 export interface StoredChunk extends DocumentChunk {
-  /** SQLite rowid from vec_chunks table */
+  /** Database row ID */
   rowid: number;
-  /** Embedding vector (stored as Float32Array for efficiency) */
+  /** Embedding vector */
   embedding: Float32Array;
 }
 
 /**
- * Result from an embedding API call.
- * Returned by EmbeddingProvider.embed().
+ * Result from embedding API call
  */
 export interface EmbeddingResult {
-  /** Array of embedding vectors (one per input chunk) */
+  /** Array of embedding vectors */
   embeddings: number[][];
-  /** Model used to generate embeddings (e.g., 'text-embedding-3-small') */
+  /** Model used for embeddings */
   model: string;
-  /** Dimensionality of each embedding vector */
+  /** Embedding dimension count */
   dimensions: number;
   /** Token usage statistics */
   usage: {
-    /** Total tokens consumed by the embedding request */
+    /** Total tokens used */
     totalTokens: number;
   };
 }
 
 /**
- * Configuration for the VectorStore.
- * Passed to VectorStore constructor.
+ * Vector store configuration
  */
 export interface VectorStoreConfig {
-  /** Absolute path to the SQLite database file */
+  /** Path to SQLite database file */
   dbPath: string;
-  /** Embedding model name (used for dimension validation) */
+  /** Embedding model name */
   embeddingModel: string;
-  /** Expected embedding vector dimensions */
+  /** Embedding vector dimensions */
   embeddingDimensions: number;
 }
 
 /**
- * Document fingerprint tracking.
- * Stored in document_metadata table for incremental indexing.
+ * Document fingerprint for incremental indexing
  */
 export interface DocumentFingerprint {
   /** Unique document identifier */
   docId: string;
   /** Content hash fingerprint */
   fingerprint: string;
-  /** ISO 8601 timestamp when indexed */
+  /** ISO timestamp of indexing */
   indexedAt: string;
-  /** Number of chunks created for this document */
+  /** Number of chunks for this document */
   chunkCount: number;
 }
 
 /**
- * Schema metadata stored in the vector database.
- * Used to validate embedding model compatibility on startup.
+ * Schema metadata stored in database
  */
 export interface SchemaMetadata {
-  /** Database schema version (for future migrations) */
+  /** Schema version number */
   schemaVersion: number;
-  /** Embedding model used to create this database */
+  /** Embedding model name */
   embeddingModel: string;
   /** Embedding vector dimensions */
   embeddingDimensions: number;
-  /** ISO 8601 timestamp when schema was created */
+  /** ISO timestamp of database creation */
   createdAt: string;
 }
 
-/** Current database schema version */
+// Constants
 export const SCHEMA_VERSION = 1;
-
-/** Default embedding model for new installations */
 export const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
-
-/** Default embedding dimensions for text-embedding-3-small */
 export const DEFAULT_EMBEDDING_DIMENSIONS = 1536;
 
 /**
- * Known embedding models and their dimensions.
- * Used for dimension validation and auto-configuration.
+ * Mapping of embedding models to their dimension counts
  */
 export const EMBEDDING_MODELS: Record<string, number> = {
   'text-embedding-3-small': 1536,
