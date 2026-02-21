@@ -40,7 +40,7 @@ export class VectorStore {
     const dbDir = dirname(this.config.dbPath);
     try {
       mkdirSync(dbDir, { recursive: true });
-    } catch (err) {
+    } catch {
       // Directory might already exist - ignore error
     }
 

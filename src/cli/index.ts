@@ -47,6 +47,16 @@ program
     await runEstimate(opts);
   });
 
+program
+  .command('reindex')
+  .description('Build or update vector search index from generated documentation')
+  .option('--force', 'Re-embed all documents (ignore change detection)')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (opts) => {
+    const { runReindex } = await import('./reindex.js');
+    await runReindex(opts);
+  });
+
 // Default action: run generate when no command specified
 program
   .option('--provider <provider>', 'LLM provider override')
