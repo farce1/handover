@@ -44,7 +44,7 @@
 
 This roadmap transforms handover from a documentation generator into a queryable knowledge base accessible via Model Context Protocol. Four phases deliver: (1) vector storage foundation with embeddings and SQLite, (2) CLI-based semantic search for quality validation, (3) MCP server exposing docs and search via stdio transport, and (4) LLM-powered Q&A with RAG synthesis plus workflow prompts.
 
-- [ ] **Phase 12: Vector Storage Foundation** - Embeddings, chunking, SQLite vector storage, incremental indexing
+- [x] **Phase 12: Vector Storage Foundation** - Embeddings, chunking, SQLite vector storage, incremental indexing (completed 2026-02-21)
 - [ ] **Phase 13: Query Engine + CLI Search** - Semantic search engine, CLI search command, relevance ranking
 - [ ] **Phase 14: MCP Server (Tools + Resources)** - MCP stdio server, semantic_search tool, document resources, client config docs
 - [ ] **Phase 15: LLM Q&A + Advanced Features** - RAG-powered Q&A, workflow prompts, hybrid search, reindex command
@@ -62,7 +62,7 @@ This roadmap transforms handover from a documentation generator into a queryable
 4. User's code blocks, tables, and markdown headers remain intact in chunked text (no mid-block splits)
 5. User switches embedding models and receives validation error on startup with clear remediation steps
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 
@@ -142,7 +142,7 @@ Plans:
 | 9. Code Hardening and Pure Tests   | v3.0      | 3/3            | Complete    | 2026-02-19 |
 | 10. Algorithm and Validation Tests | v3.0      | 2/2            | Complete    | 2026-02-19 |
 | 11. AI Round Tests and Coverage    | v3.0      | 2/2            | Complete    | 2026-02-20 |
-| 12. Vector Storage Foundation      | v4.0      | 0/3            | Planned     | -          |
+| 12. Vector Storage Foundation      | v4.0      | Complete       | 2026-02-21  | -          |
 | 13. Query Engine + CLI Search      | v4.0      | 0/TBD          | Not started | -          |
 | 14. MCP Server (Tools + Resources) | v4.0      | 0/TBD          | Not started | -          |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 0/TBD          | Not started | -          |
