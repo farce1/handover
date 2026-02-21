@@ -49,6 +49,14 @@ export const HandoverConfigSchema = z.object({
     })
     .default({ pin: [], boost: [] }),
   costWarningThreshold: z.number().positive().optional(),
+  embedding: z
+    .object({
+      provider: z.enum(['openai']).default('openai'),
+      model: z.string().default('text-embedding-3-small'),
+      apiKeyEnv: z.string().optional(),
+      batchSize: z.number().int().positive().default(100),
+    })
+    .optional(),
 });
 
 export type HandoverConfig = z.infer<typeof HandoverConfigSchema>;
