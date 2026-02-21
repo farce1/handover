@@ -81,12 +81,13 @@ Plans:
 2. User sees source filename, section header, and relevance score for each search result
 3. User filters results with `--type architecture` or `--type api` to narrow search scope
 4. User searches with generic query and sees results from multiple document types ranked by relevance
-   **Plans**: TBD
+
+**Plans:** 1/2 plans executed
 
 Plans:
 
-- [ ] 13-01: TBD
-- [ ] 13-02: TBD
+- [ ] 13-01-PLAN.md — Query engine retrieval, deterministic ranking, and strict type filtering
+- [ ] 13-02-PLAN.md — CLI search command, result rendering, and option wiring
 
 #### Phase 14: MCP Server (Tools + Resources)
 
@@ -143,6 +144,6 @@ Plans:
 | 10. Algorithm and Validation Tests | v3.0      | 2/2            | Complete    | 2026-02-19 |
 | 11. AI Round Tests and Coverage    | v3.0      | 2/2            | Complete    | 2026-02-20 |
 | 12. Vector Storage Foundation      | v4.0      | Complete       | 2026-02-21  | -          |
-| 13. Query Engine + CLI Search      | v4.0      | 0/TBD          | Not started | -          |
+| 13. Query Engine + CLI Search      | 1/2 | In Progress|  | -          |
 | 14. MCP Server (Tools + Resources) | v4.0      | 0/TBD          | Not started | -          |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 0/TBD          | Not started | -          |
