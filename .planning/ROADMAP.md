@@ -61,12 +61,14 @@ This roadmap transforms handover from a documentation generator into a queryable
 3. User regenerates docs with unchanged files and sees "Skipped N unchanged documents" via content-hash detection
 4. User's code blocks, tables, and markdown headers remain intact in chunked text (no mid-block splits)
 5. User switches embedding models and receives validation error on startup with clear remediation steps
-   **Plans**: TBD
+
+**Plans:** 3 plans
 
 Plans:
 
-- [ ] 12-01: TBD
-- [ ] 12-02: TBD
+- [ ] 12-01-PLAN.md — Config schema, vector types, SQLite schema, VectorStore class
+- [ ] 12-02-PLAN.md — Markdown-aware document chunker (TDD)
+- [ ] 12-03-PLAN.md — Embedding provider, reindex orchestrator, CLI command, progress bar
 
 #### Phase 13: Query Engine + CLI Search
 
@@ -140,7 +142,7 @@ Plans:
 | 9. Code Hardening and Pure Tests   | v3.0      | 3/3            | Complete    | 2026-02-19 |
 | 10. Algorithm and Validation Tests | v3.0      | 2/2            | Complete    | 2026-02-19 |
 | 11. AI Round Tests and Coverage    | v3.0      | 2/2            | Complete    | 2026-02-20 |
-| 12. Vector Storage Foundation      | v4.0      | 0/TBD          | Not started | -          |
+| 12. Vector Storage Foundation      | v4.0      | 0/3            | Planned     | -          |
 | 13. Query Engine + CLI Search      | v4.0      | 0/TBD          | Not started | -          |
 | 14. MCP Server (Tools + Resources) | v4.0      | 0/TBD          | Not started | -          |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 0/TBD          | Not started | -          |
