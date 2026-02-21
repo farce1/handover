@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 12 of 15 (Vector Storage Foundation)
-Plan: 3 of 3 (next: 12-03)
-Status: Executing Phase 12 plans
-Last activity: 2026-02-21 — completed 12-02 (Markdown-aware Document Chunker)
+Plan: 3 of 3 (completed)
+Status: Phase 12 complete
+Last activity: 2026-02-21 — completed 12-03 (Reindex Pipeline)
 
-Progress: [█████████████████░░░] 78% (29/37 total plans across all milestones)
+Progress: [██████████████████░░] 81% (30/37 total plans across all milestones)
 
 ## Performance Metrics
 
@@ -45,10 +45,11 @@ Progress: [█████████████████░░░] 78% (29
 | ----- | ---- | ------------------------------- | -------- | ---------- |
 | 12    | 01   | Vector Storage Foundation       | 5 min    | 2026-02-21 |
 | 12    | 02   | Markdown-aware Document Chunker | 6 min    | 2026-02-21 |
+| 12    | 03   | Reindex Pipeline                | 4 min    | 2026-02-21 |
 
-- Total plans completed: 2
-- Average duration: ~5.5 min/plan
-- Total execution time: ~11 min
+- Total plans completed: 3
+- Average duration: ~5 min/plan
+- Total execution time: ~15 min
 - Timeline: Started 2026-02-21
 
 ## Accumulated Context
@@ -61,7 +62,7 @@ v4.0 architectural approach:
 
 - MCP server as separate entry point (clean separation from core DAG orchestrator)
 - Incremental indexing with content-hash (reuse existing AnalysisCache pattern)
-- Embedding provider extends BaseProvider (consistent retry/rate-limit patterns)
+- Embedding provider as standalone class (not extending BaseProvider - different use case)
 - SQLite + sqlite-vec for vector storage (zero-config, runs in-process)
 - Phase ordering: Storage → Search → MCP → Advanced (validates quality at each step)
 
@@ -78,6 +79,12 @@ v4.0 implementation decisions (12-02):
 - Pure TypeScript chunker (avoided LangChain dependency - saved ~5MB for ~200 lines)
 - Created types.ts as blocking fix (plan 12-02 executed before 12-01 completion)
 
+v4.0 implementation decisions (12-03):
+
+- Embedding provider standalone (BaseProvider is for LLM completions, not embeddings)
+- SHA-256 content hashing for fingerprints (consistent with AnalysisCache pattern)
+- Progress bar to stderr (critical for MCP stdout cleanliness)
+
 ### Pending Todos
 
 None.
@@ -91,16 +98,16 @@ External setup still required from v1.0:
 - RELEASE_PLEASE_TOKEN (GitHub fine-grained PAT) as repo secret
 - CODECOV_TOKEN as repo secret
 
-v4.0 critical pitfalls to address:
+v4.0 critical pitfalls:
 
-- Phase 12: stdout corruption in MCP servers (enforce stderr logging)
-- Phase 12: embedding dimension validation (store in schema, verify on startup)
-- Phase 12: markdown-aware chunking (preserve code blocks, tables, headers)
+- ✅ Phase 12: stdout corruption in MCP servers (enforced stderr logging throughout)
+- ✅ Phase 12: embedding dimension validation (stored in schema, verified on startup)
+- ✅ Phase 12: markdown-aware chunking (preserves code blocks, tables, headers)
 - Phase 13: top-k over global threshold (portable across queries)
 - Phase 14: MCP resource pagination (never unbounded resource lists)
 
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 12-02-PLAN.md (Markdown-aware Document Chunker)
-Resume file: .planning/phases/12-vector-storage-foundation/12-02-SUMMARY.md
+Stopped at: Completed 12-03-PLAN.md (Reindex Pipeline) - Phase 12 complete
+Resume file: .planning/phases/12-vector-storage-foundation/12-03-SUMMARY.md
