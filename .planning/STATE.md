@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 13 of 15 (Query Engine + CLI Search)
-Plan: 1 of 2 (completed)
-Status: Phase 13 in progress
-Last activity: 2026-02-21 — completed 13-01 (Query Engine Retrieval)
+Plan: 2 of 2 (completed)
+Status: Phase 13 complete
+Last activity: 2026-02-22 — completed 13-02 (CLI Search Command)
 
-Progress: [███████████████████░] 84% (31/37 total plans across all milestones)
+Progress: [███████████████████░] 86% (32/37 total plans across all milestones)
 
 ## Performance Metrics
 
@@ -47,10 +47,11 @@ Progress: [███████████████████░] 84% (31
 | 12    | 02   | Markdown-aware Document Chunker | 6 min    | 2026-02-21 |
 | 12    | 03   | Reindex Pipeline                | 4 min    | 2026-02-21 |
 | 13    | 01   | Query Engine Retrieval          | 1 min    | 2026-02-21 |
+| 13    | 02   | CLI Search Command              | 1 min    | 2026-02-22 |
 
-- Total plans completed: 4
-- Average duration: ~4 min/plan
-- Total execution time: ~16 min
+- Total plans completed: 5
+- Average duration: ~3.4 min/plan
+- Total execution time: ~17 min
 - Timeline: Started 2026-02-21
 
 ## Accumulated Context
@@ -88,6 +89,9 @@ v4.0 implementation decisions (12-03):
 - [Phase 13]: Use SQL distance/source_file/chunk_index ordering for deterministic search ties
 - [Phase 13]: Validate --type values against a fixed lowercase allowlist with suggestions
 - [Phase 13]: Preflight missing/empty search index and instruct users to run handover reindex
+- [Phase 13]: Use process.stdout.isTTY gating so search output uses subtle emphasis in TTY and plain fallback otherwise
+- [Phase 13]: Keep search result output ordered as rank, relevance, source, section, snippet for deterministic scanning
+- [Phase 13]: Include repeated --type examples in search help text to reinforce strict filter semantics
 
 ### Pending Todos
 
@@ -112,6 +116,6 @@ v4.0 critical pitfalls:
 
 ## Session Continuity
 
-Last session: 2026-02-21
-Stopped at: Completed 13-01-PLAN.md
-Resume file: .planning/phases/13-query-engine-cli-search/13-02-PLAN.md
+Last session: 2026-02-22
+Stopped at: Completed 13-02-PLAN.md
+Resume file: None

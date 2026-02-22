@@ -18,10 +18,10 @@ Requirements for MCP server and semantic search milestone. Each maps to roadmap 
 
 ### Search
 
-- [ ] **SRCH-01**: User can search generated docs with `handover search "query"` CLI command
+- [x] **SRCH-01**: User can search generated docs with `handover search "query"` CLI command
 - [x] **SRCH-02**: User receives top-k most relevant document chunks ranked by cosine similarity
 - [x] **SRCH-03**: User can filter search results by document type or metadata
-- [ ] **SRCH-04**: User sees source file, section, and relevance score for each search result
+- [x] **SRCH-04**: User sees source file, section, and relevance score for each search result
 
 ### MCP Server
 
@@ -74,10 +74,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STORE-04    | Phase 12 | Pending |
 | STORE-05    | Phase 12 | Pending |
 | STORE-06    | Phase 12 | Pending |
-| SRCH-01     | Phase 13 | Pending |
+| SRCH-01     | Phase 13 | Complete |
 | SRCH-02     | Phase 13 | Complete |
 | SRCH-03     | Phase 13 | Complete |
-| SRCH-04     | Phase 13 | Pending |
+| SRCH-04     | Phase 13 | Complete |
 | MCP-01      | Phase 14 | Pending |
 | MCP-02      | Phase 14 | Pending |
 | MCP-03      | Phase 14 | Pending |

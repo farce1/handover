@@ -45,7 +45,7 @@
 This roadmap transforms handover from a documentation generator into a queryable knowledge base accessible via Model Context Protocol. Four phases deliver: (1) vector storage foundation with embeddings and SQLite, (2) CLI-based semantic search for quality validation, (3) MCP server exposing docs and search via stdio transport, and (4) LLM-powered Q&A with RAG synthesis plus workflow prompts.
 
 - [x] **Phase 12: Vector Storage Foundation** - Embeddings, chunking, SQLite vector storage, incremental indexing (completed 2026-02-21)
-- [ ] **Phase 13: Query Engine + CLI Search** - Semantic search engine, CLI search command, relevance ranking
+- [x] **Phase 13: Query Engine + CLI Search** - Semantic search engine, CLI search command, relevance ranking (completed 2026-02-22)
 - [ ] **Phase 14: MCP Server (Tools + Resources)** - MCP stdio server, semantic_search tool, document resources, client config docs
 - [ ] **Phase 15: LLM Q&A + Advanced Features** - RAG-powered Q&A, workflow prompts, hybrid search, reindex command
 
@@ -82,7 +82,7 @@ Plans:
 3. User filters results with `--type architecture` or `--type api` to narrow search scope
 4. User searches with generic query and sees results from multiple document types ranked by relevance
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 
@@ -144,6 +144,6 @@ Plans:
 | 10. Algorithm and Validation Tests | v3.0      | 2/2            | Complete    | 2026-02-19 |
 | 11. AI Round Tests and Coverage    | v3.0      | 2/2            | Complete    | 2026-02-20 |
 | 12. Vector Storage Foundation      | v4.0      | Complete       | 2026-02-21  | -          |
-| 13. Query Engine + CLI Search      | 1/2 | In Progress|  | -          |
+| 13. Query Engine + CLI Search      | 2/2 | Complete   | 2026-02-22 | -          |
 | 14. MCP Server (Tools + Resources) | v4.0      | 0/TBD          | Not started | -          |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 0/TBD          | Not started | -          |
