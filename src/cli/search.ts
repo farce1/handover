@@ -1,6 +1,6 @@
 import pc from 'picocolors';
 import { loadConfig } from '../config/loader.js';
-import { answerQuestion } from '../qa/answerer.js';
+import { answerQuestion, formatCitationFootnotes } from '../qa/answerer.js';
 import { ConfigError, HandoverError, ProviderError, handleCliError } from '../utils/errors.js';
 import { searchDocuments } from '../vector/query-engine.js';
 
@@ -53,7 +53,9 @@ function toQaModeError(err: unknown): unknown {
 
   if (
     err instanceof HandoverError &&
-    (err.code?.startsWith('PROVIDER_') === true || err.code?.startsWith('CONFIG_') === true)
+    (err.code?.startsWith('PROVIDER_') === true ||
+      err.code?.startsWith('CONFIG_') === true ||
+      err.code?.startsWith('EMBEDDING_') === true)
   ) {
     return new HandoverError(
       'QA mode is unavailable with the current provider setup',
@@ -154,9 +156,7 @@ async function runQaMode(
       }
       if (result.citations.length > 0) {
         console.log();
-        const footnotes = result.citations.map((citation, index) => {
-          return `[${index + 1}] ${citation.sourceFile} :: ${citation.sectionPath} (chunk ${citation.chunkIndex})`;
-        });
+        const footnotes = formatCitationFootnotes(result.citations);
         renderFootnotes(emphasize, footnotes);
       }
       return;
@@ -166,9 +166,7 @@ async function runQaMode(
     console.log(result.answer.answer);
     console.log();
 
-    const footnotes = result.answer.citations.map((citation, index) => {
-      return `[${index + 1}] ${citation.sourceFile} :: ${citation.sectionPath} (chunk ${citation.chunkIndex})`;
-    });
+    const footnotes = formatCitationFootnotes(result.answer.citations);
 
     renderFootnotes(emphasize, footnotes);
   } catch (err) {

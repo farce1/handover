@@ -35,6 +35,12 @@ export type AnswerQuestionResult =
       citations: QaCitation[];
     };
 
+export function formatCitationFootnotes(citations: QaCitation[]): string[] {
+  return citations.map((citation, index) => {
+    return `[${index + 1}] ${citation.sourceFile} :: ${citation.sectionPath} (chunk ${citation.chunkIndex})`;
+  });
+}
+
 export function buildQaPromptContext(matches: SearchDocumentMatch[]): string {
   const lines: string[] = [];
 
