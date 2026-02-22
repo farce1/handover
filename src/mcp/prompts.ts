@@ -6,6 +6,11 @@ import {
   type AnswerQuestionResult,
 } from '../qa/answerer.js';
 import type { HandoverConfig } from '../config/schema.js';
+import {
+  clearWorkflowCheckpoint,
+  loadWorkflowCheckpoint,
+  saveWorkflowCheckpoint,
+} from './workflow-checkpoints.js';
 
 type WorkflowId = 'architecture' | 'security' | 'dependencies';
 
@@ -161,6 +166,7 @@ const WORKFLOWS: WorkflowDefinition[] = [
 
 export interface RegisterMcpPromptsOptions {
   config: HandoverConfig;
+  outputDir?: string;
   answerFn?: typeof answerQuestion;
 }
 
@@ -195,6 +201,19 @@ function buildBranchPromptMessage(
     focus ? `Current focus context: ${focus}` : 'No focus provided yet.',
     '',
     'Call this prompt again with both `branch` and `question` to complete.',
+  ].join('\n');
+}
+
+function buildResumeMessage(
+  workflow: WorkflowDefinition,
+  branch: WorkflowBranch,
+  stepIndex: number,
+  focus?: string,
+): string {
+  return [
+    `Resumed ${workflow.title} from checkpoint (step ${stepIndex}).`,
+    '',
+    buildBranchPromptMessage(workflow, branch, focus),
   ].join('\n');
 }
 
@@ -262,9 +281,24 @@ export function registerMcpPrompts(server: McpServer, options: RegisterMcpPrompt
         argsSchema: workflowArgumentSchema,
       },
       async ({ branch: branchInput, focus, question }) => {
-        const branch = getBranch(workflow, branchInput);
+        const checkpoint = loadWorkflowCheckpoint(workflow.id, {
+          outputDir: options.outputDir,
+        });
+        const branch = getBranch(workflow, branchInput ?? checkpoint?.selectedBranch);
+        const resumedFocus = focus ?? checkpoint?.args.focus;
 
         if (!branch) {
+          saveWorkflowCheckpoint(
+            {
+              workflowId: workflow.id,
+              selectedBranch: '',
+              stepIndex: 0,
+              requiredArgs: ['branch', 'question'],
+              args: {},
+            },
+            { outputDir: options.outputDir },
+          );
+
           return {
             description: workflow.description,
             messages: [
@@ -274,12 +308,30 @@ export function registerMcpPrompts(server: McpServer, options: RegisterMcpPrompt
         }
 
         if (!question) {
+          saveWorkflowCheckpoint(
+            {
+              workflowId: workflow.id,
+              selectedBranch: branch.id,
+              stepIndex: 1,
+              requiredArgs: ['question'],
+              args: resumedFocus ? { focus: resumedFocus } : {},
+            },
+            { outputDir: options.outputDir },
+          );
+
+          const hasResumed = Boolean(checkpoint?.selectedBranch);
+
           return {
             description: workflow.description,
             messages: [
               {
                 role: 'assistant',
-                content: { type: 'text', text: buildBranchPromptMessage(workflow, branch, focus) },
+                content: {
+                  type: 'text',
+                  text: hasResumed
+                    ? buildResumeMessage(workflow, branch, checkpoint?.stepIndex ?? 1, resumedFocus)
+                    : buildBranchPromptMessage(workflow, branch, resumedFocus),
+                },
               },
             ],
           };
@@ -287,7 +339,11 @@ export function registerMcpPrompts(server: McpServer, options: RegisterMcpPrompt
 
         const result = await executeQa({
           config: options.config,
-          query: buildWorkflowQuery(branch, question, focus),
+          query: buildWorkflowQuery(branch, question, resumedFocus),
+        });
+
+        clearWorkflowCheckpoint(workflow.id, {
+          outputDir: options.outputDir,
         });
 
         return {

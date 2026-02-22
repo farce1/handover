@@ -1,6 +1,7 @@
 import { loadConfig } from '../config/loader.js';
 import { createMcpStructuredError } from '../mcp/errors.js';
 import { verifyServePrerequisites } from '../mcp/preflight.js';
+import { registerMcpPrompts } from '../mcp/prompts.js';
 import { registerMcpResources } from '../mcp/resources.js';
 import { startMcpServer } from '../mcp/server.js';
 import { registerMcpTools } from '../mcp/tools.js';
@@ -18,6 +19,7 @@ export async function runServe(): Promise<void> {
       registerHooks: [
         (server) => registerMcpResources(server, { outputDir: config.output }),
         (server) => registerMcpTools(server, { config }),
+        (server) => registerMcpPrompts(server, { config, outputDir: config.output }),
       ],
     });
 
