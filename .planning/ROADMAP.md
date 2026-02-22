@@ -102,12 +102,13 @@ Plans:
 4. User's Claude Desktop accesses raw analysis data resources (file tree, dependency graph, git history)
 5. User runs `handover serve` with missing docs and sees prompt to run `handover generate` first
 6. User follows docs/user/mcp-setup.md and successfully configures Claude Desktop, Cursor, or VS Code
-   **Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
 
-- [ ] 14-01: TBD
-- [ ] 14-02: TBD
+- [ ] 14-01-PLAN.md — MCP stdio serve bootstrap, preflight validation, and structured startup errors
+- [ ] 14-02-PLAN.md — MCP docs/analysis resources with deterministic pagination and not-found contracts
+- [ ] 14-03-PLAN.md — semantic_search MCP tool adapter and multi-client setup documentation
 
 #### Phase 15: LLM Q&A + Advanced Features
 
@@ -145,5 +146,5 @@ Plans:
 | 11. AI Round Tests and Coverage    | v3.0      | 2/2            | Complete    | 2026-02-20 |
 | 12. Vector Storage Foundation      | v4.0      | Complete       | 2026-02-21  | -          |
 | 13. Query Engine + CLI Search      | 2/2 | Complete    | 2026-02-22 | -          |
-| 14. MCP Server (Tools + Resources) | v4.0      | 0/TBD          | Not started | -          |
+| 14. MCP Server (Tools + Resources) | v4.0      | 0/3            | Planned     | -          |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 0/TBD          | Not started | -          |
