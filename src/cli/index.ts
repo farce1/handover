@@ -85,6 +85,14 @@ program
     await runSearch(query, opts);
   });
 
+program
+  .command('serve')
+  .description('Start MCP server over stdio transport')
+  .action(async () => {
+    const { runServe } = await import('./serve.js');
+    await runServe();
+  });
+
 // Default action: run generate when no command specified
 program
   .option('--provider <provider>', 'LLM provider override')

@@ -1,4 +1,6 @@
 import { loadConfig } from '../config/loader.js';
+import { createMcpStructuredError } from '../mcp/errors.js';
+import { verifyServePrerequisites } from '../mcp/preflight.js';
 import { startMcpServer } from '../mcp/server.js';
 
 function writeToStderr(message: string): void {
@@ -7,16 +9,17 @@ function writeToStderr(message: string): void {
 
 export async function runServe(): Promise<void> {
   try {
-    loadConfig();
+    const config = loadConfig();
+    verifyServePrerequisites(config.output);
 
     await startMcpServer();
 
     writeToStderr('MCP server listening on stdio.');
     writeToStderr('Ready: stdout is reserved for JSON-RPC protocol frames only.');
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const structured = createMcpStructuredError(error);
     writeToStderr('Failed to start MCP server.');
-    writeToStderr(message);
+    writeToStderr(JSON.stringify(structured));
     process.exitCode = 1;
   }
 }
