@@ -57,6 +57,34 @@ program
     await runReindex(opts);
   });
 
+program
+  .command('search <query>')
+  .description('Search generated documentation using semantic similarity')
+  .option(
+    '--top-k <n>',
+    'Number of results to return (default: 10)',
+    (value) => {
+      return Number.parseInt(value, 10);
+    },
+    10,
+  )
+  .option(
+    '--type <type>',
+    'Filter by document type (repeatable)',
+    (value, previous: string[]) => {
+      return [...previous, value];
+    },
+    [],
+  )
+  .addHelpText(
+    'after',
+    '\nExamples:\n  $ handover search "authentication"\n  $ handover search "dependency graph" --top-k 5\n  $ handover search "system design" --type architecture --type modules',
+  )
+  .action(async (query, opts) => {
+    const { runSearch } = await import('./search.js');
+    await runSearch(query, opts);
+  });
+
 // Default action: run generate when no command specified
 program
   .option('--provider <provider>', 'LLM provider override')
