@@ -52,3 +52,22 @@
 - 80% CI coverage gate enforced with WASM/integration-only exclusions scoping the denominator to unit-testable surface area
 
 ---
+
+## v4.0 MCP Server & Semantic Search (Shipped: 2026-02-22)
+
+**Phases completed:** 4 phases, 11 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Added sqlite-vec backed vector storage with incremental, hash-aware reindexing at `.handover/search.db`
+- Shipped deterministic semantic retrieval and `handover search` UX with strict type filters and rich result metadata
+- Added `handover serve` MCP stdio server with startup preflight checks and structured remediation errors
+- Exposed generated docs and raw analyzer outputs as deterministic, paginated MCP resources
+- Added MCP `semantic_search` tool and setup docs for Claude Desktop, Cursor, and VS Code
+- Delivered grounded QA mode (`search --mode qa`) with citations, MCP workflow prompts, and resumable checkpoints
+
+**Known gaps / tech debt:**
+
+- Runtime human-validation matrix pending for provider-backed reindex, semantic relevance quality, and MCP client interoperability
+
+---

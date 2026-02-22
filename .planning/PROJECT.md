@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An open source TypeScript CLI that generates comprehensive, AI-powered codebase documentation through multi-round LLM analysis. Ships with content-hash caching, streaming token output, incremental context packing, Anthropic prompt caching, and parallel rendering — making re-runs 2-5x faster and 50%+ cheaper on tokens. Backed by 254 unit tests with 92%+ coverage enforced in CI.
+An open source TypeScript CLI that generates comprehensive, AI-powered codebase documentation and serves it as a queryable knowledge base for AI coding tools. Handover now ships semantic vector search, MCP resources/tools/prompts, and grounded Q&A on top of its multi-round LLM analysis pipeline, with content-hash caching, incremental context packing, prompt caching, and parallel rendering. Backed by 254 tests with 92%+ coverage enforced in CI.
 
 ## Core Value
 
@@ -48,21 +48,25 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - ✓ Test infrastructure: createMockProvider() factory, memfs, vitest coverage exclusions — v3.0
 - ✓ Code hardening: SCORE\_\* named constants, logger.debug() in catch blocks, CLI validation reorder — v3.0
 - ✓ 254 unit tests (pure-function + algorithm + AI round) with 80% CI coverage gate — v3.0
+- ✓ sqlite-vec vector index with markdown-aware chunking and embedding metadata validation — v4.0
+- ✓ `handover reindex` with incremental skip logic and deterministic progress reporting — v4.0
+- ✓ `handover search` semantic retrieval with strict type filters and ranked relevance output — v4.0
+- ✓ `handover serve` MCP stdio server with startup preflight and structured remediation errors — v4.0
+- ✓ MCP resources for generated docs and raw analyzer outputs with deterministic pagination — v4.0
+- ✓ Grounded QA mode with source citations and MCP workflow prompts with resume checkpoints — v4.0
 
 ### Active
 
-## Current Milestone: v4.0 MCP Server & Semantic Search
+## Current Milestone: v5.0 Remote & Advanced MCP
 
-**Goal:** Make handover's generated documentation queryable by AI coding tools via an MCP server with semantic search, LLM-powered Q&A, raw analysis data access, and remote regeneration.
+**Goal:** Extend local MCP + semantic search into remote-capable operations and richer runtime UX while preserving protocol stability.
 
 **Target features:**
 
-- `handover serve` — MCP server exposing docs, analysis data, search, Q&A, and regeneration
-- Semantic search with embeddings from configured provider + SQLite vector cache
-- LLM-synthesized answers grounded in generated documentation
-- Raw analysis data (file tree, dependency graph, git history) as MCP resources
-- `handover reindex` — manual reindexing command
-- Auto-detect missing docs on startup with prompt to generate
+- MCP tool to trigger documentation regeneration remotely (RMT-01)
+- Optional HTTP MCP transport for hosted/remote deployment scenarios (RMT-02)
+- Local embedding provider path (for example Ollama) for offline workflows (RMT-03)
+- Streaming MCP responses for long-form QA interactions (RMT-04)
 
 ### Out of Scope
 
@@ -80,7 +84,8 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - v1.0 OSS milestone shipped: 3 phases, 9 plans, community health, CI/CD, docs
 - v2.0 Performance milestone shipped: 4 phases, 8 plans, caching, streaming, incremental analysis, prompt caching
 - v3.0 Robustness milestone shipped: 4 phases, 10 plans, CI fix, scorecard hardening, 254 unit tests, 80% coverage gate
-- v4.0 MCP Server & Semantic Search: in progress
+- v4.0 MCP Server & Semantic Search: shipped 2026-02-22 (4 phases, 11 plans)
+- v4.0 audit status: tech_debt (implementation complete; runtime human-validation matrix pending)
 - Architecture: DAG orchestrator, 8 static analyzers, 6 AI rounds, 14 document renderers, Zod-first domain model
 - CI runs on every PR; release-please automates versioning; OIDC publishes to npm with provenance
 - Codebase: ~24.8K LOC TypeScript across 90+ source files, 254 tests, 92%+ coverage
@@ -124,7 +129,12 @@ Every person (or LLM) who encounters this repo should understand what handover d
 | 80% coverage gate after Phase 11 (not Phase 8)   | Gate only meaningful with real test suite; early enforcement fails CI  | ✓ Good  |
 | Coverage exclusions for integration-only modules | factory.ts, logger.ts excluded — unit-testable surface only            | ✓ Good  |
 | vi.hoisted() pattern as test convention          | Clean mock setup, avoids temporal dead zone issues                     | ✓ Good  |
+| SQLite + sqlite-vec for semantic retrieval       | Zero-config local vector search in CLI runtime                         | ✓ Good  |
+| Keep MCP transport stdio-first for v4.0          | Best compatibility with local AI coding tools, lowest ops overhead     | ✓ Good  |
+| Route MCP diagnostics to stderr only             | Prevent JSON-RPC/stdout protocol corruption during tool execution       | ✓ Good  |
+| Reuse configured provider for QA synthesis       | Avoid separate credential surface and reduce setup friction             | ✓ Good  |
+| Persist MCP workflow checkpoints under .handover | Resume prompts safely across sessions with explicit load/save/clear     | ✓ Good  |
 
 ---
 
-_Last updated: 2026-02-20 after v4.0 milestone started_
+_Last updated: 2026-02-22 after v4.0 milestone completion_
