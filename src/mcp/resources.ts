@@ -1,14 +1,44 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
+  ErrorCode,
   ListResourcesRequestSchema,
+  McpError,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ReadResourceResult, Resource } from '@modelcontextprotocol/sdk/types.js';
+import { loadConfig } from '../config/loader.js';
+import { runStaticAnalysis } from '../analyzers/coordinator.js';
 import { DOCUMENT_REGISTRY } from '../renderers/registry.js';
+import type { StaticAnalysisResult } from '../analyzers/types.js';
+import { paginateResources } from './pagination.js';
 
 const DOCS_URI_PREFIX = 'handover://docs/';
+const ANALYSIS_URI_PREFIX = 'handover://analysis/';
+const DEFAULT_PAGE_SIZE = 25;
+const DEFAULT_PAGE_LIMIT_CAP = 50;
+
+const ANALYSIS_RESOURCES = [
+  {
+    id: 'file-tree',
+    title: 'Analysis - File Tree',
+    description: 'Raw static file tree analysis payload (file and directory metadata).',
+    select: (analysis: StaticAnalysisResult) => analysis.fileTree,
+  },
+  {
+    id: 'dependency-graph',
+    title: 'Analysis - Dependency Graph',
+    description: 'Raw dependency graph analysis payload (package manifests and warnings).',
+    select: (analysis: StaticAnalysisResult) => analysis.dependencies,
+  },
+  {
+    id: 'git-history',
+    title: 'Analysis - Git History',
+    description: 'Raw git history analysis payload (commits, contributors, ownership).',
+    select: (analysis: StaticAnalysisResult) => analysis.gitHistory,
+  },
+] as const;
 
 interface ResourceCatalogEntry {
   uri: string;
@@ -21,6 +51,9 @@ interface ResourceCatalogEntry {
 
 export interface RegisterMcpResourcesOptions {
   outputDir: string;
+  pageSize?: number;
+  pageLimitCap?: number;
+  analysisLoader?: () => Promise<StaticAnalysisResult>;
 }
 
 function toMcpResource(entry: ResourceCatalogEntry): Resource {
@@ -74,6 +107,36 @@ function buildDocsCatalog(outputDir: string): ResourceCatalogEntry[] {
   );
 }
 
+function buildAnalysisCatalog(
+  loadAnalysis: () => Promise<StaticAnalysisResult>,
+): ResourceCatalogEntry[] {
+  return ANALYSIS_RESOURCES.map((resource) => {
+    const uri = `${ANALYSIS_URI_PREFIX}${resource.id}`;
+
+    return {
+      uri,
+      name: resource.id,
+      title: resource.title,
+      mimeType: 'application/json',
+      description: resource.description,
+      read: async () => {
+        const analysis = await loadAnalysis();
+        const payload = resource.select(analysis);
+
+        return {
+          contents: [
+            {
+              uri,
+              mimeType: 'application/json',
+              text: JSON.stringify(payload, null, 2),
+            },
+          ],
+        };
+      },
+    };
+  });
+}
+
 function createNotFoundResult(uri: string, availableUris: string[]): ReadResourceResult {
   return {
     contents: [
@@ -99,9 +162,25 @@ export function registerMcpResources(
   server: McpServer,
   options: RegisterMcpResourcesOptions,
 ): void {
+  let analysisPromise: Promise<StaticAnalysisResult> | undefined;
+  const loadAnalysis =
+    options.analysisLoader ??
+    (() => {
+      if (!analysisPromise) {
+        const config = loadConfig();
+        analysisPromise = runStaticAnalysis(process.cwd(), config);
+      }
+
+      return analysisPromise;
+    });
+
   const docsCatalog = buildDocsCatalog(options.outputDir);
-  const resourceByUri = new Map(docsCatalog.map((entry) => [entry.uri, entry]));
-  const availableUris = docsCatalog.map((entry) => entry.uri);
+  const analysisCatalog = buildAnalysisCatalog(loadAnalysis);
+  const catalog = sortCatalog([...docsCatalog, ...analysisCatalog]);
+  const resourceByUri = new Map(catalog.map((entry) => [entry.uri, entry]));
+  const availableUris = catalog.map((entry) => entry.uri);
+  const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+  const pageLimitCap = options.pageLimitCap ?? DEFAULT_PAGE_LIMIT_CAP;
 
   server.server.registerCapabilities({
     resources: {
@@ -109,10 +188,25 @@ export function registerMcpResources(
     },
   });
 
-  server.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    return {
-      resources: docsCatalog.map(toMcpResource),
-    };
+  server.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+    try {
+      const paged = paginateResources({
+        items: catalog.map(toMcpResource),
+        cursor: request.params?.cursor,
+        defaultLimit: pageSize,
+        maxLimit: pageLimitCap,
+      });
+
+      return {
+        resources: paged.items,
+        nextCursor: paged.nextCursor,
+      };
+    } catch {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Invalid resources cursor. Call resources/list without cursor to restart pagination.',
+      );
+    }
   });
 
   server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
