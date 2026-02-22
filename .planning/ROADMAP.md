@@ -123,12 +123,12 @@ Plans:
 3. User runs `handover search --mode=fast` for quick semantic search or `--mode=qa` for LLM synthesis
 4. User triggers MCP prompt "Explain architecture" and receives multi-turn workflow with structured questions
 5. User runs `handover reindex` to manually regenerate embeddings after config changes
-   **Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 
-- [ ] 15-01: TBD
-- [ ] 15-02: TBD
+- [ ] 15-01-PLAN.md — Shared QA orchestrator and CLI search mode contracts
+- [ ] 15-02-PLAN.md — MCP prompt workflows with resume checkpoints and reindex UX reporting
 
 ## Progress
 
