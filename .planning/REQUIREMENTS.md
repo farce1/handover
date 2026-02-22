@@ -35,10 +35,10 @@ Requirements for MCP server and semantic search milestone. Each maps to roadmap 
 
 ### LLM Q&A
 
-- [ ] **QA-01**: User can ask natural language questions and receive LLM-synthesized answers grounded in generated docs
-- [ ] **QA-02**: User's Q&A reuses configured handover LLM provider (no separate setup)
-- [ ] **QA-03**: User can choose between fast semantic search (default) and LLM-synthesized answers
-- [ ] **QA-04**: User receives answers that cite specific source documents and sections
+- [x] **QA-01**: User can ask natural language questions and receive LLM-synthesized answers grounded in generated docs
+- [x] **QA-02**: User's Q&A reuses configured handover LLM provider (no separate setup)
+- [x] **QA-03**: User can choose between fast semantic search (default) and LLM-synthesized answers
+- [x] **QA-04**: User receives answers that cite specific source documents and sections
 
 ## v5.0 Requirements
 
@@ -85,10 +85,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-05      | Phase 14 | Complete |
 | MCP-06      | Phase 15 | Pending |
 | MCP-07      | Phase 14 | Complete |
-| QA-01       | Phase 15 | Pending |
-| QA-02       | Phase 15 | Pending |
-| QA-03       | Phase 15 | Pending |
-| QA-04       | Phase 15 | Pending |
+| QA-01       | Phase 15 | Complete |
+| QA-02       | Phase 15 | Complete |
+| QA-03       | Phase 15 | Complete |
+| QA-04       | Phase 15 | Complete |
 
 **Coverage:**
 

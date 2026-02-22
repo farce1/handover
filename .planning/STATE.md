@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 
 ## Current Position
 
-Phase: 14 of 15 (MCP Server (Tools + Resources))
-Plan: 4 of 4 (completed)
-Status: Phase 14 complete
-Last activity: 2026-02-22 — completed 14-04 (serve bootstrap wiring for MCP resources + tool preservation)
+Phase: 15 of 15 (LLM Q&A + Advanced Features)
+Plan: 1 of 2 (in progress)
+Status: Executing phase 15
+Last activity: 2026-02-22 — completed 15-01 (shared QA orchestrator + search mode contracts)
 
-Progress: [██████████████████████░] 95% (35/37 total plans across all milestones)
+Progress: [███████████████████████░] 97% (36/37 total plans across all milestones)
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [██████████████████████░
 - Average duration: ~5.4 min/plan
 - Total execution time: ~43 min
 - Timeline: Started 2026-02-21
+| Phase 15 P01 | 5 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,9 @@ v4.0 implementation decisions (12-03):
 - [Phase 14]: Sort resource catalogs by URI/title before slicing and return MCP_RESOURCE_NOT_FOUND payloads for stable client remediation.
 - [Phase 14]: Attached registerMcpResources to runServe using config.output so serve preflight and resource file resolution share the same output path.
 - [Phase 14]: Kept registerMcpResources and registerMcpTools in the same startMcpServer registerHooks path to preserve semantic_search while enabling resources.
+- [Phase 15]: Kept QA citations derived only from retrieved metadata to prevent drift.
+- [Phase 15]: Applied clarification-first branching when evidence is weak or conflicting.
+- [Phase 15]: Made search output display active mode explicitly for fast and qa paths.
 
 ### Pending Todos
 
@@ -131,5 +135,5 @@ v4.0 critical pitfalls:
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Phase 15 context gathered
-Resume file: .planning/phases/15-llm-q-a-advanced-features/15-CONTEXT.md
+Stopped at: Completed 15-01-PLAN.md
+Resume file: .planning/phases/15-llm-q-a-advanced-features/15-02-PLAN.md
