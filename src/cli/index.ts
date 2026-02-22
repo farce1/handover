@@ -60,6 +60,7 @@ program
 program
   .command('search <query>')
   .description('Search generated documentation using semantic similarity')
+  .option('--mode <mode>', 'Search mode: fast (default) or qa', 'fast')
   .option(
     '--top-k <n>',
     'Number of results to return (default: 10)',
@@ -78,7 +79,7 @@ program
   )
   .addHelpText(
     'after',
-    '\nExamples:\n  $ handover search "authentication"\n  $ handover search "dependency graph" --top-k 5\n  $ handover search "system design" --type architecture --type modules',
+    '\nExamples:\n  $ handover search "authentication"\n  $ handover search "How does the DAG orchestrator work?" --mode qa\n  $ handover search "dependency graph" --mode fast --top-k 5\n  $ handover search "system design" --type architecture --type modules',
   )
   .action(async (query, opts) => {
     const { runSearch } = await import('./search.js');
