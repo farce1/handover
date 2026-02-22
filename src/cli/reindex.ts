@@ -53,9 +53,23 @@ export async function runReindex(options: ReindexCommandOptions): Promise<void> 
     );
 
     let progressStarted = false;
+    let lastPhase: ReindexProgressEvent['phase'] | null = null;
+
+    const stageLabels: Record<ReindexProgressEvent['phase'], string> = {
+      scanning: 'Scanning generated documents',
+      chunking: 'Chunking changed documents',
+      embedding: 'Embedding chunk batches',
+      storing: 'Writing vectors to SQLite index',
+      complete: 'Finalizing reindex summary',
+    };
 
     // Progress callback
     const onProgress = (event: ReindexProgressEvent) => {
+      if (event.phase !== lastPhase) {
+        logger.info(`Stage: ${stageLabels[event.phase]}`);
+        lastPhase = event.phase;
+      }
+
       if (event.phase === 'embedding' && !progressStarted) {
         progressBar.start(event.chunksTotal, 0, {
           documentsProcessed: event.documentsProcessed,
@@ -87,14 +101,31 @@ export async function runReindex(options: ReindexCommandOptions): Promise<void> 
     // Print summary
     logger.blank();
 
-    if (result.documentsProcessed === 0 && result.documentsSkipped > 0) {
-      logger.success(`All ${result.documentsSkipped} documents unchanged, nothing to reindex`);
-    } else {
-      logger.success(
-        `Reindexed ${result.documentsProcessed} documents (${result.chunksCreated} chunks, ${result.totalTokens} tokens)` +
-          (result.documentsSkipped > 0 ? `, skipped ${result.documentsSkipped} unchanged` : ''),
+    logger.info(
+      `Summary: processed ${result.documentsProcessed}, skipped ${result.documentsSkipped}, failed ${result.documentsFailed} (total ${result.documentsTotal}).`,
+    );
+
+    logger.info(
+      `Embeddings: ${result.chunksCreated} stored chunks, ${result.totalTokens} tokens, model ${result.embeddingModel} (${result.embeddingDimensions}D).`,
+    );
+
+    if (result.documentsFailed > 0) {
+      logger.warn('Reindex completed with partial failures.');
+      for (const warning of result.warnings) {
+        logger.warn(`- ${warning}`);
+      }
+      logger.warn(
+        'Remediation: fix listed documents, then rerun `handover reindex --force --verbose`.',
       );
-      logger.info(`Model: ${result.embeddingModel} (${result.embeddingDimensions}D)`);
+    } else if (result.documentsProcessed === 0 && result.documentsSkipped > 0) {
+      logger.success(
+        `All ${result.documentsSkipped} documents unchanged, index is already up to date.`,
+      );
+    } else {
+      logger.success('Reindex completed successfully.');
+      logger.info('Next steps:');
+      logger.info('- handover search "architecture"');
+      logger.info('- handover serve');
     }
   } catch (err) {
     handleCliError(err, 'Failed to reindex documents');

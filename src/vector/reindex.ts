@@ -45,6 +45,8 @@ export interface ReindexProgressEvent {
   documentsProcessed: number;
   /** Number of documents skipped */
   documentsSkipped: number;
+  /** Number of documents that failed processing */
+  documentsFailed: number;
   /** Total number of chunks */
   chunksTotal: number;
   /** Number of chunks processed */
@@ -59,6 +61,10 @@ export interface ReindexResult {
   documentsProcessed: number;
   /** Number of documents skipped (unchanged) */
   documentsSkipped: number;
+  /** Number of documents that failed processing */
+  documentsFailed: number;
+  /** Total discovered markdown documents */
+  documentsTotal: number;
   /** Number of chunks created */
   chunksCreated: number;
   /** Total tokens used for embeddings */
@@ -67,6 +73,8 @@ export interface ReindexResult {
   embeddingModel: string;
   /** Embedding dimensions */
   embeddingDimensions: number;
+  /** Non-fatal warnings encountered during indexing */
+  warnings: string[];
 }
 
 /**
@@ -177,6 +185,7 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
     documentsTotal: documents.length,
     documentsProcessed: 0,
     documentsSkipped: 0,
+    documentsFailed: 0,
     chunksTotal: 0,
     chunksProcessed: 0,
   });
@@ -207,6 +216,8 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
 
     const changedDocs: DocumentMeta[] = [];
     let documentsSkipped = 0;
+    let documentsFailed = 0;
+    const warnings: string[] = [];
 
     if (force) {
       logger.log('Force mode enabled - re-embedding all documents');
@@ -231,6 +242,7 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
       documentsTotal: documents.length,
       documentsProcessed: 0,
       documentsSkipped,
+      documentsFailed,
       chunksTotal: 0,
       chunksProcessed: 0,
     });
@@ -240,10 +252,13 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
       return {
         documentsProcessed: 0,
         documentsSkipped,
+        documentsFailed,
+        documentsTotal: documents.length,
         chunksCreated: 0,
         totalTokens: 0,
         embeddingModel,
         embeddingDimensions,
+        warnings,
       };
     }
 
@@ -263,20 +278,49 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
         allChunks.push({ doc, chunks });
         logger.log(`  ${doc.sourceFile}: ${chunks.length} chunks`);
       } catch (err) {
-        logger.warn(
-          `Failed to chunk ${doc.sourceFile}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        // Continue with other documents
+        const message = `Failed to chunk ${doc.sourceFile}: ${err instanceof Error ? err.message : String(err)}`;
+        logger.warn(message);
+        warnings.push(message);
+        documentsFailed++;
       }
     }
 
     const totalChunks = allChunks.reduce((sum, item) => sum + item.chunks.length, 0);
+
+    if (totalChunks === 0) {
+      const message =
+        'No chunks were produced from changed documents. Check warnings and rerun with --verbose after fixing malformed files.';
+      warnings.push(message);
+
+      onProgress?.({
+        phase: 'complete',
+        documentsTotal: documents.length,
+        documentsProcessed: 0,
+        documentsSkipped,
+        documentsFailed,
+        chunksTotal: 0,
+        chunksProcessed: 0,
+      });
+
+      return {
+        documentsProcessed: 0,
+        documentsSkipped,
+        documentsFailed,
+        documentsTotal: documents.length,
+        chunksCreated: 0,
+        totalTokens: 0,
+        embeddingModel,
+        embeddingDimensions,
+        warnings,
+      };
+    }
 
     onProgress?.({
       phase: 'embedding',
       documentsTotal: documents.length,
       documentsProcessed: 0,
       documentsSkipped,
+      documentsFailed,
       chunksTotal: totalChunks,
       chunksProcessed: 0,
     });
@@ -295,6 +339,7 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
       documentsTotal: documents.length,
       documentsProcessed: 0,
       documentsSkipped,
+      documentsFailed,
       chunksTotal: totalChunks,
       chunksProcessed: totalChunks,
     });
@@ -306,6 +351,7 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
 
     let embeddingOffset = 0;
     let documentsProcessed = 0;
+    let chunksStored = 0;
 
     for (const { doc, chunks } of allChunks) {
       try {
@@ -327,13 +373,14 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
 
         embeddingOffset += chunks.length;
         documentsProcessed++;
+        chunksStored += chunks.length;
 
         logger.log(`  Stored ${doc.sourceFile} (${chunks.length} chunks)`);
       } catch (err) {
-        logger.warn(
-          `Failed to store ${doc.sourceFile}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        // Continue with other documents
+        const message = `Failed to store ${doc.sourceFile}: ${err instanceof Error ? err.message : String(err)}`;
+        logger.warn(message);
+        warnings.push(message);
+        documentsFailed++;
       }
     }
 
@@ -342,8 +389,9 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
       documentsTotal: documents.length,
       documentsProcessed,
       documentsSkipped,
+      documentsFailed,
       chunksTotal: totalChunks,
-      chunksProcessed: totalChunks,
+      chunksProcessed: chunksStored,
     });
 
     logger.log('Reindexing complete');
@@ -351,10 +399,13 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
     return {
       documentsProcessed,
       documentsSkipped,
-      chunksCreated: totalChunks,
+      documentsFailed,
+      documentsTotal: documents.length,
+      chunksCreated: chunksStored,
       totalTokens,
       embeddingModel,
       embeddingDimensions,
+      warnings,
     };
   } finally {
     vectorStore.close();
