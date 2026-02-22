@@ -30,7 +30,7 @@ Requirements for MCP server and semantic search milestone. Each maps to roadmap 
 - [x] **MCP-03**: User can access raw analysis data (file tree, dependency graph, git history) as MCP resources
 - [x] **MCP-04**: User can search docs via MCP `semantic_search` tool
 - [x] **MCP-05**: User is prompted to generate docs when `handover serve` detects missing output
-- [ ] **MCP-06**: User can use pre-built MCP prompts for common workflows (explain architecture, find security concerns, understand dependencies)
+- [x] **MCP-06**: User can use pre-built MCP prompts for common workflows (explain architecture, find security concerns, understand dependencies)
 - [x] **MCP-07**: User has documentation for configuring MCP client in Claude Desktop, Cursor, and VS Code
 
 ### LLM Q&A
@@ -83,7 +83,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-03      | Phase 14 | Complete |
 | MCP-04      | Phase 14 | Complete |
 | MCP-05      | Phase 14 | Complete |
-| MCP-06      | Phase 15 | Pending |
+| MCP-06      | Phase 15 | Complete |
 | MCP-07      | Phase 14 | Complete |
 | QA-01       | Phase 15 | Complete |
 | QA-02       | Phase 15 | Complete |

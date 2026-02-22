@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 15 of 15 (LLM Q&A + Advanced Features)
-Plan: 1 of 2 (in progress)
-Status: Executing phase 15
-Last activity: 2026-02-22 — completed 15-01 (shared QA orchestrator + search mode contracts)
+Plan: 2 of 2 (complete)
+Status: Phase 15 complete
+Last activity: 2026-02-22 — completed 15-02 (MCP workflows + reindex staged UX)
 
-Progress: [███████████████████████░] 97% (36/37 total plans across all milestones)
+Progress: [████████████████████████] 100% (37/37 total plans across all milestones)
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [███████████████████████
 - Total execution time: ~43 min
 - Timeline: Started 2026-02-21
 | Phase 15 P01 | 5 min | 3 tasks | 5 files |
+| Phase 15 P02 | 0 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,9 @@ v4.0 implementation decisions (12-03):
 - [Phase 15]: Kept QA citations derived only from retrieved metadata to prevent drift.
 - [Phase 15]: Applied clarification-first branching when evidence is weak or conflicting.
 - [Phase 15]: Made search output display active mode explicitly for fast and qa paths.
+- [Phase 15]: Use protocol-native MCP prompt registration with bounded branch steps and completion artifacts.
+- [Phase 15]: Persist MCP workflow checkpoints under .handover with explicit load/save/clear helpers for resumability.
+- [Phase 15]: Treat reindex partial failures as successful completion with deterministic counts and remediation warnings.
 
 ### Pending Todos
 
@@ -135,5 +139,5 @@ v4.0 critical pitfalls:
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 15-01-PLAN.md
-Resume file: .planning/phases/15-llm-q-a-advanced-features/15-02-PLAN.md
+Stopped at: Completed 15-02-PLAN.md
+Resume file: None

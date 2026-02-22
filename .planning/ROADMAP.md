@@ -47,7 +47,7 @@ This roadmap transforms handover from a documentation generator into a queryable
 - [x] **Phase 12: Vector Storage Foundation** - Embeddings, chunking, SQLite vector storage, incremental indexing (completed 2026-02-21)
 - [x] **Phase 13: Query Engine + CLI Search** - Semantic search engine, CLI search command, relevance ranking (completed 2026-02-22)
 - [x] **Phase 14: MCP Server (Tools + Resources)** - MCP stdio server, semantic_search tool, document resources, client config docs (completed 2026-02-22)
-- [ ] **Phase 15: LLM Q&A + Advanced Features** - RAG-powered Q&A, workflow prompts, hybrid search, reindex command
+- [x] **Phase 15: LLM Q&A + Advanced Features** - RAG-powered Q&A, workflow prompts, hybrid search, reindex command (completed 2026-02-22)
 
 #### Phase 12: Vector Storage Foundation
 
@@ -148,4 +148,4 @@ Plans:
 | 12. Vector Storage Foundation      | v4.0      | Complete       | 2026-02-21  | -          |
 | 13. Query Engine + CLI Search      | 2/2 | Complete    | 2026-02-22 | -          |
 | 14. MCP Server (Tools + Resources) | 4/4 | Complete    | 2026-02-22 | -          |
-| 15. LLM Q&A + Advanced Features    | 1/2 | In Progress|  | -          |
+| 15. LLM Q&A + Advanced Features    | 2/2 | Complete   | 2026-02-22 | -          |
