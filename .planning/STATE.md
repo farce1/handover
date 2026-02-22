@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 14 of 15 (MCP Server (Tools + Resources))
-Plan: 1 of 3 (completed)
+Plan: 2 of 3 (completed)
 Status: Phase 14 in progress
-Last activity: 2026-02-22 — completed 14-01 (MCP stdio bootstrap, preflight, and startup errors)
+Last activity: 2026-02-22 — completed 14-03 (semantic_search MCP tool adapter and setup docs)
 
-Progress: [████████████████████░] 89% (33/37 total plans across all milestones)
+Progress: [█████████████████████░] 92% (34/37 total plans across all milestones)
 
 ## Performance Metrics
 
@@ -49,10 +49,11 @@ Progress: [████████████████████░] 89% 
 | 13    | 01   | Query Engine Retrieval          | 1 min    | 2026-02-21 |
 | 13    | 02   | CLI Search Command              | 1 min    | 2026-02-22 |
 | 14    | 01   | MCP Serve Bootstrap + Preflight | 4 min    | 2026-02-22 |
+| 14    | 03   | MCP Semantic Search + Setup Docs | 2 min   | 2026-02-22 |
 
-- Total plans completed: 6
-- Average duration: ~3.5 min/plan
-- Total execution time: ~21 min
+- Total plans completed: 7
+- Average duration: ~3.3 min/plan
+- Total execution time: ~23 min
 - Timeline: Started 2026-02-21
 
 ## Accumulated Context
@@ -96,6 +97,9 @@ v4.0 implementation decisions (12-03):
 - [Phase 14]: Reserve stdout for MCP JSON-RPC frames only; emit serve diagnostics to stderr
 - [Phase 14]: Fail fast at serve startup when generated docs are missing and remediate with handover generate
 - [Phase 14]: Normalize serve startup failures to structured code/message/action payloads
+- [Phase 14]: Register semantic_search during serve startup via MCP register hook wiring
+- [Phase 14]: Use explicit tool-layer validation so invalid semantic_search input maps to SEARCH_INVALID_INPUT
+- [Phase 14]: Standardize semantic_search success payload to query/limit/total/results and keep no-match as success
 
 ### Pending Todos
 
@@ -121,5 +125,5 @@ v4.0 critical pitfalls:
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 14-01-PLAN.md
+Stopped at: Completed 14-03-PLAN.md
 Resume file: .planning/phases/14-mcp-server-tools-resources/14-02-PLAN.md
