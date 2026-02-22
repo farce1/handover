@@ -13,4 +13,6 @@ coverage/
 
 # GSD (Get Shit Done) - tooling
 .claude/
+.planning
+.opencode
 PRD.md
