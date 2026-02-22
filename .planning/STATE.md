@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 
 ## Current Position
 
-Phase: 13 of 15 (Query Engine + CLI Search)
-Plan: 2 of 2 (completed)
-Status: Phase 13 complete
-Last activity: 2026-02-22 — completed 13-02 (CLI Search Command)
+Phase: 14 of 15 (MCP Server (Tools + Resources))
+Plan: 1 of 3 (completed)
+Status: Phase 14 in progress
+Last activity: 2026-02-22 — completed 14-01 (MCP stdio bootstrap, preflight, and startup errors)
 
-Progress: [███████████████████░] 86% (32/37 total plans across all milestones)
+Progress: [████████████████████░] 89% (33/37 total plans across all milestones)
 
 ## Performance Metrics
 
@@ -48,10 +48,11 @@ Progress: [███████████████████░] 86% (32
 | 12    | 03   | Reindex Pipeline                | 4 min    | 2026-02-21 |
 | 13    | 01   | Query Engine Retrieval          | 1 min    | 2026-02-21 |
 | 13    | 02   | CLI Search Command              | 1 min    | 2026-02-22 |
+| 14    | 01   | MCP Serve Bootstrap + Preflight | 4 min    | 2026-02-22 |
 
-- Total plans completed: 5
-- Average duration: ~3.4 min/plan
-- Total execution time: ~17 min
+- Total plans completed: 6
+- Average duration: ~3.5 min/plan
+- Total execution time: ~21 min
 - Timeline: Started 2026-02-21
 
 ## Accumulated Context
@@ -92,6 +93,9 @@ v4.0 implementation decisions (12-03):
 - [Phase 13]: Use process.stdout.isTTY gating so search output uses subtle emphasis in TTY and plain fallback otherwise
 - [Phase 13]: Keep search result output ordered as rank, relevance, source, section, snippet for deterministic scanning
 - [Phase 13]: Include repeated --type examples in search help text to reinforce strict filter semantics
+- [Phase 14]: Reserve stdout for MCP JSON-RPC frames only; emit serve diagnostics to stderr
+- [Phase 14]: Fail fast at serve startup when generated docs are missing and remediate with handover generate
+- [Phase 14]: Normalize serve startup failures to structured code/message/action payloads
 
 ### Pending Todos
 
@@ -117,5 +121,5 @@ v4.0 critical pitfalls:
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Phase 14 context gathered
-Resume file: .planning/phases/14-mcp-server-tools-resources/14-CONTEXT.md
+Stopped at: Completed 14-01-PLAN.md
+Resume file: .planning/phases/14-mcp-server-tools-resources/14-02-PLAN.md
