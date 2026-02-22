@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 Phase: 14 of 15 (MCP Server (Tools + Resources))
 Plan: 2 of 3 (completed)
 Status: Phase 14 in progress
-Last activity: 2026-02-22 — completed 14-03 (semantic_search MCP tool adapter and setup docs)
+Last activity: 2026-02-22 — completed 14-02 (MCP docs/analysis resources with deterministic pagination and not-found contracts)
 
 Progress: [█████████████████████░] 92% (34/37 total plans across all milestones)
 
@@ -49,11 +49,12 @@ Progress: [█████████████████████░] 9
 | 13    | 01   | Query Engine Retrieval          | 1 min    | 2026-02-21 |
 | 13    | 02   | CLI Search Command              | 1 min    | 2026-02-22 |
 | 14    | 01   | MCP Serve Bootstrap + Preflight | 4 min    | 2026-02-22 |
+| 14    | 02   | MCP Resources + Pagination      | 4 min    | 2026-02-22 |
 | 14    | 03   | MCP Semantic Search + Setup Docs | 2 min   | 2026-02-22 |
 
 - Total plans completed: 7
-- Average duration: ~3.3 min/plan
-- Total execution time: ~23 min
+- Average duration: ~3.4 min/plan
+- Total execution time: ~27 min
 - Timeline: Started 2026-02-21
 
 ## Accumulated Context
@@ -100,6 +101,8 @@ v4.0 implementation decisions (12-03):
 - [Phase 14]: Register semantic_search during serve startup via MCP register hook wiring
 - [Phase 14]: Use explicit tool-layer validation so invalid semantic_search input maps to SEARCH_INVALID_INPUT
 - [Phase 14]: Standardize semantic_search success payload to query/limit/total/results and keep no-match as success
+- [Phase 14]: Override SDK default resources/list handling with custom cursor-aware handlers to enforce pagination contracts.
+- [Phase 14]: Sort resource catalogs by URI/title before slicing and return MCP_RESOURCE_NOT_FOUND payloads for stable client remediation.
 
 ### Pending Todos
 
@@ -125,5 +128,5 @@ v4.0 critical pitfalls:
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 14-03-PLAN.md
-Resume file: .planning/phases/14-mcp-server-tools-resources/14-02-PLAN.md
+Stopped at: Completed 14-02-PLAN.md
+Resume file: .planning/phases/14-mcp-server-tools-resources/14-03-PLAN.md

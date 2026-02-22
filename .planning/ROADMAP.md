@@ -46,7 +46,7 @@ This roadmap transforms handover from a documentation generator into a queryable
 
 - [x] **Phase 12: Vector Storage Foundation** - Embeddings, chunking, SQLite vector storage, incremental indexing (completed 2026-02-21)
 - [x] **Phase 13: Query Engine + CLI Search** - Semantic search engine, CLI search command, relevance ranking (completed 2026-02-22)
-- [ ] **Phase 14: MCP Server (Tools + Resources)** - MCP stdio server, semantic_search tool, document resources, client config docs
+- [x] **Phase 14: MCP Server (Tools + Resources)** - MCP stdio server, semantic_search tool, document resources, client config docs (completed 2026-02-22)
 - [ ] **Phase 15: LLM Q&A + Advanced Features** - RAG-powered Q&A, workflow prompts, hybrid search, reindex command
 
 #### Phase 12: Vector Storage Foundation
@@ -102,7 +102,7 @@ Plans:
 4. User's Claude Desktop accesses raw analysis data resources (file tree, dependency graph, git history)
 5. User runs `handover serve` with missing docs and sees prompt to run `handover generate` first
 6. User follows docs/user/mcp-setup.md and successfully configures Claude Desktop, Cursor, or VS Code
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 
@@ -146,5 +146,5 @@ Plans:
 | 11. AI Round Tests and Coverage    | v3.0      | 2/2            | Complete    | 2026-02-20 |
 | 12. Vector Storage Foundation      | v4.0      | Complete       | 2026-02-21  | -          |
 | 13. Query Engine + CLI Search      | 2/2 | Complete    | 2026-02-22 | -          |
-| 14. MCP Server (Tools + Resources) | 2/3 | In Progress|  | -          |
+| 14. MCP Server (Tools + Resources) | 3/3 | Complete   | 2026-02-22 | -          |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 0/TBD          | Not started | -          |
