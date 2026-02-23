@@ -1,4 +1,35 @@
 import { z } from 'zod';
+import {
+  DEFAULT_EMBEDDING_LOCAL_BASE_URL,
+  DEFAULT_EMBEDDING_LOCALITY_MODE,
+  EMBEDDING_LOCALITY_MODES,
+} from '../vector/types.js';
+
+const LocalEmbeddingConfigSchema = z.object({
+  baseUrl: z.string().url().default(DEFAULT_EMBEDDING_LOCAL_BASE_URL),
+  model: z.string().optional(),
+  timeout: z.number().int().positive().optional(),
+});
+
+const EmbeddingConfigSchema = z
+  .object({
+    provider: z.enum(['openai']).default('openai'),
+    model: z.string().default('text-embedding-3-small'),
+    apiKeyEnv: z.string().optional(),
+    batchSize: z.number().int().positive().default(100),
+    mode: z.enum(EMBEDDING_LOCALITY_MODES).default(DEFAULT_EMBEDDING_LOCALITY_MODE),
+    local: LocalEmbeddingConfigSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.mode !== 'remote-only' && !value.local?.model) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['local', 'model'],
+        message:
+          'embedding.local.model is required when embedding.mode is local-only or local-preferred',
+      });
+    }
+  });
 
 /**
  * Zod schema for .handover.yml configuration.
@@ -49,14 +80,7 @@ export const HandoverConfigSchema = z.object({
     })
     .default({ pin: [], boost: [] }),
   costWarningThreshold: z.number().positive().optional(),
-  embedding: z
-    .object({
-      provider: z.enum(['openai']).default('openai'),
-      model: z.string().default('text-embedding-3-small'),
-      apiKeyEnv: z.string().optional(),
-      batchSize: z.number().int().positive().default(100),
-    })
-    .optional(),
+  embedding: EmbeddingConfigSchema.optional(),
 });
 
 export type HandoverConfig = z.infer<typeof HandoverConfigSchema>;

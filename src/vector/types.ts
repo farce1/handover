@@ -140,6 +140,22 @@ export interface SchemaMetadata {
 export const SCHEMA_VERSION = 1;
 export const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 export const DEFAULT_EMBEDDING_DIMENSIONS = 1536;
+export const DEFAULT_EMBEDDING_LOCALITY_MODE = 'local-preferred';
+export const DEFAULT_EMBEDDING_LOCAL_BASE_URL = 'http://localhost:11434';
+
+export const EMBEDDING_LOCALITY_MODES = ['local-only', 'local-preferred', 'remote-only'] as const;
+
+export type EmbeddingLocalityMode = (typeof EMBEDDING_LOCALITY_MODES)[number];
+
+export const EMBEDDING_PROVIDER_ROUTES = ['local', 'remote'] as const;
+
+export type EmbeddingProviderRoute = (typeof EMBEDDING_PROVIDER_ROUTES)[number];
+
+export interface EmbeddingRouteMetadata {
+  mode: EmbeddingLocalityMode;
+  provider: EmbeddingProviderRoute;
+  reason: string;
+}
 
 /**
  * Mapping of embedding models to their dimension counts
