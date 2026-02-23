@@ -83,7 +83,12 @@ Plans:
   2. User gets immediate, actionable validation errors when embedding model or dimensions conflict with stored index metadata.
   3. User can set embedding locality policy (`local-only`, `local-preferred`, `remote-only`) and observe routing behavior that matches the selected mode.
   4. User can run embedding provider health checks before indexing and receive clear diagnostics for failures.
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 17-01-PLAN.md - Build embedding locality config, local provider router, and shared health-check primitives
+- [ ] 17-02-PLAN.md - Wire mode-aware routing and fail-fast compatibility validation into reindex and retrieval
+- [ ] 17-03-PLAN.md - Expose embedding health command, CLI mode overrides, and mode/provider run summaries
 
 ### Phase 18: Remote Regeneration Job Control
 **Goal**: Users can trigger and monitor remote documentation regeneration safely through MCP with deterministic lifecycle behavior.
