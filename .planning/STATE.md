@@ -116,5 +116,5 @@ v4.0 deferred runtime validation:
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 16-02-PLAN.md
-Resume file: None
+Stopped at: Phase 17 context gathered
+Resume file: .planning/phases/17-local-embedding-provider-routing/17-CONTEXT.md
