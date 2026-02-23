@@ -1,606 +1,237 @@
-# Architecture Research: MCP Server + Semantic Search Integration
+# Architecture Research
 
-**Domain:** TypeScript CLI with MCP server, semantic search, embeddings, and vector storage
-**Researched:** 2026-02-20
-**Confidence:** MEDIUM (Official MCP docs + WebSearch verified sources)
+**Domain:** Handover v5.0 Remote and Advanced MCP integration
+**Researched:** 2026-02-23
+**Confidence:** HIGH for internal integration points, MEDIUM for remote transport hardening specifics
 
-## Executive Summary
+## Standard Architecture
 
-This milestone adds four new capabilities to the existing handover CLI: (1) MCP server exposing documentation via tools/resources, (2) semantic search over generated docs, (3) embedding generation for vector similarity, and (4) SQLite-based vector storage. The architecture integrates cleanly with handover's existing DAG orchestrator, parallel analyzers, and document rendering pipeline by treating these as NEW data flows that consume existing outputs rather than modifying core analysis logic.
-
-**Integration pattern:** Additive, not invasive. New components read from `.handover/` output directory and cache, expose via MCP protocol, and store in separate `.handover/search.db` vector database.
-
-## System Overview
+### System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         EXISTING HANDOVER CLI                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐                         │
-│  │ Static  │  │ AI      │  │ Render  │  │ Cache   │                         │
-│  │Analyzers│→ │ Rounds  │→ │Pipeline │→ │ (.md)   │                         │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘                         │
-│       ↓            ↓            ↓            ↓                                │
-│  .handover/cache/  .handover/cache/rounds/  .handover/*.md                   │
-└─────────────────────────────────────────────────────────────────────────────┘
-                              ↓ (reads)
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         NEW COMPONENTS (THIS MILESTONE)                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                      MCP Server Layer                                 │   │
-│  │  ┌───────────┐  ┌────────────┐  ┌─────────────┐                     │   │
-│  │  │ Tools     │  │ Resources  │  │ Prompts     │                     │   │
-│  │  │ (search)  │  │ (docs)     │  │ (templates) │                     │   │
-│  │  └─────┬─────┘  └──────┬─────┘  └──────┬──────┘                     │   │
-│  └────────┼────────────────┼────────────────┼────────────────────────────┘   │
-│           │                │                │                                │
-│           ↓                ↓                ↓                                │
-│  ┌───────────────────────────────────────────────────────────────┐          │
-│  │              Search & Indexing Layer                           │          │
-│  │  ┌──────────────┐  ┌───────────────┐  ┌────────────────┐     │          │
-│  │  │ Document     │  │ Embedding     │  │ Vector Query   │     │          │
-│  │  │ Indexer      │→ │ Generator     │→ │ Engine         │     │          │
-│  │  │ (chunking)   │  │ (OpenAI API)  │  │ (cosine sim)   │     │          │
-│  │  └──────────────┘  └───────────────┘  └────────────────┘     │          │
-│  └───────────────────────────────────────────────────────────────┘          │
-│           ↓                                         ↓                        │
-│  ┌─────────────────────────────────────────────────────────────┐            │
-│  │                  Storage Layer (SQLite)                      │            │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │            │
-│  │  │ documents    │  │ chunks       │  │ embeddings   │      │            │
-│  │  │ (metadata)   │  │ (text+meta)  │  │ (float32[])  │      │            │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘      │            │
-│  └─────────────────────────────────────────────────────────────┘            │
-│                          .handover/search.db                                 │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                              Client Entry Layer                              │
+├───────────────────────────────────────────────────────────────────────────────┤
+│  handover generate   handover reindex/search   handover serve               │
+│                                                         │                    │
+│                                                         ├── stdio transport  │
+│                                                         └── HTTP transport   │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                            MCP Application Layer                             │
+├───────────────────────────────────────────────────────────────────────────────┤
+│  Resources (docs/analysis)   Tools (search, regenerate)   Prompts (QA flow) │
+│                   │                     │                         │           │
+│                   └───────────────┬─────┴──────────────┬──────────┘           │
+│                                   │                    │                      │
+│                          QA + Search Services      Generate Service           │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                           Data + Provider Layer                              │
+├───────────────────────────────────────────────────────────────────────────────┤
+│  Vector query-engine   embedder providers   DAG orchestrator + renderers     │
+│         │                      │                      │                       │
+│         └────────────── .handover/search.db ◄────────┴── output markdown     │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Component Responsibilities
+### Component Responsibilities
 
-| Component               | Responsibility                                                                             | Integration Point                                            |
-| ----------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| **MCP Server**          | Expose handover docs via stdio/HTTP transport, register tools/resources/prompts            | NEW: standalone entry point (`src/mcp/server.ts`)            |
-| **Document Indexer**    | Parse `.handover/*.md`, chunk text (512 tokens, recursive character split), detect changes | Reads from existing render output directory                  |
-| **Embedding Generator** | Call OpenAI `text-embedding-3-small` API, batch requests, handle rate limits               | NEW: wraps existing `BaseProvider` retry/rate-limit patterns |
-| **Vector Storage**      | SQLite with `sqlite-vec` extension, CRUD operations on chunks/embeddings                   | NEW: `src/search/vector-store.ts`                            |
-| **Query Engine**        | Cosine similarity search, rerank with metadata filters, hybrid text + vector               | NEW: `src/search/query-engine.ts`                            |
-| **Reindex Manager**     | Incremental indexing based on file content hash, trigger on `handover generate` completion | Hooks into existing `AnalysisCache` hash pattern             |
+| Component | Responsibility | Typical Implementation |
+|-----------|----------------|------------------------|
+| `src/cli/serve.ts` | Boot MCP runtime and wire registrations | Load config, preflight, start MCP server |
+| `src/mcp/server.ts` | Server and transport lifecycle | `McpServer` + transport adapter(s) |
+| `src/mcp/tools.ts` | Action surface for MCP clients | Tool handlers with strict input validation |
+| `src/mcp/prompts.ts` | Guided QA workflows over indexed docs | Prompt orchestration around `answerQuestion()` |
+| `src/qa/answerer.ts` | Retrieval + synthesis logic | `searchDocuments()` + provider completion |
+| `src/vector/*` | Chunk, embed, index, query | sqlite-vec + embedding provider abstraction |
+| `src/cli/generate.ts` | Canonical doc regeneration pipeline | DAG static analysis -> rounds -> rendering |
 
 ## Recommended Project Structure
 
 ```
 src/
-├── mcp/                    # MCP server implementation
-│   ├── server.ts           # Server entry point, transport setup
-│   ├── tools.ts            # Tool registrations (semantic_search, etc.)
-│   ├── resources.ts        # Resource registrations (document access)
-│   ├── prompts.ts          # Prompt templates for handover workflows
-│   └── types.ts            # MCP-specific TypeScript types
-├── search/                 # Semantic search engine
-│   ├── indexer.ts          # Document chunking and indexing
-│   ├── embeddings.ts       # OpenAI embedding generation
-│   ├── vector-store.ts     # SQLite vector database operations
-│   ├── query-engine.ts     # Search orchestration and ranking
-│   └── types.ts            # Search-specific types
-├── cli/                    # Existing CLI (MODIFIED)
-│   ├── index.ts            # Add `handover serve` command
-│   └── generate.ts         # Add post-render indexing hook
-├── providers/              # Existing (MINOR MODIFICATION)
-│   └── base-provider.ts    # Extend for embedding API pattern
-├── cache/                  # Existing (REUSE)
-│   └── round-cache.ts      # Pattern for incremental indexing hash
-└── config/                 # Existing (MODIFIED)
-    └── schema.ts           # Add MCP + search config fields
+├── mcp/                         # MCP protocol layer (transports + registrations)
+│   ├── server.ts                # START HERE: transport-agnostic server bootstrap
+│   ├── tools.ts                 # semantic_search + new remote regeneration tools
+│   ├── prompts.ts               # workflow prompts; add streaming-aware QA prompt path
+│   ├── resources.ts             # docs + analyzer resource exposure
+│   ├── preflight.ts             # serve safety checks before startup
+│   ├── workflow-checkpoints.ts  # persisted prompt checkpoints
+│   └── job-runner.ts            # NEW: long-running MCP tool execution + progress
+├── services/                    # NEW: reusable app services decoupled from CLI I/O
+│   ├── generate-service.ts      # wraps runGenerate pipeline for programmatic use
+│   └── qa-service.ts            # wraps answerQuestion with streaming callbacks
+├── vector/                      # indexing/search foundation reused by MCP + CLI
+│   ├── reindex.ts
+│   ├── query-engine.ts
+│   ├── embedder.ts
+│   └── vector-store.ts
+├── providers/                   # LLM + embedding provider implementations
+└── cli/                         # command adapters only (argument parsing + UX)
 ```
 
 ### Structure Rationale
 
-- **`src/mcp/`**: Isolated from core CLI logic — MCP server can run independently via `handover serve` or stdio transport.
-- **`src/search/`**: Clean separation of search concerns — indexer, embeddings, storage, and query are independent modules that compose at the engine level.
-- **Minimal existing code changes**: Only CLI entry point, config schema, and optional post-render hook touched.
+- **`mcp/` stays protocol-only:** register capabilities, validate payloads, map errors; no DAG orchestration logic here.
+- **`services/` is the key v5 seam:** remote MCP and local CLI share the same generation/QA business logic.
+- **`cli/` remains a thin adapter:** avoid coupling long-running UX behavior (spinners/stdout) to MCP execution paths.
 
 ## Architectural Patterns
 
-### Pattern 1: MCP Server as Separate Entry Point
+### Pattern 1: Service Extraction for Remote-Safe Execution
 
-**What:** MCP server runs as a standalone process (stdio or HTTP transport), separate from the `handover generate` CLI pipeline. The server reads from the `.handover/` output directory and vector database — it does NOT trigger analysis.
-
-**When to use:** When exposing handover docs to LLM clients (Claude Desktop, VS Code, custom agents). The server is a read-only consumer of handover's output.
-
-**Trade-offs:**
-
-- **PRO**: Clean separation — MCP server crashes don't affect CLI, and CLI doesn't need MCP dependencies loaded.
-- **PRO**: Supports both local (stdio) and remote (HTTP) deployment without architectural changes.
-- **CON**: Requires IPC or shared filesystem to access handover output (acceptable — `.handover/` is already shared state).
+**What:** Move "do the work" logic out of CLI handlers into service modules. CLI and MCP both call services.
+**When to use:** RMT-01 (remote regeneration) and RMT-04 (streaming QA) where CLI assumptions break MCP constraints.
+**Trade-offs:** Slight module churn now, significantly lower duplication/rework later.
 
 **Example:**
-
 ```typescript
-// src/mcp/server.ts
-import { Server } from '@modelcontextprotocol/server';
-import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
-
-const server = new Server(
-  {
-    name: 'handover-mcp',
-    version: '0.1.0',
-  },
-  {
-    capabilities: {
-      tools: {},
-      resources: {},
-      prompts: {},
-    },
-  },
-);
-
-// Register semantic search tool
-server.tool(
-  'semantic_search',
-  {
-    description: 'Search handover documentation using semantic similarity',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string' },
-        limit: { type: 'number', default: 5 },
-      },
-      required: ['query'],
-    },
-  },
-  async ({ query, limit }) => {
-    const engine = new QueryEngine(vectorStore);
-    const results = await engine.search(query, limit);
-    return { content: [{ type: 'text', text: JSON.stringify(results) }] };
-  },
-);
-
-// Register document resource
-server.resource('handover://docs/{docId}', async ({ docId }) => {
-  const doc = await readDocFromDisk(docId); // .handover/*.md
-  return { contents: [{ uri: `handover://docs/${docId}`, text: doc }] };
-});
-
-// Start stdio transport
-const transport = new StdioServerTransport();
-await server.connect(transport);
+// Pseudocode shape
+// cli/generate.ts -> services/generate-service.ts
+// mcp/tools.ts (regenerate_docs) -> services/generate-service.ts
 ```
 
-### Pattern 2: Incremental Indexing with Content Hash
+### Pattern 2: Transport Adapter Boundary
 
-**What:** Reuse handover's existing `AnalysisCache` pattern to detect changed documents. Only reindex chunks from modified `.md` files. Hash each document's content (SHA-256), compare to stored hash, skip unchanged files.
-
-**When to use:** After every `handover generate` completion. Triggered automatically in render step's `onComplete` hook.
-
-**Trade-offs:**
-
-- **PRO**: Avoids expensive embedding API calls for unchanged docs (embeddings cost $0.02/1M tokens — full reindex of 14 docs with 50 chunks each = ~$0.001, but 100 runs = $0.10).
-- **PRO**: Aligns with existing handover incremental patterns (analyzer cache, round cache).
-- **CON**: Requires tracking document hashes in `search.db` (adds `documents` table with `content_hash` column).
+**What:** Keep MCP registrations transport-agnostic; transport implementation selected at bootstrap (stdio or HTTP).
+**When to use:** RMT-02 optional HTTP transport.
+**Trade-offs:** One extra abstraction layer, but avoids branching logic spread across all tools/prompts.
 
 **Example:**
-
 ```typescript
-// src/search/indexer.ts
-export class DocumentIndexer {
-  async indexDocuments(docsDir: string): Promise<IndexResult> {
-    const files = await glob('*.md', { cwd: docsDir });
-    const changedFiles: string[] = [];
-
-    for (const file of files) {
-      const content = await readFile(join(docsDir, file), 'utf-8');
-      const hash = createHash('sha256').update(content).digest('hex');
-      const stored = await this.store.getDocHash(file);
-
-      if (hash !== stored) {
-        changedFiles.push(file);
-        await this.reindexDocument(file, content, hash);
-      }
-    }
-
-    return { total: files.length, changed: changedFiles.length };
-  }
-
-  private async reindexDocument(file: string, content: string, hash: string) {
-    // Delete old chunks for this doc
-    await this.store.deleteChunks(file);
-
-    // Chunk with recursive character split (512 tokens, 10% overlap)
-    const chunks = this.chunker.chunk(content, { maxTokens: 512, overlap: 0.1 });
-
-    // Generate embeddings (batched)
-    const embeddings = await this.embedder.embed(chunks.map((c) => c.text));
-
-    // Store chunks + embeddings
-    await this.store.insertChunks(file, chunks, embeddings);
-    await this.store.updateDocHash(file, hash);
-  }
-}
+type McpTransportMode = 'stdio' | 'http';
+startMcpServer({ mode, registerHooks });
 ```
 
-### Pattern 3: Embedding Provider Extending BaseProvider Pattern
+### Pattern 3: Progress/Streaming via MCP Notifications
 
-**What:** Create `EmbeddingProvider` class that extends handover's existing `BaseProvider` abstract class. Reuses retry logic, rate limiting, and token estimation. Implements `doComplete` for OpenAI embeddings API instead of chat completions.
-
-**When to use:** For all embedding generation (initial indexing and query-time embedding).
-
-**Trade-offs:**
-
-- **PRO**: Consistent error handling, retry backoff, and rate limiting across all LLM calls.
-- **PRO**: Minimal new code — reuse existing provider infrastructure.
-- **CON**: Slight API mismatch (embeddings don't have "completion" semantics), but acceptable because the retry/rate-limit patterns are the same.
+**What:** For long operations, emit progress notifications tied to request metadata rather than printing output.
+**When to use:** RMT-04 streaming QA and RMT-01 regeneration progress.
+**Trade-offs:** Requires cooperative client support; fallback remains final non-streamed result payload.
 
 **Example:**
-
 ```typescript
-// src/search/embeddings.ts
-import { BaseProvider } from '../providers/base-provider.js';
-import OpenAI from 'openai';
-
-export class EmbeddingProvider extends BaseProvider {
-  readonly name = 'openai-embeddings';
-  private client: OpenAI;
-
-  constructor(apiKey: string, concurrency = 4) {
-    super('text-embedding-3-small', concurrency);
-    this.client = new OpenAI({ apiKey });
-  }
-
-  protected async doComplete<T>(
-    request: { text: string | string[] },
-    schema: unknown, // Unused for embeddings
-    onToken?: (count: number) => void,
-  ): Promise<{ data: T }> {
-    const texts = Array.isArray(request.text) ? request.text : [request.text];
-
-    const response = await this.client.embeddings.create({
-      model: this.model,
-      input: texts,
-    });
-
-    // Report token usage
-    onToken?.(response.usage.total_tokens);
-
-    const embeddings = response.data.map((d) => d.embedding);
-    return { data: embeddings as T };
-  }
-
-  protected isRetryable(err: unknown): boolean {
-    // Rate limit or server errors
-    return err instanceof OpenAI.APIError && (err.status === 429 || err.status >= 500);
-  }
-
-  maxContextTokens(): number {
-    return 8191; // text-embedding-3-small context window
-  }
-}
-```
-
-### Pattern 4: SQLite Vector Storage with sqlite-vec
-
-**What:** Use `better-sqlite3` with `sqlite-vec` extension for vector storage. Store documents, chunks, and embeddings in normalized tables. Use `vec0` virtual table for cosine similarity queries.
-
-**When to use:** For all vector operations (insert, search, delete).
-
-**Trade-offs:**
-
-- **PRO**: No external dependencies — SQLite runs in-process, no separate vector DB service.
-- **PRO**: `sqlite-vec` is pure C with no dependencies, runs anywhere Node runs.
-- **PRO**: ACID transactions, WAL mode for write concurrency.
-- **CON**: Not suitable for >1M vectors (HNSW indexes degrade), but handover docs are <10K chunks maximum.
-
-**Example:**
-
-```typescript
-// src/search/vector-store.ts
-import Database from 'better-sqlite3';
-import * as sqliteVec from 'sqlite-vec';
-
-export class VectorStore {
-  private db: Database.Database;
-
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
-    sqliteVec.load(this.db);
-    this.initSchema();
-  }
-
-  private initSchema() {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS documents (
-        id INTEGER PRIMARY KEY,
-        filename TEXT UNIQUE NOT NULL,
-        content_hash TEXT NOT NULL,
-        indexed_at TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS chunks (
-        id INTEGER PRIMARY KEY,
-        doc_id INTEGER NOT NULL,
-        chunk_index INTEGER NOT NULL,
-        text TEXT NOT NULL,
-        metadata TEXT, -- JSON
-        FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
-      );
-
-      CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
-        chunk_id INTEGER PRIMARY KEY,
-        embedding FLOAT[1536]
-      );
-    `);
-  }
-
-  async search(queryEmbedding: Float32Array, limit = 5): Promise<SearchResult[]> {
-    const stmt = this.db.prepare(`
-      SELECT
-        c.id, c.text, c.metadata, d.filename,
-        vec_distance_cosine(v.embedding, ?) as distance
-      FROM vec_chunks v
-      JOIN chunks c ON c.id = v.chunk_id
-      JOIN documents d ON d.id = c.doc_id
-      ORDER BY distance ASC
-      LIMIT ?
-    `);
-
-    return stmt.all(queryEmbedding.buffer, limit) as SearchResult[];
-  }
+if (extra._meta?.progressToken !== undefined) {
+  await extra.sendNotification({
+    method: 'notifications/progress',
+    params: { progressToken: extra._meta.progressToken, progress, total, message },
+  });
 }
 ```
 
 ## Data Flow
 
-### Indexing Flow (Post-Render)
+### Request Flow
 
 ```
-[handover generate completes]
+[MCP client tool/prompt call]
     ↓
-[Render step onComplete hook]
+[mcp/tools.ts or mcp/prompts.ts handler]
     ↓
-[DocumentIndexer.indexDocuments()]
-    ↓ (for each changed .md file)
-[ChunkDocument (512 tokens, recursive split)]
+[service layer (qa-service / generate-service)]
     ↓
-[EmbeddingProvider.embed(chunks)]
-    ↓ (batched OpenAI API calls)
-[VectorStore.insertChunks(embeddings)]
+[vector + provider + DAG subsystems]
     ↓
-[Update document content hash]
-    ↓
-[search.db updated]
+[structured MCP response (+ optional progress notifications)]
 ```
 
-### Query Flow (MCP Tool Call)
+### State Management
 
 ```
-[LLM client calls semantic_search tool]
+[Disk-backed state]
     ↓
-[MCP server receives tool call]
+(.handover/output markdown, .handover/search.db, workflow checkpoints)
     ↓
-[QueryEngine.search(query)]
+[Stateless MCP handlers + short-lived per-request job state]
     ↓
-[EmbeddingProvider.embed(query)] → [1536-dim vector]
-    ↓
-[VectorStore.search(queryEmbedding)]
-    ↓ (SQLite cosine similarity)
-[Top-k chunks retrieved]
-    ↓
-[Rerank with metadata filters] (optional)
-    ↓
-[Return chunks + document names to LLM]
+[Client-visible progress/result]
 ```
 
-### Resource Access Flow (MCP Resource)
+### Key Data Flows
 
-```
-[LLM client requests handover://docs/{docId}]
-    ↓
-[MCP server resource handler]
-    ↓
-[Read .handover/{docId}.md from disk]
-    ↓
-[Return full document content]
-```
+1. **RMT-04 streaming QA flow:** prompt/tool request -> retrieval (`query-engine`) -> provider synthesis with token/progress callbacks -> MCP progress notifications -> final cited answer.
+2. **RMT-01 remote regenerate flow:** tool request -> generate service launches DAG pipeline -> progress events mapped to MCP notifications -> docs rewritten + optional reindex -> completion payload.
+3. **RMT-03 local embedding flow:** query/reindex path -> embedding provider router -> OpenAI (`/v1/embeddings`) or local Ollama (`/api/embed` or `/v1/embeddings`) -> vector store operations.
+4. **RMT-02 HTTP flow:** HTTP POST/GET at single MCP endpoint -> same tool/prompt handlers as stdio -> optional SSE response stream for long-running calls.
 
 ## Integration Points
 
 ### New Components
 
-| Component          | Location                     | Purpose                                              |
-| ------------------ | ---------------------------- | ---------------------------------------------------- |
-| MCP Server         | `src/mcp/server.ts`          | Stdio/HTTP server exposing handover via MCP protocol |
-| MCP Tools          | `src/mcp/tools.ts`           | `semantic_search`, `list_documents`, etc.            |
-| MCP Resources      | `src/mcp/resources.ts`       | `handover://docs/{id}` resource URIs                 |
-| MCP Prompts        | `src/mcp/prompts.ts`         | Prompt templates for common workflows                |
-| Document Indexer   | `src/search/indexer.ts`      | Chunking, change detection, orchestration            |
-| Embedding Provider | `src/search/embeddings.ts`   | OpenAI text-embedding-3-small wrapper                |
-| Vector Store       | `src/search/vector-store.ts` | SQLite + sqlite-vec CRUD operations                  |
-| Query Engine       | `src/search/query-engine.ts` | Search orchestration, ranking, filters               |
-| Chunker            | `src/search/chunker.ts`      | Recursive character split with overlap               |
+| Component | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| `src/services/generate-service.ts` | Shared domain service called by CLI + MCP | Prevents reusing CLI renderer/logging in MCP context |
+| `src/services/qa-service.ts` | Shared QA orchestration with callback hooks | Enables streaming and non-streaming from same core |
+| `src/mcp/job-runner.ts` | Long-running task coordinator for tools | Handles progress, cancellation, and concurrency guard |
+| `src/mcp/transports/http.ts` | HTTP adapter around MCP server | Optional transport selected by config/flags |
+| `src/vector/embedding-router.ts` | Embedding backend selection | Routes OpenAI vs local provider without changing callers |
 
 ### Modified Existing Components
 
-| Component        | File                             | Modification                                     |
-| ---------------- | -------------------------------- | ------------------------------------------------ |
-| CLI Entry        | `src/cli/index.ts`               | Add `handover serve` command for MCP server      |
-| Generate Command | `src/cli/generate.ts`            | Add post-render indexing hook (lines ~950-960)   |
-| Config Schema    | `src/config/schema.ts`           | Add `mcp` and `search` config objects            |
-| BaseProvider     | `src/providers/base-provider.ts` | NONE (EmbeddingProvider extends without changes) |
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `src/cli/serve.ts` <-> `src/mcp/server.ts` | Direct function call | Add transport mode/host/port and security defaults |
+| `src/mcp/tools.ts` <-> `src/cli/generate.ts` | Replace direct CLI invocation with service call | Avoid stdout contamination and terminal renderer assumptions |
+| `src/mcp/prompts.ts` <-> `src/qa/answerer.ts` | Add streaming callback contract | Keep existing final response format backward-compatible |
+| `src/vector/embedder.ts` <-> `src/config/schema.ts` | Config-driven provider routing | Extend embedding config beyond current OpenAI-only enum |
+| `src/mcp/resources.ts` <-> analysis execution | Keep lazy read-only behavior | Do not broaden to mutating actions |
 
-### External Dependencies
+## Build Order (Dependency-Aware for RMT-01..RMT-04)
 
-| Dependency                     | Purpose                 | Integration                                            |
-| ------------------------------ | ----------------------- | ------------------------------------------------------ |
-| `@modelcontextprotocol/server` | MCP server SDK          | TypeScript SDK for stdio/HTTP transport                |
-| `sqlite-vec`                   | Vector search extension | Load into better-sqlite3 via `sqliteVec.load(db)`      |
-| OpenAI API                     | Embedding generation    | Call `embeddings.create()` with text-embedding-3-small |
+1. **Foundation extraction (prerequisite, no feature flag):** introduce `generate-service` and `qa-service`, keep CLI behavior unchanged.
+   - Why first: every target feature needs CLI-independent execution paths.
+2. **RMT-04 streaming MCP QA (priority target):** add progress/token streaming in QA prompt/tool handlers using MCP notifications.
+   - Depends on: qa service callback seam.
+3. **RMT-03 local embedding provider path:** add embedding router + config extensions + Ollama path.
+   - Depends on: minimal config/schema updates; unblocks offline QA/search/reindex for remote deployments.
+4. **RMT-01 remote regeneration tool:** add `regenerate_docs` MCP tool with guarded job runner (single active run, progress, cancellation).
+   - Depends on: generate service + (recommended) progress framework from RMT-04.
+5. **RMT-02 optional HTTP transport:** add transport adapter and secure defaults (Origin validation, localhost bind default, auth hook).
+   - Depends on: stable tool/prompt/resource handlers and service boundaries from steps 1-4.
 
-## Configuration Schema Extensions
+## Anti-Patterns to Avoid
 
-```typescript
-// src/config/schema.ts (additions)
-export const HandoverConfigSchema = z.object({
-  // ... existing fields ...
-  mcp: z
-    .object({
-      enabled: z.boolean().default(false),
-      transport: z.enum(['stdio', 'http']).default('stdio'),
-      httpPort: z.number().int().positive().default(3000),
-    })
-    .default({ enabled: false, transport: 'stdio', httpPort: 3000 }),
+### Anti-Pattern 1: Calling CLI handlers directly from MCP tools
 
-  search: z
-    .object({
-      enabled: z.boolean().default(true),
-      embeddingModel: z.string().default('text-embedding-3-small'),
-      chunkSize: z.number().int().positive().default(512),
-      chunkOverlap: z.number().min(0).max(0.5).default(0.1),
-      maxResults: z.number().int().positive().default(5),
-    })
-    .default({
-      enabled: true,
-      embeddingModel: 'text-embedding-3-small',
-      chunkSize: 512,
-      chunkOverlap: 0.1,
-      maxResults: 5,
-    }),
-});
-```
+**What people do:** invoke `runGenerate()` inside tool handlers.
+**Why it's wrong:** CLI code is terminal-UX oriented and may write stdout; MCP stdio requires protocol-only stdout.
+**Do this instead:** call service modules that return structured events/results.
 
-## Anti-Patterns
+### Anti-Pattern 2: Baking transport conditionals into every tool
 
-### Anti-Pattern 1: Modifying Core DAG Steps for Indexing
+**What people do:** `if (http) { ... } else { ... }` inside each registration.
+**Why it's wrong:** multiplies complexity and drifts behavior between transports.
+**Do this instead:** single transport adapter boundary in server bootstrap.
 
-**What people might do:** Add vector indexing as a DAG step that depends on the render step.
+### Anti-Pattern 3: Hard-switching embeddings without dimension validation
 
-**Why it's wrong:** DAG orchestrator is designed for analysis pipeline, not post-processing side effects. Adding indexing to the DAG creates coupling and makes the MCP server dependent on running `handover generate`.
-
-**Do this instead:** Trigger indexing in the render step's completion callback or as a separate post-generate hook. Keep indexing as an optional, decoupled operation.
-
-### Anti-Pattern 2: Embedding All Documents on Every Generate
-
-**What people might do:** Regenerate embeddings for all documents on every `handover generate` run.
-
-**Why it's wrong:** Wastes API quota and money. Embeddings API costs $0.02 per 1M tokens. Full reindex of 14 docs (~50K tokens) costs ~$0.001, but 100 runs = $0.10. With incremental indexing, only changed docs are reindexed (typically 1-2 docs per run).
-
-**Do this instead:** Use content-hash-based change detection (SHA-256 of document content). Only reindex chunks from modified files. Store document hashes in `search.db`.
-
-### Anti-Pattern 3: Tight Coupling Between MCP Server and CLI
-
-**What people might do:** Embed MCP server logic directly in `src/cli/generate.ts` or share mutable state between CLI and server.
-
-**Why it's wrong:** MCP server should run independently (stdio transport via Claude Desktop or HTTP for remote access). Coupling to CLI makes deployment complex and prevents running the server without triggering analysis.
-
-**Do this instead:** MCP server reads from `.handover/` directory and `search.db` (shared filesystem). Server is a stateless consumer of handover's output. Use separate entry point (`src/mcp/server.ts`).
-
-### Anti-Pattern 4: Custom Vector Search Implementation
-
-**What people might do:** Implement cosine similarity search in TypeScript with in-memory vectors.
-
-**Why it's wrong:** Poor performance for >1K vectors, high memory usage, no persistence. Reinvents the wheel when SQLite extensions exist.
-
-**Do this instead:** Use `sqlite-vec` extension with `better-sqlite3`. Provides SIMD-accelerated cosine similarity, on-disk persistence, and ACID transactions. Runs anywhere SQLite runs (Linux/macOS/Windows, WASM).
+**What people do:** swap embedding model/provider against existing DB.
+**Why it's wrong:** vector dimension mismatch corrupts search behavior.
+**Do this instead:** enforce embedding model+dimension metadata checks and require reindex on mismatch.
 
 ## Scaling Considerations
 
-| Scale                      | Architecture Adjustments                                                                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| 0-100 docs, <5K chunks     | Current architecture sufficient. SQLite handles 10K vectors easily. Indexing takes <5s.                                  |
-| 100-1K docs, 5K-50K chunks | Add HNSW indexing (sqlite-vec supports). Query latency stays <100ms. Consider batch embedding (2048 texts per API call). |
-| 1K+ docs, 50K+ chunks      | Migrate to dedicated vector DB (Pinecone, Weaviate). SQLite vec0 virtual table degrades with >100K vectors.              |
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| Local/team (stdio, single user) | Current process model is sufficient; prefer stdio by default |
+| Hosted small remote (HTTP, tens of sessions) | Add per-session limits, request timeouts, tool concurrency caps |
+| Larger remote deployment | Externalize job state and queue; avoid in-process long-run task contention |
 
 ### Scaling Priorities
 
-1. **First bottleneck:** Embedding API rate limits. Solution: Batch requests (max 2048 texts per call), use `RateLimiter` from `BaseProvider`, add retry backoff.
-2. **Second bottleneck:** SQLite write throughput during indexing. Solution: Use transactions (batch 100 inserts per transaction), enable WAL mode (`pragma journal_mode = WAL`).
-3. **Third bottleneck:** Query latency for >10K chunks. Solution: Add HNSW indexing via `sqlite-vec`'s `vss0` table (approximate nearest neighbor), or migrate to Pinecone/Weaviate.
-
-## Build Order (Suggested Phase Structure)
-
-### Phase 1: Vector Storage + Indexing (Foundation)
-
-**Goal:** Get chunks stored in SQLite with embeddings, no MCP server yet.
-
-**Components:**
-
-1. `VectorStore` (SQLite + sqlite-vec schema)
-2. `DocumentIndexer` (chunking + change detection)
-3. `EmbeddingProvider` (OpenAI API wrapper)
-4. Post-render indexing hook in `generate.ts`
-5. Config schema extensions
-
-**Deliverable:** Running `handover generate` automatically indexes changed docs into `search.db`.
-
-**Rationale:** Establishes data layer before building query/MCP layers. Allows testing chunking and embedding quality independently.
-
-### Phase 2: Query Engine + CLI Search
-
-**Goal:** Semantic search works via CLI command (`handover search "query"`).
-
-**Components:**
-
-1. `QueryEngine` (search orchestration)
-2. CLI `search` command in `src/cli/index.ts`
-3. Result formatting/display
-
-**Deliverable:** `handover search "authentication flow"` returns relevant chunks from docs.
-
-**Rationale:** Validates search quality before exposing via MCP. Easier to debug/iterate without MCP protocol overhead.
-
-### Phase 3: MCP Server (Tools + Resources)
-
-**Goal:** MCP server exposes handover docs to LLM clients.
-
-**Components:**
-
-1. `src/mcp/server.ts` (stdio/HTTP transport)
-2. `src/mcp/tools.ts` (`semantic_search` tool)
-3. `src/mcp/resources.ts` (document access)
-4. CLI `serve` command
-
-**Deliverable:** Claude Desktop can connect to handover MCP server, search docs, and read full documents.
-
-**Rationale:** Builds on proven search engine from Phase 2. MCP layer is thin adapter over existing functionality.
-
-### Phase 4: Prompts + Advanced Features
-
-**Goal:** Prompt templates for common workflows, hybrid search, metadata filters.
-
-**Components:**
-
-1. `src/mcp/prompts.ts` (prompt templates)
-2. Hybrid search (text + vector)
-3. Metadata filters (by document type, section)
-4. Reindexing CLI command (`handover reindex`)
-
-**Deliverable:** Full-featured MCP server with rich query capabilities.
-
-**Rationale:** Deferred nice-to-haves until core functionality is stable.
+1. **First bottleneck:** long-running regeneration requests blocking process; mitigate via job runner and concurrency caps.
+2. **Second bottleneck:** provider/embedding latency and retries; mitigate via progress notifications + cancellation propagation.
 
 ## Sources
 
-### HIGH Confidence (Official Documentation)
-
-- [MCP Architecture Overview](https://modelcontextprotocol.io/docs/learn/architecture) - Official MCP specification
-- [TypeScript MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk) - Official SDK repository
-- [OpenAI Embeddings API](https://platform.openai.com/docs/api-reference/embeddings) - Official API reference
-- [sqlite-vec Extension](https://github.com/asg017/sqlite-vec) - Official vector search extension
-
-### MEDIUM Confidence (WebSearch Verified)
-
-- [MCP Best Practices](https://modelcontextprotocol.info/docs/best-practices/) - Community-maintained guide
-- [Chunking Strategies for RAG](https://weaviate.io/blog/chunking-strategies-for-rag) - Weaviate research
-- [2026 RAG Performance Paradox](https://ragaboutit.com/the-2026-rag-performance-paradox-why-simpler-chunking-strategies-are-outperforming-complex-ai-driven-methods/) - 2026 performance findings
-- [Vector Embeddings Guide](https://www.meilisearch.com/blog/what-are-vector-embeddings) - Comprehensive 2026 overview
-- [Incremental Indexing Patterns](https://milvus.io/ai-quick-reference/how-do-you-handle-incremental-updates-in-a-vector-database) - Milvus documentation
-- [SQLite Vector Search Integration](https://stephencollins.tech/posts/how-to-use-sqLite-to-store-and-query-vector-embeddings) - Practical TypeScript guide
-
-### LOW Confidence (Single Source)
-
-- [Best Embedding Models 2026](https://elephas.app/blog/best-embedding-models) - Model comparison guide (not verified with OpenAI official docs)
+- Internal codebase: `src/cli/serve.ts`, `src/mcp/server.ts`, `src/mcp/tools.ts`, `src/mcp/prompts.ts`, `src/qa/answerer.ts`, `src/vector/embedder.ts`, `src/vector/reindex.ts`, `src/config/schema.ts`.
+- Project context: `.planning/PROJECT.md` (v5 milestone goals and priority ordering).
+- MCP spec transports (2025-06-18): https://modelcontextprotocol.io/specification/2025-06-18/basic/transports (HTTP + SSE behavior and security requirements).
+- MCP tools spec (2025-06-18): https://modelcontextprotocol.io/specification/2025-06-18/server/tools.
+- MCP TypeScript SDK protocol docs (`v1.x`): https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/v1.x/docs/protocol.md (progress notifications and cancellation).
+- MCP TypeScript SDK server docs (`v1.x`): https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/v1.x/docs/server.md (stdio vs Streamable HTTP patterns).
+- Ollama API docs: https://raw.githubusercontent.com/ollama/ollama/main/docs/api.md (`/api/embed`).
+- Ollama OpenAI compatibility: https://docs.ollama.com/openai (`/v1/embeddings`).
 
 ---
-
-_Architecture research for: MCP server and semantic search integration_
-_Researched: 2026-02-20_
+*Architecture research for: Handover v5.0 Remote and Advanced MCP*
+*Researched: 2026-02-23*

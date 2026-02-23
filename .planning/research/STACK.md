@@ -1,266 +1,144 @@
 # Stack Research
 
-**Domain:** MCP Server with Semantic Search & Embeddings
-**Researched:** 2026-02-20
+**Domain:** v5.0 Remote & Advanced MCP stack additions (brownfield)
+**Researched:** 2026-02-23
 **Confidence:** HIGH
 
 ## Recommended Stack
 
 ### Core Technologies
 
-| Technology                | Version            | Purpose                   | Why Recommended                                                                                                                                                                                                                                                        |
-| ------------------------- | ------------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| @modelcontextprotocol/sdk | ^1.26.0            | MCP server implementation | Official TypeScript SDK from Anthropic with full MCP spec support. v1.x is production-ready with v2 coming Q1 2026. Industry standard with 26,405 npm dependents. Provides built-in stdio/HTTP transports and tool/resource/prompt primitives.                         |
-| better-sqlite3            | ^12.6.2            | SQLite database driver    | Fastest synchronous SQLite library for Node.js with full TypeScript support. Native performance (10,000+ ops/sec), zero config, single-file DB perfect for CLI tools. Compatible with Node 20/22 (tested in CI).                                                       |
-| sqlite-vec                | ^0.1.7-alpha.2     | Vector search extension   | Pure C vector search extension that runs anywhere SQLite runs. Brute-force search competitive with FAISS/DuckDB. Zero dependencies, cross-platform (Linux/macOS/Windows), works with better-sqlite3. Declared stable/production-ready by maintainer despite alpha tag. |
-| openai                    | ^6.22.0 (existing) | Embeddings generation     | Already integrated. Provides text-embedding-3-small ($0.02/1M tokens) and text-embedding-3-large ($0.13/1M tokens). Best cost/performance for embeddings. Supports batch API (50% cheaper, 50K embeddings/batch).                                                      |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `@modelcontextprotocol/sdk` | `^1.26.0` (keep) | MCP server runtime for stdio + optional Streamable HTTP | Already integrated and production-ready in v1.x. Supports `StdioServerTransport` and `StreamableHTTPServerTransport` in one SDK, so v5 can stay additive without transport rewrites. |
+| Node `http` (`node:http`) | Node `20/22` runtime targets (existing CI) | Host optional HTTP MCP endpoint for remote clients | No new dependency footprint. Keeps transport optional and avoids introducing framework-specific operational complexity for a CLI-first product. |
+| `openai` | `^6.22.0` (keep) | Unified embedding client for cloud OpenAI and local OpenAI-compatible endpoints (Ollama `/v1/embeddings`) | Already in repo. Supports configurable `baseURL`, retries, and timeout handling; ideal for RMT-03 without adding another SDK. |
 
 ### Supporting Libraries
 
-| Library               | Version           | Purpose                                   | When to Use                                                                                                                                                                                     |
-| --------------------- | ----------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| @types/better-sqlite3 | ^7.6.13           | TypeScript types for better-sqlite3       | If types not bundled with better-sqlite3. Provides Database, Statement, and Transaction interfaces.                                                                                             |
-| zod                   | ^4.3.6 (existing) | Runtime validation for embeddings/vectors | Validate embedding dimensions, vector metadata, search params. Already used throughout handover for domain validation.                                                                          |
-| voyageai              | ^1.x (optional)   | Alternative embeddings provider           | Only if need domain-specific models (voyage-law-2, voyage-code-3). voyage-4-large outperforms OpenAI by 14% but costs $0.06/1M (3x OpenAI). Use for specialized use cases, not general-purpose. |
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| `zod` | `^3.25.76` (keep) | Validate new config surface (`serve.transport`, `serve.http`, `embedding.provider=ollama`) and MCP tool I/O | Use for all new v5 config/schema contracts so behavior remains consistent with current codebase patterns. |
+| `@modelcontextprotocol/inspector` | Latest (dev-only, optional) | Validate Streamable HTTP transport behavior and event flow during development | Use only while implementing/debugging RMT-02 and RMT-04; not required at runtime. |
+| Ollama daemon | current stable (external runtime) | Local embedding inference path for offline/private indexing | Use only when user explicitly opts into local embeddings; keep OpenAI embeddings as default path. |
 
 ### Development Tools
 
-| Tool                            | Purpose              | Notes                                                                                      |
-| ------------------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
-| @modelcontextprotocol/inspector | MCP server debugging | Optional. Visual inspector for testing MCP tools/resources without building a full client. |
-| vitest                          | Testing (existing)   | Extend existing test suite for vector search, embeddings, MCP handlers.                    |
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| Existing `vitest` integration suite | Validate remote tool behavior, transport switching, and stream output contracts | Extend integration coverage; no new testing framework needed. |
+| Existing CLI (`commander`) | Expose optional HTTP transport flags/settings | Keep `serve` default as stdio; add opt-in HTTP mode to preserve backward compatibility. |
 
 ## Installation
 
 ```bash
-# Core additions (MCP + Vector Search)
-npm install @modelcontextprotocol/sdk better-sqlite3 sqlite-vec
+# Required runtime additions
+# None (recommended approach reuses existing dependencies)
 
-# TypeScript types
-npm install -D @types/better-sqlite3
-
-# Optional: Alternative embeddings (only if needed)
-npm install voyageai
+# Optional dev tooling for transport debugging
+npm install -D @modelcontextprotocol/inspector
 ```
 
 ## Alternatives Considered
 
-| Recommended               | Alternative                    | When to Use Alternative                                                                                                                                                    |
-| ------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| @modelcontextprotocol/sdk | Custom JSON-RPC implementation | Never. MCP SDK provides protocol compliance, type safety, transport handling, and future-proofing for v2.                                                                  |
-| better-sqlite3            | node-sqlite3 (async)           | If need async/await API or multiple concurrent writers. better-sqlite3 is synchronous and 2-5x faster for CLI use cases with single writer.                                |
-| sqlite-vec                | FAISS (via faiss-node)         | If need ANN algorithms (HNSW, IVF) for 1M+ vectors. sqlite-vec uses brute-force (perfect for <100K vectors). FAISS adds 50MB+ dependencies and platform-specific binaries. |
-| sqlite-vec                | Pinecone/Weaviate/Qdrant       | If need distributed search, multi-tenancy, or cloud-hosted vector DB. Overkill for CLI tool. sqlite-vec keeps everything local and zero-config.                            |
-| OpenAI embeddings         | Voyage AI embeddings           | If need domain-specific models (legal, code, finance) or 14% better accuracy justifies 3x cost. OpenAI sufficient for general documentation search.                        |
-| OpenAI embeddings         | Local models (via Ollama)      | If privacy/offline required. 10-20x slower, lower quality. Not recommended unless hard requirement.                                                                        |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| `@modelcontextprotocol/sdk@^1.26.0` | Early migration to SDK v2 package split (`@modelcontextprotocol/server`, etc.) | Only if project explicitly schedules a broader migration. v2 is still marked pre-alpha on the main branch docs; unnecessary risk for this milestone. |
+| Node `http` + SDK Streamable HTTP transport | Add Express/Hono app layer directly in handover | Only if you need framework middleware beyond MCP needs (complex auth, custom reverse-proxy behavior). For v5 scope, built-in Node HTTP is enough. |
+| Reuse `openai` client with `baseURL` for Ollama | Add `ollama` npm client dependency | Only if you need Ollama-specific APIs not exposed via OpenAI-compatible endpoints. For embeddings path, OpenAI-compatible API is sufficient. |
 
 ## What NOT to Use
 
-| Avoid                              | Why                                                                                                                           | Use Instead                                                |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| sqlite-vss (Faiss-based)           | Deprecated predecessor to sqlite-vec. Last updated 2023.                                                                      | sqlite-vec (active development, pure C, smaller footprint) |
-| text-embedding-ada-002             | 5x more expensive ($0.0001 vs $0.00002 per 1K tokens) than text-embedding-3-small. Older model.                               | text-embedding-3-small or text-embedding-3-large           |
-| MCP HTTP transport for CLI         | Adds network overhead, auth complexity, TLS requirements. stdio is 100x faster (10K vs 100-1K ops/sec) for single-client CLI. | stdio transport (default for local MCP servers)            |
-| Custom vector similarity functions | Reinventing wheel. sqlite-vec provides optimized vec_distance_cosine, vec_distance_l2.                                        | sqlite-vec built-in distance functions                     |
-| JSON columns for vectors           | Slow, no indexing, manual parsing.                                                                                            | BLOB columns with Float32Array + sqlite-vec functions      |
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| Custom JSON-RPC over ad-hoc HTTP/WebSocket | High protocol drift risk; duplicates MCP transport/session logic already solved by SDK | `StreamableHTTPServerTransport` from MCP SDK |
+| Always-on HTTP mode replacing stdio | Breaks existing local MCP workflows and increases ops/security surface for users who do not need remote access | Keep stdio default, HTTP as explicit opt-in |
+| Adding separate embedding SDKs per provider | Increases maintenance, retry behavior divergence, and config complexity | One embedding adapter built on existing `openai` client + configurable `baseURL` |
+| Shelling out `handover generate` from MCP tool | Harder observability/error mapping and weaker type safety | Call `runGenerate`/internal pipeline entrypoints directly with bounded execution lock |
 
 ## Stack Patterns by Variant
 
-**If using MCP server for remote/team access (not typical for CLI):**
+**If local-first (default users):**
+- Keep `handover serve` on stdio (`StdioServerTransport`)
+- Keep non-streaming behavior unchanged unless streaming explicitly requested
+- Use OpenAI embeddings default path (current behavior)
 
-- Use Streamable HTTP transport instead of stdio
-- Add authentication layer (JWT or API keys)
-- Bind to localhost only (127.0.0.1) to prevent DNS rebinding attacks
-- Validate Origin header on all requests
-- Deploy behind TLS in production
+**If remote-hosted MCP (RMT-02 path):**
+- Add optional Streamable HTTP endpoint (`/mcp`) with `StreamableHTTPServerTransport`
+- Enforce origin validation + localhost binding by default; require explicit auth config for non-localhost
+- Maintain identical tools/resources/prompts registration so business behavior stays transport-agnostic
 
-**If vector dataset grows beyond 100K embeddings:**
+**If offline/private embeddings (RMT-03 path):**
+- Add `embedding.provider: ollama` and `embedding.baseUrl` config
+- Route embedding calls to Ollama OpenAI-compatible `/v1/embeddings` via existing `openai` client
+- Keep vector schema metadata strict (`model`, dimensions) to prevent mixed-vector-space corruption
 
-- Consider migrating from sqlite-vec (brute-force) to FAISS-based solution with ANN indexes
-- Implement pagination in search results
-- Add batch reindexing with progress tracking
-- Monitor query latency (sqlite-vec optimal for <100K vectors, degrades linearly beyond)
-
-**If need offline/air-gapped embeddings:**
-
-- Add Ollama provider (already in handover)
-- Use local models (nomic-embed-text, all-minilm)
-- Expect 10-20x slower generation and lower quality
-- Document tradeoffs for users
+**If long-form QA streaming (RMT-04 path):**
+- Keep current provider `onToken` callback plumbing as token source
+- Emit incremental MCP progress/log messages during QA synthesis
+- Return final structured response unchanged for compatibility with non-streaming clients
 
 ## Version Compatibility
 
-| Package A                        | Compatible With                             | Notes                                                                                                                                                                   |
-| -------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| @modelcontextprotocol/sdk@1.26.0 | Node.js 18+                                 | v2 SDK expected Q1 2026 will reorganize imports to @modelcontextprotocol/server and @modelcontextprotocol/node. Breaking changes expected but concepts identical.       |
-| better-sqlite3@12.6.2            | Node.js 20.x, 22.x, 23.x, 24.x              | Prebuilt binaries for LTS versions. Requires node-gyp for custom builds.                                                                                                |
-| sqlite-vec@0.1.7-alpha.2         | better-sqlite3 >=12                         | Auto-loads prebuilt extension when available. Platform-specific packages (sqlite-vec-darwin-x64, sqlite-vec-linux-x64, sqlite-vec-windows-x64) installed automatically. |
-| sqlite-vec@0.1.7-alpha.2         | OpenAI embeddings (1536 or 3072 dimensions) | Use Float32Array, store as BLOB, query with vec_distance_cosine(). text-embedding-3-small defaults to 1536 dims, text-embedding-3-large to 3072 dims.                   |
-| openai@6.22.0                    | Batch API                                   | Max 50K embeddings per batch, 2000 batches/hour, 200MB file limit, 24hr turnaround. 50% cost savings.                                                                   |
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| `@modelcontextprotocol/sdk@1.26.0` | Node `>=18` (package), project CI Node `20/22` | Includes stdio + Streamable HTTP transport classes needed for v5. |
+| `openai@6.22.0` | OpenAI API + OpenAI-compatible `baseURL` endpoints (e.g., Ollama) | Enables local embedding endpoint reuse without new SDK. |
+| MCP Streamable HTTP spec (2025-06-18) | `@modelcontextprotocol/sdk@1.26.0` transport implementation | Remote mode must respect protocol/session headers and SSE/JSON response behavior. |
 
 ## Integration Points with Existing Stack
 
-### Reuse Existing Infrastructure
+### RMT-01: Remote regeneration tool
 
-| Existing Component   | Integration Point        | How to Leverage                                                                                                    |
-| -------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| Zod domain model     | Embedding/vector schemas | Define EmbeddingSchema, VectorSearchSchema, MCPToolSchema with Zod. Validate at runtime.                           |
-| Content-hash caching | Embedding cache          | Key: contentHash(documentContent), Value: embedding vector. Avoid regenerating embeddings for unchanged documents. |
-| 8 LLM providers      | Embeddings abstraction   | Extend providers/base.ts with getEmbedding() method. Only OpenAI/Azure OpenAI initially. Ollama for offline.       |
-| Rate limiter         | OpenAI API calls         | Reuse existing rate-limiter.ts for embeddings API. Batch embeddings to minimize calls (up to 2048 inputs/request). |
-| vitest test suite    | Vector search tests      | Test cosine similarity, vector serialization, MCP tool handlers. Add to existing 254 tests.                        |
-| CLI architecture     | MCP server command       | Add `handover serve` command alongside `handover generate`. Use Commander.js (existing).                           |
+| Existing Component | Integration Point | Why This Fit |
+|--------------------|-------------------|--------------|
+| `src/mcp/tools.ts` | Register `regenerate_docs` tool | Existing MCP tool registration/error payload patterns are already in place. |
+| `src/cli/generate.ts` (`runGenerate`) | Invoke generation pipeline directly | Reuses DAG orchestration, caching, and renderer logic; avoids duplicate generation path. |
+| `src/utils/errors.ts` + MCP structured errors | Map generation failures to deterministic tool errors | Keeps remediation quality consistent with current MCP UX. |
 
-### New Abstractions Needed
+### RMT-02: Optional HTTP transport
 
-1. **Embeddings Service** (`src/embeddings/service.ts`)
-   - Abstract embedding generation behind interface
-   - Support OpenAI (primary), Voyage AI (optional), Ollama (offline)
-   - Implement batch processing for bulk operations
-   - Integrate with content-hash cache
+| Existing Component | Integration Point | Why This Fit |
+|--------------------|-------------------|--------------|
+| `src/mcp/server.ts` | Extend `startMcpServer()` to support transport mode selection | Today it is stdio-only; this is the natural abstraction seam for transport strategy. |
+| `src/cli/serve.ts` | Add transport options/config wiring | Existing serve preflight + hook registration can remain unchanged. |
+| Existing resources/tools/prompts registration | Reuse same hooks for both stdio and HTTP | Prevents capability drift between transports. |
 
-2. **Vector Store** (`src/vector-store/sqlite-vec.ts`)
-   - Initialize better-sqlite3 + sqlite-vec extension
-   - Create/migrate vector tables with Float32Array columns
-   - Implement insert/search/delete operations
-   - Handle vector serialization/deserialization
+### RMT-03: Local embedding provider path
 
-3. **MCP Server** (`src/mcp/server.ts`)
-   - Initialize MCP SDK with stdio transport
-   - Register tools: searchDocumentation, askQuestion, reindexDocuments
-   - Register resources: documentChunks, embeddingMetadata
-   - Error handling with retry strategies
+| Existing Component | Integration Point | Why This Fit |
+|--------------------|-------------------|--------------|
+| `src/config/schema.ts` (`embedding`) | Expand provider enum from `openai` to `openai|ollama` plus `baseUrl` | Keeps provider selection explicit and validated. |
+| `src/vector/embedder.ts` | Replace fixed OpenAI URL with provider/baseUrl-aware client call | Single adapter can serve both cloud and local embeddings. |
+| `src/vector/types.ts` (`EMBEDDING_MODELS`) | Add local model dimension handling strategy | Prevents vector DB mismatch when switching embedding models/providers. |
 
-4. **Reindexing Strategy** (`src/embeddings/reindex.ts`)
-   - Detect changed documents via content-hash comparison
-   - Incremental reindexing (only changed docs)
-   - Progress tracking for large codebases
-   - Version metadata (embedding model, dimension, date)
+### RMT-04: Streaming MCP QA responses
 
-## Migration Strategy from Existing handover
+| Existing Component | Integration Point | Why This Fit |
+|--------------------|-------------------|--------------|
+| `src/qa/answerer.ts` | Thread `onToken` through `provider.complete(...)` in QA path | Provider interface already supports streaming callbacks. |
+| `src/mcp/prompts.ts` (or new QA tool) | Emit incremental MCP progress/log updates while QA is running | Preserves grounded QA while improving UX for long answers. |
+| MCP transport layer | Stream over stdio or Streamable HTTP SSE depending on selected transport | Same server logic, transport-specific delivery handled by SDK. |
 
-**Phase 1: Vector Storage Foundation**
+## Explicit Non-Additions for v5.0
 
-- Add better-sqlite3 + sqlite-vec
-- Create embeddings database schema
-- Implement vector serialization utils
-- Test with sample embeddings
-
-**Phase 2: Embeddings Generation**
-
-- Extend LLM provider interface with embeddings support
-- Implement OpenAI embeddings via existing openai SDK
-- Add content-hash-based caching
-- Batch processing for bulk operations
-
-**Phase 3: Semantic Search**
-
-- Implement vector similarity search
-- Add relevance scoring (cosine similarity)
-- Integrate with existing document renderers
-- Return context-aware results
-
-**Phase 4: MCP Server**
-
-- Initialize @modelcontextprotocol/sdk
-- Expose tools: search, Q&A, reindex
-- stdio transport for local CLI
-- Error handling and retries
-
-**Phase 5: Reindexing & Maintenance**
-
-- Detect document changes via content-hash
-- Incremental reindexing workflow
-- CLI command: `handover reindex`
-- Version tracking for model changes
-
-## Performance Characteristics
-
-| Operation                     | Expected Performance                         | Notes                                                                        |
-| ----------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------- |
-| Embedding generation (OpenAI) | 2-5 sec / 100 documents                      | Batch API: 50% cheaper, 24hr latency. Use for bulk. Real-time: Standard API. |
-| Vector insert (sqlite-vec)    | 10,000+ inserts/sec                          | better-sqlite3 synchronous performance. Use transactions for bulk inserts.   |
-| Vector search (sqlite-vec)    | <100ms for 10K vectors, <1s for 100K vectors | Linear scan (brute-force). Degrades linearly with dataset size.              |
-| MCP tool call (stdio)         | <10ms overhead                               | stdio transport: 10K+ ops/sec. Negligible compared to LLM/embedding latency. |
-| Content-hash cache lookup     | <1ms                                         | In-memory or SQLite cache. Prevents redundant embedding generation.          |
-
-## Cost Projections
-
-**Scenario: 1000-file codebase, 50K tokens of documentation**
-
-| Operation                         | Model                    | Cost         | Notes                                            |
-| --------------------------------- | ------------------------ | ------------ | ------------------------------------------------ |
-| Initial indexing                  | text-embedding-3-small   | $0.001       | 50K tokens × $0.02/1M = $0.001                   |
-| Initial indexing                  | text-embedding-3-large   | $0.0065      | 50K tokens × $0.13/1M = $0.0065                  |
-| Incremental reindex (10% changed) | text-embedding-3-small   | $0.0001      | 5K tokens × $0.02/1M = $0.0001                   |
-| 100 Q&A queries                   | gpt-4o-mini + embeddings | $0.002       | Embeddings negligible vs LLM inference cost      |
-| Batch reindex (monthly)           | text-embedding-3-small   | $0.001/month | If using Batch API: 50% discount → $0.0005/month |
-
-**Recommendation:** Use text-embedding-3-small for cost efficiency. Upgrade to text-embedding-3-large only if search quality insufficient (unlikely for code documentation).
-
-## Known Limitations & Gotchas
-
-1. **sqlite-vec is alpha-tagged but stable**
-   - Maintainer declared v0.1.0 production-ready
-   - Alpha tag reflects pre-1.0 semantic versioning
-   - Used by Docker MCP Gateway (production)
-   - Monitor for v1.0 release in 2026
-
-2. **better-sqlite3 requires native compilation**
-   - Prebuilt binaries for common platforms
-   - May need node-gyp for exotic platforms
-   - CI already tests Node 20/22 (covered)
-
-3. **MCP SDK v2 breaking changes coming Q1 2026**
-   - v1.x will receive 6 months support after v2 ships
-   - Import paths change: `@modelcontextprotocol/sdk` → `@modelcontextprotocol/server`
-   - Concepts remain identical (easy migration)
-   - Pin to ^1.26.0, plan migration in Q2 2026
-
-4. **Embedding model changes require full reindex**
-   - Vector spaces incompatible across models
-   - Store embedding metadata (model, version, dimensions) in DB
-   - Detect mismatches on startup
-   - Voyage AI's shared embedding space (v4) solves this but costs 3x
-
-5. **OpenAI rate limits for embeddings**
-   - Tier-dependent: Free tier extremely limited
-   - Use Batch API for bulk operations (50K/batch, 24hr turnaround)
-   - Implement exponential backoff (existing rate-limiter.ts)
-   - Consider caching aggressively
-
-6. **Float32Array precision tradeoffs**
-   - sqlite-vec supports float32, int8, bit vectors
-   - float32: 4 bytes/dimension, high precision
-   - int8: 1 byte/dimension, 4x smaller, minimal quality loss for large dimensions
-   - Use float32 for <2048 dims, consider int8 for 3072+ dims if storage critical
+1. Do **not** add Redis/queue infra for regeneration in this milestone.
+2. Do **not** add WebSocket transport; MCP standard path is stdio + Streamable HTTP.
+3. Do **not** introduce a second vector database (keep SQLite + sqlite-vec).
+4. Do **not** replace current grounded QA architecture; only add streaming delivery.
+5. Do **not** migrate to MCP SDK v2 package split during this milestone.
 
 ## Sources
 
-### HIGH Confidence (Official Docs & Releases)
-
-- [@modelcontextprotocol/sdk npm](https://www.npmjs.com/package/@modelcontextprotocol/sdk) — Version 1.26.0, v2 roadmap
-- [MCP TypeScript SDK GitHub](https://github.com/modelcontextprotocol/typescript-sdk) — Official implementation
-- [Model Context Protocol Docs](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports) — Transport specifications
-- [better-sqlite3 GitHub](https://github.com/WiseLibs/better-sqlite3) — Version 12.6.2, Node 20/22 compatibility
-- [sqlite-vec GitHub](https://github.com/asg017/sqlite-vec) — v0.1.0 stable release announcement
-- [sqlite-vec JavaScript docs](https://alexgarcia.xyz/sqlite-vec/js.html) — Node.js integration guide
-- [OpenAI Embeddings API](https://platform.openai.com/docs/api-reference/embeddings) — Pricing, models, batch API
-- [OpenAI Batch API](https://developers.openai.com/api/docs/guides/batch/) — 50K limit, 50% discount
-
-### MEDIUM Confidence (Community Sources + Multiple Corroborations)
-
-- [MCP Transport Comparison](https://medium.com/@kumaran.isk/dual-transport-mcp-servers-stdio-vs-http-explained-bd8865671e1f) — stdio vs HTTP performance
-- [sqlite-vec Tutorial](https://stephencollins.tech/posts/how-to-use-sqlite-vec-to-store-and-query-vector-embeddings) — TypeScript implementation patterns
-- [Voyage AI vs OpenAI Comparison](https://elephas.app/blog/best-embedding-models) — Performance benchmarks, cost analysis
-- [MCP Error Handling Guide](https://mcpcat.io/guides/error-handling-custom-mcp-servers/) — Retry strategies, circuit breakers
-- [Document Reindexing Strategies](https://blog.gdeltproject.org/append-based-keyword-search-versus-rebuild-from-scratch-embedding-databases-technical-methodological-challenges/) — Incremental vs full reindex tradeoffs
-
-### LOW Confidence (Training Data)
-
-- None. All recommendations verified against official sources or multiple corroborating sources from 2026.
+- `https://modelcontextprotocol.io/specification/2025-06-18/basic/transports` — Streamable HTTP and stdio protocol requirements (**HIGH**)
+- `https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress` — progress notification semantics for long-running operations (**HIGH**)
+- `https://github.com/modelcontextprotocol/typescript-sdk` — v1.x recommendation and transport capabilities in official SDK docs/releases (**HIGH**)
+- `https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/v1.x/docs/server.md` — v1 server transport guidance and deployment patterns (**HIGH**)
+- `https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/v1.x/src/server/streamableHttp.ts` — concrete Streamable HTTP transport implementation details (**HIGH**)
+- `https://docs.ollama.com/openai` — OpenAI-compatible endpoint support (`/v1/embeddings`) for local provider path (**HIGH**)
+- `https://docs.ollama.com/capabilities/embeddings` — native embedding endpoint behavior and model guidance (**HIGH**)
+- `https://github.com/openai/openai-node` — `baseURL` support, streaming, retries/timeouts in JS SDK (**HIGH**)
 
 ---
-
-_Stack research for: MCP Server with Semantic Search & Embeddings_
-_Researched: 2026-02-20_
+*Stack research for: v5.0 Remote & Advanced MCP additions*
+*Researched: 2026-02-23*
