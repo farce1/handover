@@ -1,0 +1,45 @@
+---
+title: handover
+description: Generate comprehensive codebase documentation for any project
+template: splash
+hero:
+  tagline: The unified CLI for turning any codebase into clear, navigable documentation.
+  actions:
+    - text: Get started
+      link: /handover/user/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Command reference
+      link: /handover/reference/commands/
+      variant: secondary
+    - text: View on GitHub
+      link: https://github.com/farce1/handover
+      variant: minimal
+---
+
+## Start quickly
+
+1. Install the package and initialize your project.
+2. Configure provider keys and defaults.
+3. Generate documentation with a single command.
+
+## Explore by outcome
+
+- **I am onboarding a new repo**: [Getting started](/handover/user/getting-started/)
+- **I need CLI flags and environment details**: [Command reference](/handover/reference/commands/)
+- **I need release history**: [Changelog](/handover/reference/changelog/)
+- **I want to contribute to the project**: [Contributor development guide](/handover/contributor/development/)
+
+## Install
+
+```bash title="Install package"
+npm install --save-dev handover-cli
+```
+
+## First command
+
+```bash title="Generate docs"
+npx handover-cli generate
+```
+
+After setup, edit `.handover.yml` and rerun the generator. You can also run `--static-only` to build starter docs without any LLM calls.

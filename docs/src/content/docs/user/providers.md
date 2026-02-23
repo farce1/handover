@@ -1,3 +1,7 @@
+---
+title: Providers
+---
+
 # Providers
 
 handover supports 8 LLM providers through a unified interface. The provider system is designed around named presets: each provider ships with a base URL, default model, API key env var, and concurrency settings. You only need to name the provider — everything else is pre-configured.

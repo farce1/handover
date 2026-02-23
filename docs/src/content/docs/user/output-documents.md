@@ -1,3 +1,7 @@
+---
+title: Output documents
+---
+
 # Output documents
 
 handover generates 14 interconnected markdown documents in the configured output directory (default: `./handover/`). Each document covers a distinct aspect of the project. They are cross-referenced with links and include YAML front-matter for programmatic consumption.

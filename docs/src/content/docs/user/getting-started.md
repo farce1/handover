@@ -1,3 +1,7 @@
+---
+title: Getting started
+---
+
 # Getting started
 
 handover scans a codebase and produces 14 interconnected markdown documents that explain the project end-to-end. This guide takes you from install to first output.
@@ -5,7 +9,7 @@ handover scans a codebase and produces 14 interconnected markdown documents that
 ## Prerequisites
 
 - **Node.js >= 18** — check with `node --version`
-- **An LLM API key** — Anthropic is the default; see [providers.md](providers.md) for alternatives. Ollama works without an API key.
+- **An LLM API key** — Anthropic is the default; see [providers](./providers/) for alternatives. Ollama works without an API key.
 
 ## Install
 
@@ -136,6 +140,6 @@ npx handover-cli generate
 
 ## Next steps
 
-- [configuration.md](configuration.md) — all 21 config keys with types, defaults, and valid values
-- [providers.md](providers.md) — compare all 8 supported LLM providers
-- [output-documents.md](output-documents.md) — understand all 14 generated documents before running
+- [configuration](./configuration/) — all 21 config keys with types, defaults, and valid values
+- [providers](./providers/) — compare all 8 supported LLM providers
+- [output-documents](./output-documents/) — understand all 14 generated documents before running

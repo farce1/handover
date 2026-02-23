@@ -75,7 +75,7 @@ type(scope): description
 - `docs(readme): update usage examples`
 - `test(analyzers): add edge case coverage`
 
-Changesets drive automated changelog generation and release PRs, so commit message quality still matters for conventional commits in those PRs.
+Release notes and package publishes are managed manually via `RELEASE.md`, so conventional commit quality remains important for review clarity and changelog accuracy.
 
 ---
 

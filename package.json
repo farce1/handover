@@ -16,6 +16,10 @@
   "scripts": {
     "dev": "tsx src/cli/index.ts",
     "build": "tsup",
+    "docs:changelog": "node scripts/generate-docs-changelog.mjs",
+    "docs:commands": "node scripts/generate-docs-command-reference.mjs",
+    "docs:generate": "npm run docs:changelog && npm run docs:commands",
+    "docs:build": "astro build --config docs/astro.config.mjs",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --max-warnings 0",
@@ -23,9 +27,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "changeset": "changeset",
-    "ci:version": "changeset version && npm install --package-lock-only",
-    "ci:publish": "changeset publish"
+    "release": "npm run release:precheck && npm run release:publish",
+    "release:precheck": "npm run lint && npm run typecheck && npm test && npm run build",
+    "release:publish": "npm publish --access public"
   },
   "keywords": [
     "documentation",
@@ -38,7 +42,15 @@
   "bugs": {
     "url": "https://github.com/farce1/handover/issues"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/farce1/handover.git"
+  },
   "homepage": "https://github.com/farce1/handover#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "0.78.0",
     "@clack/prompts": "^1.0.1",
@@ -56,18 +68,20 @@
     "sqlite-vec": "^0.1.7-alpha.2",
     "web-tree-sitter": "0.26.5",
     "yaml": "^2.7.0",
-    "zod": "^4.3.6",
+    "zod": "^3.25.76",
     "zod-to-json-schema": "^3.24.0"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.5.2",
-    "@changesets/cli": "^2.29.8",
+    "@astrojs/check": "^0.9.6",
+    "@astrojs/mdx": "^4.3.13",
+    "@astrojs/starlight": "^0.37.6",
     "@commitlint/cli": "^20.4.2",
     "@commitlint/config-conventional": "^20.4.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cli-progress": "^3.11.6",
     "@types/node": "^25.2.3",
     "@vitest/coverage-v8": "^4.0.18",
+    "astro": "^5.17.3",
     "cli-progress": "^3.12.0",
     "eslint": "^10.0.1",
     "eslint-config-prettier": "^10.1.8",

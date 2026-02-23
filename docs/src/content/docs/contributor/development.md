@@ -1,3 +1,7 @@
+---
+title: Development
+---
+
 # Development
 
 ## Prerequisites
@@ -175,7 +179,7 @@ Runs `tsc --noEmit` against the project. Type errors appear here but not necessa
 
 5. **PR template checklist** — fill out the description, check that tests cover your change, and note if the PR changes any public API or config schema.
 
-Changesets generates changelogs and release PRs automatically when release workflow sees pending changesets. You do not need to manage CHANGELOG.md manually.
+Releases are now managed manually. Keep `CHANGELOG.md` updated before each publish and follow `RELEASE.md` to ship.
 
 ## Debugging
 

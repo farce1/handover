@@ -1,8 +1,0 @@
-{
-  "$schema": "https://unpkg.com/@changesets/config@latest/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "farce1/handover" }],
-  "commit": false,
-  "baseBranch": "main",
-  "access": "public",
-  "ignore": []
-}

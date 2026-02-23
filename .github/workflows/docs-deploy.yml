@@ -8,6 +8,9 @@ on:
       - 'README.md'
       - 'package.json'
       - 'package-lock.json'
+      - 'CHANGELOG.md'
+      - 'src/cli/index.ts'
+      - 'scripts/**'
       - '.github/workflows/docs-deploy.yml'
   workflow_dispatch:
 
@@ -27,11 +30,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate docs artifacts
+        run: npm run docs:generate
+
+      - name: Build docs
+        run: npm run docs:build
+
       - name: Prepare docs artifact
         run: |
-          mkdir -p .pages
-          cp -R docs/. .pages/
-          touch .pages/.nojekyll
+          touch docs/dist/.nojekyll
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -39,7 +55,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: .pages
+          path: docs/dist
 
   deploy:
     name: Deploy to GitHub Pages

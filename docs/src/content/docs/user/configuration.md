@@ -1,3 +1,7 @@
+---
+title: Configuration reference
+---
+
 # Configuration reference
 
 handover supports three configuration sources. Values are merged in this precedence order (highest to lowest):
@@ -20,7 +24,7 @@ The authoritative schema is in `src/config/schema.ts`. The loading logic and pre
 | Valid values | `anthropic`, `openai`, `ollama`, `groq`, `together`, `deepseek`, `azure-openai`, `custom` |
 | Env override | `HANDOVER_PROVIDER`                                                                       |
 
-The LLM provider to use for AI analysis rounds. Each named provider comes with preset defaults (base URL, default model, API key env var). See [providers.md](providers.md) for a full comparison.
+The LLM provider to use for AI analysis rounds. Each named provider comes with preset defaults (base URL, default model, API key env var). See [providers](./providers/) for a full comparison.
 
 ```yaml
 provider: openai

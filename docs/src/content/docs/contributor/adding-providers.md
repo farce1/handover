@@ -1,3 +1,7 @@
+---
+title: Adding a provider
+---
+
 # Adding a provider
 
 handover uses a Template Method pattern for LLM providers. `BaseProvider` in `src/providers/base-provider.ts` handles the infrastructure — retry with exponential backoff, concurrent rate limiting, and token estimation. You implement the provider-specific API call. A working provider requires changes to four files.

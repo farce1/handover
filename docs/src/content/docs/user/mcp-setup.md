@@ -1,3 +1,7 @@
+---
+title: MCP setup
+---
+
 # MCP setup
 
 Use this guide to connect handover's MCP server to Claude Desktop, Cursor, or VS Code.

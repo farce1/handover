@@ -1,0 +1,45 @@
+---
+interface Props {
+  entries: {
+    version: string;
+    date: string;
+    summary: string;
+    notes: string[];
+  }[];
+  generatedAt: string;
+}
+
+const { entries, generatedAt } = Astro.props;
+---
+
+<div>
+  <p>Generated on <code>{generatedAt}</code></p>
+
+  {entries.length === 0 && (
+    <section>
+      <h2>No release entries yet</h2>
+      <p>
+        The changelog file exists but has no versioned entries yet. New releases
+        appear here automatically when <code>CHANGELOG.md</code> is updated.
+      </p>
+    </section>
+  )}
+
+  <div class="reference-list">
+    {entries.map((release) => (
+      <section>
+        <h2>{release.version}</h2>
+        {release.date && <p>Released: {release.date}</p>}
+        <p>{release.summary || 'Release notes available in source changelog.'}</p>
+
+        {release.notes.length > 0 && (
+          <ul>
+            {release.notes.map((note) => <li>{note}</li>)}
+          </ul>
+        )}
+
+        <p>Source: <code>CHANGELOG.md</code></p>
+      </section>
+    ))}
+  </div>
+</div>

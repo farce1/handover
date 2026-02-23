@@ -2,4 +2,4 @@
 
 All notable changes to this project will be documented in this file.
 
-This changelog is automatically generated from [Changesets](https://github.com/changesets/changesets).
+This changelog is maintained as part of the manual release process.

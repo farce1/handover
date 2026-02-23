@@ -1,0 +1,10 @@
+---
+title: Changelog
+description: Changelog feed generated from CHANGELOG.md
+draft: false
+---
+
+import ChangelogPage from '../../../components/reference/changelog-page.astro';
+import changelogData from './changelog-data.json';
+
+<ChangelogPage entries={changelogData.entries} generatedAt={changelogData.generatedAt} />

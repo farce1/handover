@@ -1,18 +1,22 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semver bump (patch/minor/major) or explicit version value.
+        required: true
+        default: patch
+        type: string
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release:
-    name: Release
+    name: Release to npm
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -20,92 +24,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Determine whether release should run
-        id: release_gate
-        run: |
-          set -euo pipefail
-
-          pending_changesets=0
-          if [ -d .changeset ]; then
-            pending_changesets=$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')
-          fi
-
-          before_sha='${{ github.event.before }}'
-          if [ -z "$before_sha" ] || [ "$before_sha" = '0000000000000000000000000000000000000000' ]; then
-            changed_files=$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA")
-          else
-            changed_files=$(git diff --name-only "$before_sha" "$GITHUB_SHA")
-          fi
-
-          changelog_touched=false
-          if printf '%s\n' "$changed_files" | grep -E '^CHANGELOG.md$' >/dev/null; then
-            changelog_touched=true
-          fi
-
-          should_release=false
-          reason='no pending changesets and no changelog updates in this push'
-
-          if [ "$pending_changesets" -gt 0 ]; then
-            should_release=true
-            reason="found ${pending_changesets} pending changeset(s)"
-          elif [ "$changelog_touched" = true ]; then
-            should_release=true
-            reason='root CHANGELOG.md changed in this push'
-          fi
-
-          echo "should_release=${should_release}" >> "$GITHUB_OUTPUT"
-          echo "reason=${reason}" >> "$GITHUB_OUTPUT"
-
-      - name: Skip release on non-release pushes
-        if: steps.release_gate.outputs.should_release != 'true'
-        run: |
-          echo "Skipping release workflow: ${{ steps.release_gate.outputs.reason }}"
-
       - name: Setup Node.js
-        if: steps.release_gate.outputs.should_release == 'true'
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v4
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
-        if: steps.release_gate.outputs.should_release == 'true'
         run: npm ci
 
-      - name: Build
-        if: steps.release_gate.outputs.should_release == 'true'
-        run: npm run build
+      - name: Validate package before publish
+        run: npm run release:precheck
 
-      - name: Validate publish preconditions
-        if: steps.release_gate.outputs.should_release == 'true'
-        run: |
-          set -euo pipefail
+      - name: Update package version
+        run: npm version ${{ inputs.version }} --no-git-tag-version
 
-          pending_changesets=0
-          if [ -d .changeset ]; then
-            pending_changesets=$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')
-          fi
-          if [ "$pending_changesets" -gt 0 ]; then
-            echo "Found $pending_changesets pending changeset(s); changesets/action will open or update the release PR/publish."
-            exit 0
-          fi
-
-          if grep -R --include='package.json' '"workspace:' . > /dev/null; then
-            echo "::error title=Initial release blocked::No pending changesets were found, but workspace protocol dependencies are still present."
-            echo "::error::Create and merge an initial changesets version bump before publish so workspace dependencies are rewritten to concrete semver ranges."
-            exit 1
-          fi
-
-      - name: Create Release PR or Publish
-        if: steps.release_gate.outputs.should_release == 'true'
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          version: npm run ci:version
-          publish: npm run ci:publish
-          commit: 'chore: version packages'
-          title: 'chore: version packages'
+      - name: Publish package
+        run: npm run release:publish
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

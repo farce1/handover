@@ -1,0 +1,162 @@
+---
+title: CLI command reference
+description: Reference generated from the live handover CLI help output
+---
+
+Generated: 2026-02-23T17:04:53.894Z
+
+This page is produced by `npm run docs:commands`.
+
+## handover root help
+
+```text
+> handover-cli@0.1.0 dev
+> tsx src/cli/index.ts --help
+
+Usage: handover [options] [command]
+
+Generate comprehensive codebase documentation for handover
+
+Options:
+  -V, --version             output the version number
+  --provider <provider>     LLM provider override
+  --model <model>           Model override
+  --audience <mode>         Audience mode: human (default) or ai
+  -v, --verbose             Show detailed output
+  -h, --help                display help for command
+
+Commands:
+  init                      Create .handover.yml configuration file
+  generate [options]        Analyze codebase and generate documentation
+  analyze [options]         Run static analysis on the codebase
+  estimate [options]        Estimate token count and cost before running
+  reindex [options]         Build or update vector search index from generated
+                            documentation
+  search [options] <query>  Search generated documentation using semantic
+                            similarity
+  serve                     Start MCP server over stdio transport
+```
+
+## handover init
+
+```text
+> handover-cli@0.1.0 dev
+> tsx src/cli/index.ts init --help
+
+Usage: handover init [options]
+
+Create .handover.yml configuration file
+
+Options:
+  -h, --help  display help for command
+```
+
+## handover generate
+
+```text
+> handover-cli@0.1.0 dev
+> tsx src/cli/index.ts generate --help
+
+Usage: handover generate [options]
+
+Analyze codebase and generate documentation
+
+Options:
+  --provider <provider>  LLM provider override
+  --model <model>        Model override
+  --only <docs>          Generate specific documents (comma-separated)
+  --audience <mode>      Audience mode: human (default) or ai
+  --static-only          Run static analysis only (no AI cost)
+  --no-cache             Discard cached results and run all rounds fresh
+  --stream               Show streaming token output during AI rounds
+  -v, --verbose          Show detailed output
+  -h, --help             display help for command
+```
+
+## handover analyze
+
+```text
+> handover-cli@0.1.0 dev
+> tsx src/cli/index.ts analyze --help
+
+Usage: handover analyze [options]
+
+Run static analysis on the codebase
+
+Options:
+  --json               Output JSON to stdout instead of markdown file
+  --git-depth <depth>  Git history depth: "default" (6 months) or "full"
+                       (default: "default")
+  -v, --verbose        Show detailed output
+  -h, --help           display help for command
+```
+
+## handover estimate
+
+```text
+> handover-cli@0.1.0 dev
+> tsx src/cli/index.ts estimate --help
+
+Usage: handover estimate [options]
+
+Estimate token count and cost before running
+
+Options:
+  --provider <provider>  Provider to estimate for
+  --model <model>        Model to estimate for
+  -v, --verbose          Show detailed output
+  -h, --help             display help for command
+```
+
+## handover reindex
+
+```text
+> handover-cli@0.1.0 dev
+> tsx src/cli/index.ts reindex --help
+
+Usage: handover reindex [options]
+
+Build or update vector search index from generated documentation
+
+Options:
+  --force        Re-embed all documents (ignore change detection)
+  -v, --verbose  Show detailed output
+  -h, --help     display help for command
+```
+
+## handover search
+
+```text
+> handover-cli@0.1.0 dev
+> tsx src/cli/index.ts search --help
+
+Usage: handover search [options] <query>
+
+Search generated documentation using semantic similarity
+
+Options:
+  --mode <mode>  Search mode: fast (default) or qa (default: "fast")
+  --top-k <n>    Number of results to return (default: 10) (default: 10)
+  --type <type>  Filter by document type (repeatable) (default: [])
+  -h, --help     display help for command
+
+Examples:
+  $ handover search "authentication"
+  $ handover search "How does the DAG orchestrator work?" --mode qa
+  $ handover search "dependency graph" --mode fast --top-k 5
+  $ handover search "system design" --type architecture --type modules
+```
+
+## handover serve
+
+```text
+> handover-cli@0.1.0 dev
+> tsx src/cli/index.ts serve --help
+
+Usage: handover serve [options]
+
+Start MCP server over stdio transport
+
+Options:
+  -h, --help  display help for command
+```

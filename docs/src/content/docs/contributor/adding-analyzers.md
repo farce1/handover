@@ -1,3 +1,7 @@
+---
+title: Adding an analyzer
+---
+
 # Adding an analyzer
 
 handover runs eight static analyzers concurrently — each examines a different dimension of the codebase (file structure, dependencies, git history, TODOs, environment variables, AST, tests, and documentation). All eight run in parallel via `Promise.allSettled()` in `src/analyzers/coordinator.ts`. Adding a new analyzer means writing the analyzer function, registering it in the coordinator, optionally defining a new output type, and optionally wiring it to a renderer.

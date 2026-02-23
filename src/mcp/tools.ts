@@ -9,24 +9,14 @@ import type { HandoverConfig } from '../config/schema.js';
 const DEFAULT_LIMIT = 10;
 
 const semanticSearchInputSchema = z.object({
-  query: z
-    .string({ error: 'query must be a string' })
-    .trim()
-    .min(1, { error: 'query must be a non-empty string' }),
+  query: z.string().trim().min(1, { message: 'query must be a non-empty string' }),
   limit: z
-    .number({ error: 'limit must be a number' })
-    .int({ error: 'limit must be an integer' })
-    .positive({ error: 'limit must be greater than 0' })
-    .max(50, { error: 'limit must be <= 50' })
+    .number()
+    .int({ message: 'limit must be an integer' })
+    .positive({ message: 'limit must be greater than 0' })
+    .max(50, { message: 'limit must be <= 50' })
     .optional(),
-  types: z
-    .array(
-      z
-        .string({ error: 'types entries must be strings' })
-        .trim()
-        .min(1, { error: 'types entries cannot be empty' }),
-    )
-    .optional(),
+  types: z.array(z.string().trim().min(1, { message: 'types entries cannot be empty' })).optional(),
 });
 
 type SemanticSearchFn = (input: SearchDocumentsInput) => Promise<SearchDocumentsResult>;

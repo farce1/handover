@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 *.tsbuildinfo
+docs/dist/
+docs/.astro/
+.astro/
 
 # Coverage reports
 coverage/
