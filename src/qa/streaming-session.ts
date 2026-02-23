@@ -38,6 +38,7 @@ interface QaStreamingSessionHandle {
   state: QaSessionState;
   events: QaStreamEvent[];
   result?: AnswerQuestionResult;
+  unsubscribe?: () => void;
 }
 
 export interface QaStreamingSessionManager {
@@ -68,10 +69,44 @@ export function createQaStreamingSessionManager(
   const answerFn = options.answerFn ?? answerQuestion;
   const now = options.now ?? (() => new Date());
   const active = new Map<string, ActiveSessionRuntime>();
+  const listeners = new Map<string, Set<(event: QaStreamEvent) => void>>();
+
+  class QaSessionCancelledError extends Error {
+    constructor() {
+      super('QA streaming session cancelled');
+      this.name = 'QaSessionCancelledError';
+    }
+  }
+
+  function addListener(sessionId: string, listener: (event: QaStreamEvent) => void): () => void {
+    const current = listeners.get(sessionId) ?? new Set<(event: QaStreamEvent) => void>();
+    current.add(listener);
+    listeners.set(sessionId, current);
+
+    return () => {
+      const registered = listeners.get(sessionId);
+      if (!registered) {
+        return;
+      }
+
+      registered.delete(listener);
+      if (registered.size === 0) {
+        listeners.delete(sessionId);
+      }
+    };
+  }
 
   function publish(event: QaStreamEvent, sink?: (event: QaStreamEvent) => void): void {
     options.onEvent?.(event);
     sink?.(event);
+    const sessionListeners = listeners.get(event.sessionId);
+    if (!sessionListeners) {
+      return;
+    }
+
+    for (const listener of sessionListeners) {
+      listener(event);
+    }
   }
 
   function buildEmitter(
@@ -109,6 +144,7 @@ export function createQaStreamingSessionManager(
           persisted.kind === 'error'
         ) {
           terminal = true;
+          listeners.delete(sessionId);
         }
 
         publish(persisted, sink);
@@ -170,12 +206,35 @@ export function createQaStreamingSessionManager(
       try {
         emit('stage', { stage: 'answering', message: 'Running grounded QA' });
 
-        const result = await answerFn({
+        const answerPromise = answerFn({
           config: options.config,
           query: input.query,
           topK: input.topK,
           types: input.types,
         });
+
+        const abortPromise = new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () => reject(new QaSessionCancelledError()), {
+            once: true,
+          });
+        });
+
+        let result: AnswerQuestionResult;
+        try {
+          result = await Promise.race([answerPromise, abortPromise]);
+        } catch (error) {
+          if (controller.signal.aborted && error instanceof QaSessionCancelledError) {
+            emitCancelled('Cancelled while execution was in-flight');
+            answerPromise.catch(() => undefined);
+            return {
+              sessionId,
+              state: store.getSessionState(sessionId),
+              events: store.replayEvents(sessionId, 0),
+            };
+          }
+
+          throw error;
+        }
 
         if (!isTerminal()) {
           emit('progress', { progress: 1, total: 1, message: 'Completed' });
@@ -213,10 +272,17 @@ export function createQaStreamingSessionManager(
         publish(event, input.onEvent);
       }
 
+      const state = store.getSessionState(input.sessionId, input.lastAckSequence);
+      const unsubscribe =
+        state.status === 'running' && input.onEvent
+          ? addListener(input.sessionId, input.onEvent)
+          : undefined;
+
       return {
         sessionId: input.sessionId,
-        state: store.getSessionState(input.sessionId, input.lastAckSequence),
+        state,
         events,
+        unsubscribe,
       };
     },
 

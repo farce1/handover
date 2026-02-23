@@ -1,4 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import {
   answerQuestionResultSchema,
@@ -15,6 +17,8 @@ import type { HandoverConfig } from '../config/schema.js';
 
 const DEFAULT_LIMIT = 10;
 const DEFAULT_LAST_ACK_SEQUENCE = 0;
+
+type ToolRequestExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
 const semanticSearchInputSchema = z.object({
   query: z.string().trim().min(1, { message: 'query must be a non-empty string' }),
@@ -192,6 +196,63 @@ function createToolSuccessPayload<T>(payload: T) {
   };
 }
 
+function getProgressToken(extra: ToolRequestExtra): string | number | undefined {
+  const token = (extra._meta as { progressToken?: unknown } | undefined)?.progressToken;
+  if (typeof token === 'string' || typeof token === 'number') {
+    return token;
+  }
+
+  return undefined;
+}
+
+async function sendProgressNotification(
+  extra: ToolRequestExtra,
+  event: z.infer<typeof qaStreamEventSchema>,
+): Promise<void> {
+  const progressToken = getProgressToken(extra);
+  if (progressToken === undefined || event.kind === 'token') {
+    return;
+  }
+
+  let progress = 0;
+  let total = 1;
+  let message = 'QA stream update';
+
+  if (event.kind === 'progress') {
+    progress = event.data.progress;
+    total = event.data.total ?? 1;
+    message = event.data.message ?? message;
+  } else if (event.kind === 'stage') {
+    progress = event.data.stage === 'starting' ? 0.1 : 0.6;
+    message = event.data.message ?? `QA stage: ${event.data.stage}`;
+  } else if (event.kind === 'final') {
+    progress = 1;
+    message = 'QA stream completed';
+  } else if (event.kind === 'cancelled') {
+    progress = 1;
+    message = event.data.reason ?? 'QA stream cancelled';
+  } else if (event.kind === 'error') {
+    progress = 1;
+    message = `QA stream failed: ${event.data.message}`;
+  }
+
+  await extra.sendNotification({
+    method: 'notifications/progress',
+    params: {
+      progressToken,
+      progress,
+      total,
+      message,
+    },
+  });
+}
+
+function hasTerminalEvent(events: z.infer<typeof qaStreamEventSchema>[]): boolean {
+  return events.some(
+    (event) => event.kind === 'final' || event.kind === 'cancelled' || event.kind === 'error',
+  );
+}
+
 export function registerMcpTools(server: McpServer, options: RegisterMcpToolsOptions): void {
   const executeSearch = options.searchFn ?? searchDocuments;
   const sessionManager = createQaStreamingSessionManager({
@@ -264,7 +325,7 @@ export function registerMcpTools(server: McpServer, options: RegisterMcpToolsOpt
       },
       outputSchema: qaStartResponseSchema,
     },
-    async (input) => {
+    async (input, extra) => {
       const parsed = qaStreamStartInputSchema.safeParse(input);
       if (!parsed.success) {
         const details = parsed.error.issues
@@ -274,11 +335,17 @@ export function registerMcpTools(server: McpServer, options: RegisterMcpToolsOpt
       }
 
       try {
+        const events: z.infer<typeof qaStreamEventSchema>[] = [];
         const handle = await sessionManager.startSession({
           query: parsed.data.query,
           sessionId: parsed.data.sessionId,
           topK: parsed.data.topK,
           types: parsed.data.types,
+          signal: extra.signal,
+          onEvent: (event) => {
+            events.push(event);
+            void sendProgressNotification(extra, event);
+          },
         });
 
         return createToolSuccessPayload(
@@ -287,7 +354,7 @@ export function registerMcpTools(server: McpServer, options: RegisterMcpToolsOpt
             sessionId: handle.sessionId,
             state: handle.state.status,
             lastSequence: handle.state.lastSequence,
-            events: handle.events,
+            events,
             result: handle.result,
           }),
         );
@@ -362,7 +429,7 @@ export function registerMcpTools(server: McpServer, options: RegisterMcpToolsOpt
       },
       outputSchema: qaLifecycleResponseSchema,
     },
-    async (input) => {
+    async (input, extra) => {
       const parsed = qaStreamResumeInputSchema.safeParse(input);
       if (!parsed.success) {
         const details = parsed.error.issues
@@ -382,18 +449,59 @@ export function registerMcpTools(server: McpServer, options: RegisterMcpToolsOpt
           );
         }
 
+        const streamedEvents: z.infer<typeof qaStreamEventSchema>[] = [];
         const resumed = sessionManager.resumeSession({
           sessionId: parsed.data.sessionId,
           lastAckSequence: parsed.data.lastAckSequence,
+          onEvent: (event) => {
+            streamedEvents.push(event);
+            void sendProgressNotification(extra, event);
+          },
         });
+
+        if (resumed.state.status === 'running' && resumed.unsubscribe) {
+          await new Promise<void>((resolve) => {
+            const checkTerminal = () => {
+              if (hasTerminalEvent(streamedEvents)) {
+                resolve();
+              }
+            };
+
+            const abortHandler = () => {
+              sessionManager.cancelSession({
+                sessionId: parsed.data.sessionId,
+                reason: 'Cancelled by MCP request signal during resume',
+              });
+              resolve();
+            };
+
+            extra.signal.addEventListener('abort', abortHandler, { once: true });
+
+            const interval = setInterval(() => {
+              checkTerminal();
+              if (hasTerminalEvent(streamedEvents)) {
+                clearInterval(interval);
+                extra.signal.removeEventListener('abort', abortHandler);
+                resolve();
+              }
+            }, 50);
+          });
+
+          resumed.unsubscribe();
+        }
+
+        const finalState = sessionManager.getSessionState(
+          parsed.data.sessionId,
+          parsed.data.lastAckSequence,
+        );
 
         return createToolSuccessPayload(
           qaLifecycleResponseSchema.parse({
             ok: true,
             sessionId: resumed.sessionId,
-            state: resumed.state.status,
-            lastSequence: resumed.state.lastSequence,
-            events: resumed.events,
+            state: finalState.status,
+            lastSequence: finalState.lastSequence,
+            events: streamedEvents,
           }),
         );
       } catch (error) {
