@@ -5,17 +5,147 @@
  * Implements incremental indexing with content-hash change detection.
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import Database from 'better-sqlite3';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { VectorStore } from './vector-store.js';
 import { chunkDocument } from './chunker.js';
-import { createEmbeddingProvider } from './embedder.js';
+import { createEmbeddingProvider, type EmbeddingClient } from './embedder.js';
+import { EmbeddingRouter } from './embedding-router.js';
+import { EmbeddingHealthChecker } from './embedding-health.js';
+import { LocalEmbeddingProvider } from './local-embedder.js';
 import { logger } from '../utils/logger.js';
 import { HandoverError } from '../utils/errors.js';
-import { EMBEDDING_MODELS } from './types.js';
+import {
+  DEFAULT_EMBEDDING_LOCALITY_MODE,
+  EMBEDDING_MODELS,
+  type EmbeddingLocalityMode,
+} from './types.js';
 import type { HandoverConfig } from '../config/schema.js';
 import type { DocumentChunk } from './types.js';
+
+interface StoredIndexMetadata {
+  embeddingModel: string;
+  embeddingDimensions: number;
+}
+
+function readStoredIndexMetadata(dbPath: string): StoredIndexMetadata | null {
+  if (!existsSync(dbPath)) {
+    return null;
+  }
+
+  let db: Database.Database | null = null;
+  try {
+    db = new Database(dbPath, { readonly: true });
+    const rows = db.prepare('SELECT key, value FROM schema_metadata').all() as Array<{
+      key: string;
+      value: string;
+    }>;
+
+    const metadata = rows.reduce<Record<string, string>>((acc, row) => {
+      acc[row.key] = row.value;
+      return acc;
+    }, {});
+
+    if (!metadata.embedding_model || !metadata.embedding_dimensions) {
+      return null;
+    }
+
+    return {
+      embeddingModel: metadata.embedding_model,
+      embeddingDimensions: Number(metadata.embedding_dimensions),
+    };
+  } catch {
+    return null;
+  } finally {
+    db?.close();
+  }
+}
+
+async function resolveEmbeddingDimensions(
+  provider: EmbeddingClient,
+  storedMetadata: StoredIndexMetadata | null,
+): Promise<number> {
+  const configuredDimensions = provider.getDimensions();
+  if (configuredDimensions > 0) {
+    return configuredDimensions;
+  }
+
+  if (storedMetadata && storedMetadata.embeddingModel === provider.model) {
+    return storedMetadata.embeddingDimensions;
+  }
+
+  const probeResult = await provider.embedBatch(['dimension probe']);
+  const probeDimensions = probeResult.embeddings[0]?.length ?? probeResult.dimensions;
+  if (!probeDimensions || probeDimensions <= 0) {
+    throw new HandoverError(
+      `Unable to determine embedding dimensions for model '${provider.model}'`,
+      'The provider returned an empty embedding payload during preflight probing',
+      'Verify the configured embedding model supports vector embeddings and retry reindexing',
+      'EMBEDDING_DIMENSIONS_UNKNOWN',
+    );
+  }
+
+  return probeDimensions;
+}
+
+function assertIndexCompatibility(
+  storedMetadata: StoredIndexMetadata | null,
+  activeModel: string,
+  activeDimensions: number,
+  dbPath: string,
+): void {
+  if (!storedMetadata) {
+    return;
+  }
+
+  if (
+    storedMetadata.embeddingModel === activeModel &&
+    storedMetadata.embeddingDimensions === activeDimensions
+  ) {
+    return;
+  }
+
+  throw new HandoverError(
+    'Embedding index metadata is incompatible with the active embedding route',
+    `Index metadata is ${storedMetadata.embeddingModel} (${storedMetadata.embeddingDimensions}D), but active route resolved ${activeModel} (${activeDimensions}D)`,
+    `First, rebuild the index with the active model by running 'handover reindex --force'. If the mismatch persists, delete '${dbPath}' and reindex again.`,
+    'EMBEDDING_INDEX_MISMATCH',
+  );
+}
+
+function createRemoteProvider(
+  mode: EmbeddingLocalityMode,
+  config: HandoverConfig,
+): EmbeddingClient {
+  try {
+    return createEmbeddingProvider(config);
+  } catch (err) {
+    if (
+      mode === 'remote-only' ||
+      !(err instanceof HandoverError) ||
+      err.code !== 'EMBEDDING_NO_API_KEY'
+    ) {
+      throw err;
+    }
+
+    const model = config.embedding?.model ?? 'text-embedding-3-small';
+    return {
+      provider: 'remote',
+      model,
+      getDimensions: () => EMBEDDING_MODELS[model] ?? 1536,
+      embedBatch: async () => {
+        throw new HandoverError(
+          'Remote fallback is unavailable because no OpenAI API key is configured',
+          err.reason,
+          `${err.fix}\n\nOr rerun with --embedding-mode local-only to disable remote fallback.`,
+          'EMBEDDING_REMOTE_FALLBACK_UNAVAILABLE',
+        );
+      },
+    };
+  }
+}
 
 /**
  * Options for reindexing
@@ -192,24 +322,55 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
 
   logger.log(`Found ${documents.length} documents`);
 
-  // Phase 2: Open vector store
+  const embeddingMode = config.embedding?.mode ?? DEFAULT_EMBEDDING_LOCALITY_MODE;
+  const dbPath = join(outputDir, '../.handover/search.db');
+
+  // Phase 2: Resolve embedding route and preflight compatibility
+  logger.log(`Resolving embedding route for mode '${embeddingMode}'...`);
+  const remoteProvider = createRemoteProvider(embeddingMode as EmbeddingLocalityMode, config);
+  const localProvider =
+    embeddingMode === 'remote-only'
+      ? undefined
+      : config.embedding?.local?.model
+        ? new LocalEmbeddingProvider({
+            model: config.embedding.local.model,
+            baseUrl: config.embedding.local.baseUrl,
+            timeoutMs: config.embedding.local.timeout,
+            batchSize: config.embedding?.batchSize,
+          })
+        : undefined;
+
+  const embeddingRouter = new EmbeddingRouter();
+  const healthChecker = new EmbeddingHealthChecker();
+  const route = await embeddingRouter.resolve({
+    mode: embeddingMode as EmbeddingLocalityMode,
+    operation: 'indexing',
+    interactive: false,
+    remoteProvider,
+    localProvider,
+  });
+
+  logger.log(
+    `Embedding route resolved: provider=${route.metadata.provider}, reason=${route.metadata.reason}`,
+  );
+
+  const storedMetadata = readStoredIndexMetadata(dbPath);
+
+  const embeddingModel = route.provider.model;
+  const embeddingDimensions = await resolveEmbeddingDimensions(route.provider, storedMetadata);
+  assertIndexCompatibility(storedMetadata, embeddingModel, embeddingDimensions, dbPath);
+
+  // Phase 3: Open vector store
   logger.log('Opening vector store...');
-
-  const embeddingModel = config.embedding?.model ?? 'text-embedding-3-small';
-  const embeddingDimensions = EMBEDDING_MODELS[embeddingModel] ?? 1536;
-
   const vectorStore = new VectorStore({
-    dbPath: join(outputDir, '../.handover/search.db'),
+    dbPath,
     embeddingModel,
     embeddingDimensions,
   });
-
   vectorStore.open();
 
   try {
-    // Phase 3: Create embedding provider
-    logger.log('Creating embedding provider...');
-    const embeddingProvider = createEmbeddingProvider(config);
+    const embeddingProvider = route.provider;
 
     // Phase 4: Change detection (if not forced)
     logger.log('Detecting changed documents...');
@@ -329,6 +490,10 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
 
     // Phase 6: Embed all chunks
     logger.log('Embedding chunks...');
+
+    if (route.metadata.provider === 'local' && route.diagnostics) {
+      healthChecker.assertReady(route.diagnostics);
+    }
 
     const allChunkTexts = allChunks.flatMap((item) => item.chunks.map((chunk) => chunk.content));
 
