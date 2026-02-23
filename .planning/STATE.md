@@ -102,6 +102,7 @@ v5.0 roadmap decisions:
 - [Phase 17-local-embedding-provider-routing]: Reindex and search now accept per-run --embedding-mode overrides for locality policy control.
 - [Phase 17-local-embedding-provider-routing]: Reindex/search outputs include deterministic embedding mode/provider route summary lines.
 - [Phase 17-local-embedding-provider-routing]: Reindex and retrieval now resolve embedding providers through EmbeddingRouter in non-interactive mode for deterministic locality behavior.
+- [Phase 17-local-embedding-provider-routing]: Retrieval now hard-blocks model/dimension metadata mismatches and directs users to reindex before retrying search.
 
 ### Pending Todos
 
