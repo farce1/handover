@@ -134,7 +134,7 @@ Plans:
 | 13. Query Engine + CLI Search      | v4.0      | 2/2            | Complete | 2026-02-22 |
 | 14. MCP Server (Tools + Resources) | v4.0      | 4/4            | Complete | 2026-02-22 |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 2/2            | Complete | 2026-02-22 |
-| 16. Streaming QA Session Lifecycle | v5.0      | 2/2            | Complete | 2026-02-23 |
+| 16. Streaming QA Session Lifecycle | v5.0      | Complete    | 2026-02-23 | 2026-02-23 |
 | 17. Local Embedding Provider Routing | v5.0    | 0/TBD          | Not started | - |
 | 18. Remote Regeneration Job Control | v5.0     | 0/TBD          | Not started | - |
 | 19. HTTP Transport Parity          | v5.0      | 0/TBD          | Not started | - |
