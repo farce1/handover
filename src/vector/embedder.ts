@@ -11,6 +11,19 @@ import { HandoverError } from '../utils/errors.js';
 import { EMBEDDING_MODELS } from './types.js';
 import type { HandoverConfig } from '../config/schema.js';
 
+export interface EmbeddingBatchResult {
+  embeddings: number[][];
+  totalTokens: number;
+  dimensions: number;
+}
+
+export interface EmbeddingClient {
+  readonly provider: 'remote' | 'local';
+  readonly model: string;
+  embedBatch(texts: string[]): Promise<EmbeddingBatchResult>;
+  getDimensions(): number;
+}
+
 /**
  * Configuration for embedding provider
  */
@@ -43,8 +56,9 @@ interface OpenAIEmbeddingResponse {
  *
  * Handles batching, retry logic, and rate limiting for embedding generation.
  */
-export class EmbeddingProvider {
-  private readonly model: string;
+export class EmbeddingProvider implements EmbeddingClient {
+  readonly provider = 'remote' as const;
+  readonly model: string;
   private readonly apiKey: string;
   private readonly batchSize: number;
 
@@ -107,11 +121,7 @@ export class EmbeddingProvider {
    * @param texts - Array of text strings to embed
    * @returns Embeddings, dimensions, and token usage
    */
-  async embedBatch(texts: string[]): Promise<{
-    embeddings: number[][];
-    totalTokens: number;
-    dimensions: number;
-  }> {
+  async embedBatch(texts: string[]): Promise<EmbeddingBatchResult> {
     if (texts.length === 0) {
       return {
         embeddings: [],
