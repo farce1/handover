@@ -1,10 +1,109 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createEmbeddingProvider } from './embedder.js';
+import { EmbeddingHealthChecker } from './embedding-health.js';
+import { EmbeddingRouter } from './embedding-router.js';
+import { LocalEmbeddingProvider } from './local-embedder.js';
 import { VectorStore } from './vector-store.js';
 import { HandoverError } from '../utils/errors.js';
-import { EMBEDDING_MODELS } from './types.js';
+import {
+  DEFAULT_EMBEDDING_LOCALITY_MODE,
+  EMBEDDING_MODELS,
+  type EmbeddingLocalityMode,
+} from './types.js';
 import type { HandoverConfig } from '../config/schema.js';
+import Database from 'better-sqlite3';
+
+interface StoredIndexMetadata {
+  embeddingModel: string;
+  embeddingDimensions: number;
+}
+
+function readStoredIndexMetadata(dbPath: string): StoredIndexMetadata | null {
+  if (!existsSync(dbPath)) {
+    return null;
+  }
+
+  let db: Database.Database | null = null;
+  try {
+    db = new Database(dbPath, { readonly: true });
+    const rows = db.prepare('SELECT key, value FROM schema_metadata').all() as Array<{
+      key: string;
+      value: string;
+    }>;
+
+    const metadata = rows.reduce<Record<string, string>>((acc, row) => {
+      acc[row.key] = row.value;
+      return acc;
+    }, {});
+
+    if (!metadata.embedding_model || !metadata.embedding_dimensions) {
+      return null;
+    }
+
+    return {
+      embeddingModel: metadata.embedding_model,
+      embeddingDimensions: Number(metadata.embedding_dimensions),
+    };
+  } catch {
+    return null;
+  } finally {
+    db?.close();
+  }
+}
+
+function assertRetrievalCompatibility(
+  storedMetadata: StoredIndexMetadata | null,
+  activeModel: string,
+  activeDimensions: number,
+): void {
+  if (!storedMetadata) {
+    return;
+  }
+
+  if (
+    storedMetadata.embeddingModel === activeModel &&
+    storedMetadata.embeddingDimensions === activeDimensions
+  ) {
+    return;
+  }
+
+  throw new HandoverError(
+    'Search index is incompatible with the active embedding configuration',
+    `Index metadata is ${storedMetadata.embeddingModel} (${storedMetadata.embeddingDimensions}D), but retrieval resolved ${activeModel} (${activeDimensions}D)`,
+    `First, reindex with the active model by running 'handover reindex --force'. Then rerun the search query.`,
+    'SEARCH_EMBEDDING_MISMATCH',
+  );
+}
+
+function createRemoteProvider(mode: EmbeddingLocalityMode, config: HandoverConfig) {
+  try {
+    return createEmbeddingProvider(config);
+  } catch (err) {
+    if (
+      mode === 'remote-only' ||
+      !(err instanceof HandoverError) ||
+      err.code !== 'EMBEDDING_NO_API_KEY'
+    ) {
+      throw err;
+    }
+
+    const model = config.embedding?.model ?? 'text-embedding-3-small';
+    return {
+      provider: 'remote' as const,
+      model,
+      getDimensions: () => EMBEDDING_MODELS[model] ?? 1536,
+      embedBatch: async () => {
+        throw new HandoverError(
+          'Remote fallback is unavailable because no OpenAI API key is configured',
+          err.reason,
+          `${err.fix}\n\nOr rerun with --embedding-mode local-only to disable remote fallback.`,
+          'SEARCH_REMOTE_FALLBACK_UNAVAILABLE',
+        );
+      },
+    };
+  }
+}
 
 const DEFAULT_TOP_K = 10;
 
@@ -167,8 +266,54 @@ export async function searchDocuments(input: SearchDocumentsInput): Promise<Sear
     );
   }
 
-  const embeddingModel = input.config.embedding?.model ?? 'text-embedding-3-small';
-  const embeddingDimensions = EMBEDDING_MODELS[embeddingModel] ?? 1536;
+  const embeddingMode = input.config.embedding?.mode ?? DEFAULT_EMBEDDING_LOCALITY_MODE;
+  const remoteProvider = createRemoteProvider(embeddingMode as EmbeddingLocalityMode, input.config);
+  const localProvider =
+    embeddingMode === 'remote-only'
+      ? undefined
+      : input.config.embedding?.local?.model
+        ? new LocalEmbeddingProvider({
+            model: input.config.embedding.local.model,
+            baseUrl: input.config.embedding.local.baseUrl,
+            timeoutMs: input.config.embedding.local.timeout,
+            batchSize: input.config.embedding?.batchSize,
+          })
+        : undefined;
+
+  const embeddingRouter = new EmbeddingRouter();
+  const healthChecker = new EmbeddingHealthChecker();
+  const route = await embeddingRouter.resolve({
+    mode: embeddingMode as EmbeddingLocalityMode,
+    operation: 'retrieval',
+    interactive: false,
+    remoteProvider,
+    localProvider,
+  });
+
+  if (route.metadata.provider === 'local' && route.diagnostics) {
+    healthChecker.assertReady(route.diagnostics);
+  }
+
+  const embeddingModel = route.provider.model;
+  const storedMetadata = readStoredIndexMetadata(dbPath);
+  const embeddingDimensions =
+    route.provider.getDimensions() > 0
+      ? route.provider.getDimensions()
+      : storedMetadata?.embeddingModel === embeddingModel
+        ? storedMetadata.embeddingDimensions
+        : 0;
+
+  if (embeddingDimensions <= 0) {
+    throw new HandoverError(
+      `Unable to resolve embedding dimensions for model '${embeddingModel}'`,
+      'Retrieval requires known embedding dimensions before vector search can run',
+      'Set a known embedding model dimension mapping or reindex once with a resolvable model to seed metadata.',
+      'SEARCH_EMBEDDING_DIMENSIONS_UNKNOWN',
+    );
+  }
+
+  assertRetrievalCompatibility(storedMetadata, embeddingModel, embeddingDimensions);
+
   const vectorStore = new VectorStore({
     dbPath,
     embeddingModel,
@@ -187,8 +332,7 @@ export async function searchDocuments(input: SearchDocumentsInput): Promise<Sear
       );
     }
 
-    const embedder = createEmbeddingProvider(input.config);
-    const { embeddings } = await embedder.embedBatch([query]);
+    const { embeddings } = await route.provider.embedBatch([query]);
     const queryEmbedding = embeddings[0];
 
     const rows = vectorStore.search(queryEmbedding, {
