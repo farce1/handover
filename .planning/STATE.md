@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 17 of 20 (Local Embedding Provider Routing)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In Progress
-Last activity: 2026-02-23 - completed 17-01 embedding locality config, router, and health primitives
+Last activity: 2026-02-23 - completed 17-03 embedding health command and CLI mode override visibility
 
-Progress: [███████████████████████░] 95% (40/42 plans completed)
+Progress: [████████████████████████░] 98% (41/42 plans completed)
 
 ## Performance Metrics
 
@@ -62,6 +62,8 @@ Progress: [███████████████████████
 | Phase 16 P01 | 2 min | 3 tasks | 3 files |
 | Phase 16 P02 | 4 min | 3 tasks | 3 files |
 | Phase 17-local-embedding-provider-routing P01 | 3 min | 2 tasks | 6 files |
+| Phase 17-local-embedding-provider-routing P03 | 4 min | 2 tasks | 4 files |
+| Phase 17-local-embedding-provider-routing P02 | 5 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -96,6 +98,10 @@ v5.0 roadmap decisions:
 - [Phase 16]: Resume validates lastAckSequence bounds and returns structured remediation for invalid cursors.
 - [Phase 17-local-embedding-provider-routing]: local-preferred fallback now requires explicit confirmation in interactive flows and fails with remediation in non-interactive contexts
 - [Phase 17-local-embedding-provider-routing]: embedding health checks now centralize Ollama connectivity and model readiness diagnostics via /api/version and /api/show
+- [Phase 17-local-embedding-provider-routing]: Health-check failures now print structured JSON diagnostics before CLI exit formatting.
+- [Phase 17-local-embedding-provider-routing]: Reindex and search now accept per-run --embedding-mode overrides for locality policy control.
+- [Phase 17-local-embedding-provider-routing]: Reindex/search outputs include deterministic embedding mode/provider route summary lines.
+- [Phase 17-local-embedding-provider-routing]: Reindex and retrieval now resolve embedding providers through EmbeddingRouter in non-interactive mode for deterministic locality behavior.
 
 ### Pending Todos
 
@@ -119,5 +125,5 @@ v4.0 deferred runtime validation:
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 17-local-embedding-provider-routing-01-PLAN.md
+Stopped at: Completed 17-local-embedding-provider-routing-03-PLAN.md
 Resume file: None

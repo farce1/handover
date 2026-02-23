@@ -52,7 +52,7 @@
 ### 📋 v5.0 Remote & Advanced MCP (Planned)
 
 - [x] **Phase 16: Streaming QA Session Lifecycle** - Deliver resumable, cancellable QA streaming with stable final contract (completed 2026-02-23)
-- [ ] **Phase 17: Local Embedding Provider Routing** - Add local embedding paths with strict index compatibility validation
+- [x] **Phase 17: Local Embedding Provider Routing** - Add local embedding paths with strict index compatibility validation (completed 2026-02-23)
 - [ ] **Phase 18: Remote Regeneration Job Control** - Expose deterministic, deduplicated regeneration jobs for MCP clients
 - [ ] **Phase 19: HTTP Transport Parity** - Add optional Streamable HTTP transport with behavior parity to stdio
 - [ ] **Phase 20: HTTP Security and Access Controls** - Enforce origin, bind, and auth guardrails for non-local deployments
@@ -86,9 +86,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 17-01-PLAN.md - Build embedding locality config, local provider router, and shared health-check primitives
+- [x] 17-01-PLAN.md - Build embedding locality config, local provider router, and shared health-check primitives
 - [ ] 17-02-PLAN.md - Wire mode-aware routing and fail-fast compatibility validation into reindex and retrieval
-- [ ] 17-03-PLAN.md - Expose embedding health command, CLI mode overrides, and mode/provider run summaries
+- [x] 17-03-PLAN.md - Expose embedding health command, CLI mode overrides, and mode/provider run summaries
 
 ### Phase 18: Remote Regeneration Job Control
 **Goal**: Users can trigger and monitor remote documentation regeneration safely through MCP with deterministic lifecycle behavior.
@@ -140,7 +140,7 @@ Plans:
 | 14. MCP Server (Tools + Resources) | v4.0      | 4/4            | Complete | 2026-02-22 |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 2/2            | Complete | 2026-02-22 |
 | 16. Streaming QA Session Lifecycle | v5.0      | 2/2            | Complete    | 2026-02-23 |
-| 17. Local Embedding Provider Routing | v5.0    | 1/3            | In Progress | - |
+| 17. Local Embedding Provider Routing | 3/3 | Complete   | 2026-02-23 | - |
 | 18. Remote Regeneration Job Control | v5.0     | 0/TBD          | Not started | - |
 | 19. HTTP Transport Parity          | v5.0      | 0/TBD          | Not started | - |
 | 20. HTTP Security and Access Controls | v5.0   | 0/TBD          | Not started | - |
