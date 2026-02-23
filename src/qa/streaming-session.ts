@@ -144,10 +144,12 @@ export function createQaStreamingSessionManager(
           persisted.kind === 'error'
         ) {
           terminal = true;
-          listeners.delete(sessionId);
         }
 
         publish(persisted, sink);
+        if (terminal) {
+          listeners.delete(sessionId);
+        }
         return persisted;
       },
       isTerminal: () => terminal,

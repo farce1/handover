@@ -1,3 +1,4 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../config/loader.js';
 import { createMcpStructuredError } from '../mcp/errors.js';
 import { verifyServePrerequisites } from '../mcp/preflight.js';
@@ -14,13 +15,14 @@ export async function runServe(): Promise<void> {
   try {
     const config = loadConfig();
     verifyServePrerequisites(config.output);
+    const registerHooks = [
+      (server: McpServer) => registerMcpResources(server, { outputDir: config.output }),
+      (server: McpServer) => registerMcpTools(server, { config, outputDir: config.output }),
+      (server: McpServer) => registerMcpPrompts(server, { config, outputDir: config.output }),
+    ];
 
     await startMcpServer({
-      registerHooks: [
-        (server) => registerMcpResources(server, { outputDir: config.output }),
-        (server) => registerMcpTools(server, { config }),
-        (server) => registerMcpPrompts(server, { config, outputDir: config.output }),
-      ],
+      registerHooks,
     });
 
     writeToStderr('MCP server listening on stdio.');
