@@ -10,7 +10,9 @@ import { loadConfig } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
 import { handleCliError } from '../utils/errors.js';
 import { reindexDocuments } from '../vector/reindex.js';
+import { DEFAULT_EMBEDDING_LOCALITY_MODE } from '../vector/types.js';
 import type { ReindexProgressEvent } from '../vector/reindex.js';
+import type { EmbeddingLocalityMode } from '../vector/types.js';
 
 /**
  * Options for reindex command
@@ -20,6 +22,8 @@ export interface ReindexCommandOptions {
   verbose?: boolean;
   /** Force re-embed all documents (bypass change detection) */
   force?: boolean;
+  /** Override embedding locality mode for this run */
+  embeddingMode?: EmbeddingLocalityMode;
 }
 
 /**
@@ -29,6 +33,19 @@ export async function runReindex(options: ReindexCommandOptions): Promise<void> 
   try {
     // Load config
     const config = loadConfig();
+    const embeddingMode =
+      options.embeddingMode ?? config.embedding?.mode ?? DEFAULT_EMBEDDING_LOCALITY_MODE;
+
+    if (config.embedding) {
+      config.embedding.mode = embeddingMode;
+    } else {
+      config.embedding = {
+        provider: 'openai',
+        model: 'text-embedding-3-small',
+        batchSize: 100,
+        mode: embeddingMode,
+      };
+    }
 
     // Resolve output directory
     const outputDir = config.output;
@@ -108,6 +125,7 @@ export async function runReindex(options: ReindexCommandOptions): Promise<void> 
     logger.info(
       `Embeddings: ${result.chunksCreated} stored chunks, ${result.totalTokens} tokens, model ${result.embeddingModel} (${result.embeddingDimensions}D).`,
     );
+    logger.info(`Embedding route: mode ${embeddingMode}, provider remote.`);
 
     if (result.documentsFailed > 0) {
       logger.warn('Reindex completed with partial failures.');

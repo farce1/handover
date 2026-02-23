@@ -51,6 +51,10 @@ program
   .command('reindex')
   .description('Build or update vector search index from generated documentation')
   .option('--force', 'Re-embed all documents (ignore change detection)')
+  .option(
+    '--embedding-mode <mode>',
+    'Embedding locality mode: local-only, local-preferred, or remote-only',
+  )
   .option('-v, --verbose', 'Show detailed output')
   .action(async (opts) => {
     const { runReindex } = await import('./reindex.js');
@@ -69,6 +73,10 @@ program
   .command('search <query>')
   .description('Search generated documentation using semantic similarity')
   .option('--mode <mode>', 'Search mode: fast (default) or qa', 'fast')
+  .option(
+    '--embedding-mode <mode>',
+    'Embedding locality mode: local-only, local-preferred, or remote-only',
+  )
   .option(
     '--top-k <n>',
     'Number of results to return (default: 10)',

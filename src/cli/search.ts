@@ -3,11 +3,14 @@ import { loadConfig } from '../config/loader.js';
 import { answerQuestion, formatCitationFootnotes } from '../qa/answerer.js';
 import { ConfigError, HandoverError, ProviderError, handleCliError } from '../utils/errors.js';
 import { searchDocuments } from '../vector/query-engine.js';
+import { DEFAULT_EMBEDDING_LOCALITY_MODE } from '../vector/types.js';
+import type { EmbeddingLocalityMode } from '../vector/types.js';
 
 export interface SearchCommandOptions {
   topK?: number;
   type?: string[];
   mode?: string;
+  embeddingMode?: EmbeddingLocalityMode;
 }
 
 type SearchMode = 'fast' | 'qa';
@@ -38,6 +41,51 @@ function printModeBanner(emphasize: (value: string) => string, mode: SearchMode)
   const summary =
     mode === 'qa' ? 'qa (retrieval + provider synthesis)' : 'fast (retrieval-only semantic search)';
   console.log(`${emphasize('Mode')}: ${summary}`);
+  console.log();
+}
+
+function applyEmbeddingModeOverride(options: SearchCommandOptions): {
+  config: ReturnType<typeof loadConfig>;
+  mode: EmbeddingLocalityMode;
+} {
+  const config = loadConfig();
+  const mode = options.embeddingMode ?? config.embedding?.mode ?? DEFAULT_EMBEDDING_LOCALITY_MODE;
+
+  if (config.embedding) {
+    config.embedding.mode = mode;
+  } else {
+    config.embedding = {
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      batchSize: 100,
+      mode,
+    };
+  }
+
+  return {
+    config,
+    mode,
+  };
+}
+
+function getEmbeddingProviderLabel(mode: EmbeddingLocalityMode): string {
+  if (mode === 'local-only') {
+    return 'local';
+  }
+
+  if (mode === 'remote-only') {
+    return 'remote';
+  }
+
+  return 'local (preferred)';
+}
+
+function printEmbeddingRouteBanner(
+  emphasize: (value: string) => string,
+  embeddingMode: EmbeddingLocalityMode,
+): void {
+  const provider = getEmbeddingProviderLabel(embeddingMode);
+  console.log(`${emphasize('Embedding route')}: mode ${embeddingMode}, provider ${provider}`);
   console.log();
 }
 
@@ -77,10 +125,10 @@ function renderFootnotes(emphasize: (value: string) => string, citations: string
 
 async function runFastMode(
   query: string,
+  config: ReturnType<typeof loadConfig>,
   options: SearchCommandOptions,
   emphasize: (value: string) => string,
 ): Promise<void> {
-  const config = loadConfig();
   const result = await searchDocuments({
     config,
     query,
@@ -128,11 +176,10 @@ async function runFastMode(
 
 async function runQaMode(
   query: string,
+  config: ReturnType<typeof loadConfig>,
   options: SearchCommandOptions,
   emphasize: (value: string) => string,
 ): Promise<void> {
-  const config = loadConfig();
-
   try {
     const result = await answerQuestion({
       config,
@@ -179,15 +226,17 @@ export async function runSearch(query: string, options: SearchCommandOptions): P
     const isTty = Boolean(process.stdout.isTTY);
     const emphasize = createStyler(isTty);
     const mode = normalizeMode(options.mode);
+    const { config, mode: embeddingMode } = applyEmbeddingModeOverride(options);
 
     printModeBanner(emphasize, mode);
+    printEmbeddingRouteBanner(emphasize, embeddingMode);
 
     if (mode === 'qa') {
-      await runQaMode(query, options, emphasize);
+      await runQaMode(query, config, options, emphasize);
       return;
     }
 
-    await runFastMode(query, options, emphasize);
+    await runFastMode(query, config, options, emphasize);
   } catch (err) {
     handleCliError(err, 'Failed to run search command');
   }
