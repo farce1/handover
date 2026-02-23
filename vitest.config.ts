@@ -29,6 +29,9 @@ export default defineConfig({
         'src/cli/estimate.ts',
         'src/cli/init.ts',
         'src/cli/monorepo.ts',
+        'src/cli/search.ts',
+        'src/cli/reindex.ts',
+        'src/cli/serve.ts',
 
         // WASM grammar downloader and parsing layer
         'src/grammars/downloader.ts',
@@ -62,6 +65,15 @@ export default defineConfig({
         'src/providers/base-provider.ts',
         'src/providers/base.ts',
         'src/providers/schema-utils.ts',
+
+        // Semantic search and MCP runtime surfaces — integration-only
+        'src/vector/embedder.ts',
+        'src/vector/query-engine.ts',
+        'src/vector/reindex.ts',
+        'src/vector/schema.ts',
+        'src/vector/vector-store.ts',
+        'src/mcp/**',
+        'src/qa/**',
 
         // Provider factory — imports real SDK constructors (integration-only)
         'src/providers/factory.ts',
