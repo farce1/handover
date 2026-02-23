@@ -31,10 +31,10 @@ Requirements for the v5.0 milestone. Each requirement maps to exactly one roadma
 
 ### Local Embeddings and Validation (RMT-03)
 
-- [ ] **RMT-18**: User can configure an Ollama-compatible local embedding provider path for indexing and retrieval
+- [x] **RMT-18**: User can configure an Ollama-compatible local embedding provider path for indexing and retrieval
 - [ ] **RMT-19**: User gets fail-fast validation when embedding model or dimension does not match stored index metadata
-- [ ] **RMT-20**: User can select embedding locality policy mode (`local-only`, `local-preferred`, `remote-only`)
-- [ ] **RMT-21**: User can run embedding provider health checks and receive actionable diagnostics before indexing
+- [x] **RMT-20**: User can select embedding locality policy mode (`local-only`, `local-preferred`, `remote-only`)
+- [x] **RMT-21**: User can run embedding provider health checks and receive actionable diagnostics before indexing
 
 ## Future Requirements
 
@@ -79,10 +79,10 @@ Filled during roadmap creation.
 | RMT-15 | Phase 20 | Pending |
 | RMT-16 | Phase 20 | Pending |
 | RMT-17 | Phase 20 | Pending |
-| RMT-18 | Phase 17 | Pending |
+| RMT-18 | Phase 17 | Complete |
 | RMT-19 | Phase 17 | Pending |
-| RMT-20 | Phase 17 | Pending |
-| RMT-21 | Phase 17 | Pending |
+| RMT-20 | Phase 17 | Complete |
+| RMT-21 | Phase 17 | Complete |
 
 **Coverage:**
 - v5.0 requirements: 17 total

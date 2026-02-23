@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** Phase 17 planning for v5.0 Remote & Advanced MCP
+**Current focus:** Phase 17 execution for v5.0 Remote & Advanced MCP
 
 ## Current Position
 
-Phase: 16 of 20 (Streaming QA Session Lifecycle)
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-02-23 - completed 16-02 MCP QA streaming lifecycle tools
+Phase: 17 of 20 (Local Embedding Provider Routing)
+Plan: 1 of 3 in current phase
+Status: In Progress
+Last activity: 2026-02-23 - completed 17-01 embedding locality config, router, and health primitives
 
-Progress: [████████████████████████] 100% (39/39 plans completed; phase 16 complete)
+Progress: [███████████████████████░] 95% (40/42 plans completed)
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [███████████████████████
 - Timeline: 2 days (2026-02-21 to 2026-02-22)
 | Phase 16 P01 | 2 min | 3 tasks | 3 files |
 | Phase 16 P02 | 4 min | 3 tasks | 3 files |
+| Phase 17-local-embedding-provider-routing P01 | 3 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,8 @@ v5.0 roadmap decisions:
 - [Phase 16]: Lifecycle tools return deterministic session metadata (sessionId/state/lastSequence/events) for cursor-safe clients.
 - [Phase 16]: Progress notifications are emitted from canonical stream events only when _meta.progressToken is present.
 - [Phase 16]: Resume validates lastAckSequence bounds and returns structured remediation for invalid cursors.
+- [Phase 17-local-embedding-provider-routing]: local-preferred fallback now requires explicit confirmation in interactive flows and fails with remediation in non-interactive contexts
+- [Phase 17-local-embedding-provider-routing]: embedding health checks now centralize Ollama connectivity and model readiness diagnostics via /api/version and /api/show
 
 ### Pending Todos
 
@@ -116,5 +119,5 @@ v4.0 deferred runtime validation:
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Phase 17 context gathered
-Resume file: .planning/phases/17-local-embedding-provider-routing/17-CONTEXT.md
+Stopped at: Completed 17-local-embedding-provider-routing-01-PLAN.md
+Resume file: None
