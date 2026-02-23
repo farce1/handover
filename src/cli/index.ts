@@ -58,6 +58,14 @@ program
   });
 
 program
+  .command('embedding-health')
+  .description('Run embedding provider health checks')
+  .action(async () => {
+    const { runEmbeddingHealth } = await import('./embedding-health.js');
+    await runEmbeddingHealth();
+  });
+
+program
   .command('search <query>')
   .description('Search generated documentation using semantic similarity')
   .option('--mode <mode>', 'Search mode: fast (default) or qa', 'fast')
