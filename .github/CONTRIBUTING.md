@@ -75,7 +75,7 @@ type(scope): description
 - `docs(readme): update usage examples`
 - `test(analyzers): add edge case coverage`
 
-Commit messages drive automated changelog generation via release-please, so correct formatting matters.
+Changesets drive automated changelog generation and release PRs, so commit message quality still matters for conventional commits in those PRs.
 
 ---
 

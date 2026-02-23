@@ -175,7 +175,7 @@ Runs `tsc --noEmit` against the project. Type errors appear here but not necessa
 
 5. **PR template checklist** — fill out the description, check that tests cover your change, and note if the PR changes any public API or config schema.
 
-Release-please generates changelogs and release PRs automatically from merged conventional commits. You do not need to manage CHANGELOG.md manually.
+Changesets generates changelogs and release PRs automatically when release workflow sees pending changesets. You do not need to manage CHANGELOG.md manually.
 
 ## Debugging
 
