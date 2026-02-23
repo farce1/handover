@@ -51,7 +51,7 @@
 
 ### 📋 v5.0 Remote & Advanced MCP (Planned)
 
-- [ ] **Phase 16: Streaming QA Session Lifecycle** - Deliver resumable, cancellable QA streaming with stable final contract
+- [x] **Phase 16: Streaming QA Session Lifecycle** - Deliver resumable, cancellable QA streaming with stable final contract (completed 2026-02-23)
 - [ ] **Phase 17: Local Embedding Provider Routing** - Add local embedding paths with strict index compatibility validation
 - [ ] **Phase 18: Remote Regeneration Job Control** - Expose deterministic, deduplicated regeneration jobs for MCP clients
 - [ ] **Phase 19: HTTP Transport Parity** - Add optional Streamable HTTP transport with behavior parity to stdio
@@ -71,8 +71,8 @@
 **Plans**: 2 plans
 
 Plans:
-- [ ] 16-01-PLAN.md - Build durable QA streaming session core (event schema, append-only store, replay-safe manager)
-- [ ] 16-02-PLAN.md - Expose MCP streaming QA lifecycle tools (progress, cancellation, reconnect resume)
+- [x] 16-01-PLAN.md - Build durable QA streaming session core (event schema, append-only store, replay-safe manager)
+- [x] 16-02-PLAN.md - Expose MCP streaming QA lifecycle tools (progress, cancellation, reconnect resume)
 
 ### Phase 17: Local Embedding Provider Routing
 **Goal**: Users can choose local embedding execution with predictable routing and validation before indexing or retrieval.
@@ -134,7 +134,7 @@ Plans:
 | 13. Query Engine + CLI Search      | v4.0      | 2/2            | Complete | 2026-02-22 |
 | 14. MCP Server (Tools + Resources) | v4.0      | 4/4            | Complete | 2026-02-22 |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 2/2            | Complete | 2026-02-22 |
-| 16. Streaming QA Session Lifecycle | 1/2 | In Progress|  | - |
+| 16. Streaming QA Session Lifecycle | v5.0      | 2/2            | Complete | 2026-02-23 |
 | 17. Local Embedding Provider Routing | v5.0    | 0/TBD          | Not started | - |
 | 18. Remote Regeneration Job Control | v5.0     | 0/TBD          | Not started | - |
 | 19. HTTP Transport Parity          | v5.0      | 0/TBD          | Not started | - |

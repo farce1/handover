@@ -9,8 +9,8 @@ Requirements for the v5.0 milestone. Each requirement maps to exactly one roadma
 
 ### Streaming QA (RMT-04)
 
-- [ ] **RMT-05**: User can request QA in streaming mode and receive incremental progress updates during long responses
-- [ ] **RMT-06**: User can cancel an in-flight streaming QA request and receive cancellation confirmation
+- [x] **RMT-05**: User can request QA in streaming mode and receive incremental progress updates during long responses
+- [x] **RMT-06**: User can cancel an in-flight streaming QA request and receive cancellation confirmation
 - [x] **RMT-07**: User receives the same final structured QA response contract in both streaming and non-streaming modes
 - [x] **RMT-08**: User can resume a dropped streaming QA session and continue from the last acknowledged stream position
 
@@ -66,8 +66,8 @@ Filled during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RMT-05 | Phase 16 | Pending |
-| RMT-06 | Phase 16 | Pending |
+| RMT-05 | Phase 16 | Complete |
+| RMT-06 | Phase 16 | Complete |
 | RMT-07 | Phase 16 | Complete |
 | RMT-08 | Phase 16 | Complete |
 | RMT-09 | Phase 18 | Pending |

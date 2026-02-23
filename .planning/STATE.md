@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** Phase 16 execution in progress for v5.0 Remote & Advanced MCP
+**Current focus:** Phase 17 planning for v5.0 Remote & Advanced MCP
 
 ## Current Position
 
 Phase: 16 of 20 (Streaming QA Session Lifecycle)
-Plan: 1 of 2 in current phase
-Status: In Progress
-Last activity: 2026-02-23 - completed 16-01 streaming QA session lifecycle core
+Plan: 2 of 2 in current phase
+Status: Complete
+Last activity: 2026-02-23 - completed 16-02 MCP QA streaming lifecycle tools
 
-Progress: [███████████████████████░] 97% (38/39 plans completed; phase 16 plan 02 remaining)
+Progress: [████████████████████████] 100% (39/39 plans completed; phase 16 complete)
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [███████████████████████
 - Total execution time: ~48 min
 - Timeline: 2 days (2026-02-21 to 2026-02-22)
 | Phase 16 P01 | 2 min | 3 tasks | 3 files |
+| Phase 16 P02 | 4 min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,9 @@ v5.0 roadmap decisions:
 - [Phase 16]: Kept final stream payload as strict wrapper around AnswerQuestionResult to avoid contract drift.
 - [Phase 16]: Persisted events before publication so live streaming and replay share one source of truth.
 - [Phase 16]: Applied single terminal transition guard across manager and store to prevent double finalization.
+- [Phase 16]: Lifecycle tools return deterministic session metadata (sessionId/state/lastSequence/events) for cursor-safe clients.
+- [Phase 16]: Progress notifications are emitted from canonical stream events only when _meta.progressToken is present.
+- [Phase 16]: Resume validates lastAckSequence bounds and returns structured remediation for invalid cursors.
 
 ### Pending Todos
 
@@ -112,5 +116,5 @@ v4.0 deferred runtime validation:
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 16-01-PLAN.md
-Resume file: .planning/phases/16-streaming-qa-session-lifecycle/16-02-PLAN.md
+Stopped at: Completed 16-02-PLAN.md
+Resume file: None
