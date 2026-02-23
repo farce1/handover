@@ -59,14 +59,23 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ## Current Milestone: v5.0 Remote & Advanced MCP
 
-**Goal:** Extend local MCP + semantic search into remote-capable operations and richer runtime UX while preserving protocol stability.
+**Goal:** Add remote-capable MCP execution paths and stronger UX for remote users, while preserving local CLI and MCP stability.
+
+**Current priority:** Deliver streaming MCP QA responses first, then expand remote operations.
 
 **Target features:**
 
+- Streaming MCP responses for long-form QA interactions (RMT-04)
 - MCP tool to trigger documentation regeneration remotely (RMT-01)
 - Optional HTTP MCP transport for hosted/remote deployment scenarios (RMT-02)
 - Local embedding provider path (for example Ollama) for offline workflows (RMT-03)
-- Streaming MCP responses for long-form QA interactions (RMT-04)
+
+### Active Requirements
+
+- [ ] RMT-01: Remote MCP tool triggers doc regeneration
+- [ ] RMT-02: Optional HTTP MCP transport supports hosted/remote deployment
+- [ ] RMT-03: Local embedding provider path (example: Ollama) available
+- [ ] RMT-04: MCP responses stream for long-form QA interactions
 
 ### Out of Scope
 
@@ -137,4 +146,4 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ---
 
-_Last updated: 2026-02-22 after v4.0 milestone completion_
+_Last updated: 2026-02-23 after v5.0 milestone start_
