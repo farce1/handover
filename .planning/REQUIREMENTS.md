@@ -66,29 +66,29 @@ Filled during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RMT-05 | TBD | Pending |
-| RMT-06 | TBD | Pending |
-| RMT-07 | TBD | Pending |
-| RMT-08 | TBD | Pending |
-| RMT-09 | TBD | Pending |
-| RMT-10 | TBD | Pending |
-| RMT-11 | TBD | Pending |
-| RMT-12 | TBD | Pending |
-| RMT-13 | TBD | Pending |
-| RMT-14 | TBD | Pending |
-| RMT-15 | TBD | Pending |
-| RMT-16 | TBD | Pending |
-| RMT-17 | TBD | Pending |
-| RMT-18 | TBD | Pending |
-| RMT-19 | TBD | Pending |
-| RMT-20 | TBD | Pending |
-| RMT-21 | TBD | Pending |
+| RMT-05 | Phase 16 | Pending |
+| RMT-06 | Phase 16 | Pending |
+| RMT-07 | Phase 16 | Pending |
+| RMT-08 | Phase 16 | Pending |
+| RMT-09 | Phase 18 | Pending |
+| RMT-10 | Phase 18 | Pending |
+| RMT-11 | Phase 18 | Pending |
+| RMT-12 | Phase 19 | Pending |
+| RMT-13 | Phase 19 | Pending |
+| RMT-14 | Phase 20 | Pending |
+| RMT-15 | Phase 20 | Pending |
+| RMT-16 | Phase 20 | Pending |
+| RMT-17 | Phase 20 | Pending |
+| RMT-18 | Phase 17 | Pending |
+| RMT-19 | Phase 17 | Pending |
+| RMT-20 | Phase 17 | Pending |
+| RMT-21 | Phase 17 | Pending |
 
 **Coverage:**
 - v5.0 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17
+- Mapped to phases: 17
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-23 after milestone requirements scoping*
+*Last updated: 2026-02-23 after roadmap phase mapping*

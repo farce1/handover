@@ -6,7 +6,7 @@
 - ✅ **v2.0 Performance** - Phases 4-7 (shipped 2026-02-19)
 - ✅ **v3.0 Robustness** - Phases 8-11 (shipped 2026-02-20)
 - ✅ **v4.0 MCP Server & Semantic Search** - Phases 12-15 (shipped 2026-02-22)
-- 📋 **v5.0 Remote & Advanced MCP** - Phases TBD (planned)
+- 📋 **v5.0 Remote & Advanced MCP** - Phases 16-20 (planned)
 
 ## Phases
 
@@ -51,7 +51,65 @@
 
 ### 📋 v5.0 Remote & Advanced MCP (Planned)
 
-- [ ] Define v5.0 phase roadmap and plans
+- [ ] **Phase 16: Streaming QA Session Lifecycle** - Deliver resumable, cancellable QA streaming with stable final contract
+- [ ] **Phase 17: Local Embedding Provider Routing** - Add local embedding paths with strict index compatibility validation
+- [ ] **Phase 18: Remote Regeneration Job Control** - Expose deterministic, deduplicated regeneration jobs for MCP clients
+- [ ] **Phase 19: HTTP Transport Parity** - Add optional Streamable HTTP transport with behavior parity to stdio
+- [ ] **Phase 20: HTTP Security and Access Controls** - Enforce origin, bind, and auth guardrails for non-local deployments
+
+## Phase Details
+
+### Phase 16: Streaming QA Session Lifecycle
+**Goal**: Users can run long QA queries with streamed progress, cancellation, and safe resume behavior without losing response structure.
+**Depends on**: Phase 15
+**Requirements**: RMT-05, RMT-06, RMT-07, RMT-08
+**Success Criteria** (what must be TRUE):
+  1. User can start QA in streaming mode and see incremental progress during long responses.
+  2. User can cancel an active streaming QA request and receive explicit cancellation confirmation.
+  3. User receives the same final structured QA response shape in streaming and non-streaming modes.
+  4. User can reconnect and resume a dropped streaming QA session from the last acknowledged position.
+**Plans**: TBD
+
+### Phase 17: Local Embedding Provider Routing
+**Goal**: Users can choose local embedding execution with predictable routing and validation before indexing or retrieval.
+**Depends on**: Phase 15
+**Requirements**: RMT-18, RMT-19, RMT-20, RMT-21
+**Success Criteria** (what must be TRUE):
+  1. User can configure an Ollama-compatible local embedding provider path for indexing and retrieval workflows.
+  2. User gets immediate, actionable validation errors when embedding model or dimensions conflict with stored index metadata.
+  3. User can set embedding locality policy (`local-only`, `local-preferred`, `remote-only`) and observe routing behavior that matches the selected mode.
+  4. User can run embedding provider health checks before indexing and receive clear diagnostics for failures.
+**Plans**: TBD
+
+### Phase 18: Remote Regeneration Job Control
+**Goal**: Users can trigger and monitor remote documentation regeneration safely through MCP with deterministic lifecycle behavior.
+**Depends on**: Phase 16
+**Requirements**: RMT-09, RMT-10, RMT-11
+**Success Criteria** (what must be TRUE):
+  1. User can invoke `regenerate_docs` from a remote MCP client and receive a valid job reference.
+  2. User can observe deterministic job state transitions (`queued`, `running`, `completed`, `failed`) for regeneration runs.
+  3. User sending duplicate regeneration requests for the same target sees single-flight behavior instead of duplicate concurrent runs.
+**Plans**: TBD
+
+### Phase 19: HTTP Transport Parity
+**Goal**: Users can run MCP over optional Streamable HTTP with the same functional behavior they get from stdio.
+**Depends on**: Phase 18
+**Requirements**: RMT-12, RMT-13
+**Success Criteria** (what must be TRUE):
+  1. User can start MCP server in stdio mode by default and opt into Streamable HTTP mode through configuration.
+  2. User can access the same MCP tools, resources, and prompts over HTTP and stdio with equivalent behavior and outputs.
+**Plans**: TBD
+
+### Phase 20: HTTP Security and Access Controls
+**Goal**: Users can deploy HTTP MCP endpoints with explicit origin and authentication controls that protect remote usage.
+**Depends on**: Phase 19
+**Requirements**: RMT-14, RMT-15, RMT-16, RMT-17
+**Success Criteria** (what must be TRUE):
+  1. User requests from disallowed HTTP origins are rejected with remediation guidance that explains how to fix configuration.
+  2. User running HTTP mode locally gets localhost-safe bind defaults unless they explicitly override the bind settings.
+  3. User can configure authentication hooks or credentials for non-localhost deployments.
+  4. User receives clear unauthorized diagnostics when HTTP authentication fails.
+**Plans**: TBD
 
 ## Progress
 
@@ -72,3 +130,8 @@
 | 13. Query Engine + CLI Search      | v4.0      | 2/2            | Complete | 2026-02-22 |
 | 14. MCP Server (Tools + Resources) | v4.0      | 4/4            | Complete | 2026-02-22 |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 2/2            | Complete | 2026-02-22 |
+| 16. Streaming QA Session Lifecycle | v5.0      | 0/TBD          | Not started | - |
+| 17. Local Embedding Provider Routing | v5.0    | 0/TBD          | Not started | - |
+| 18. Remote Regeneration Job Control | v5.0     | 0/TBD          | Not started | - |
+| 19. HTTP Transport Parity          | v5.0      | 0/TBD          | Not started | - |
+| 20. HTTP Security and Access Controls | v5.0   | 0/TBD          | Not started | - |

@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** Defining requirements for v5.0 Remote & Advanced MCP
+**Current focus:** Phase 16 planning kickoff for v5.0 Remote & Advanced MCP
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-23 - started v5.0 milestone planning
+Phase: 16 of 20 (Streaming QA Session Lifecycle)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-02-23 - created v5.0 roadmap phases (16-20) and mapped all requirements
 
-Progress: [████████████████████████] 100% (37/37 total plans across all shipped milestones)
+Progress: [████████████████████████] 100% (37/37 plans completed across shipped milestones; v5.0 plans not started)
 
 ## Performance Metrics
 
@@ -80,6 +80,12 @@ Milestone closure decisions:
 - ROADMAP condensed to milestone-level summaries with detailed execution history archived
 - Next milestone scope moved to remote and advanced MCP capabilities (v5.0)
 
+v5.0 roadmap decisions:
+
+- Phase numbering continues from 16 through 20 (no reset)
+- Requirement coverage fixed at 17/17 mapped (RMT-05 through RMT-21)
+- Delivery order set to Streaming QA -> Local Embeddings -> Remote Regeneration -> HTTP Parity -> HTTP Security
+
 ### Pending Todos
 
 None.
@@ -102,5 +108,5 @@ v4.0 deferred runtime validation:
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Started v5.0 milestone and began requirements planning
-Resume file: None (ready for /gsd-new-milestone)
+Stopped at: Roadmap creation complete for v5.0 milestone; ready for /gsd-plan-phase 16
+Resume file: None (ready for /gsd-plan-phase 16)
