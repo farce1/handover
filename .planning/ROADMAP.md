@@ -68,7 +68,11 @@
   2. User can cancel an active streaming QA request and receive explicit cancellation confirmation.
   3. User receives the same final structured QA response shape in streaming and non-streaming modes.
   4. User can reconnect and resume a dropped streaming QA session from the last acknowledged position.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 16-01-PLAN.md - Build durable QA streaming session core (event schema, append-only store, replay-safe manager)
+- [ ] 16-02-PLAN.md - Expose MCP streaming QA lifecycle tools (progress, cancellation, reconnect resume)
 
 ### Phase 17: Local Embedding Provider Routing
 **Goal**: Users can choose local embedding execution with predictable routing and validation before indexing or retrieval.
@@ -130,7 +134,7 @@
 | 13. Query Engine + CLI Search      | v4.0      | 2/2            | Complete | 2026-02-22 |
 | 14. MCP Server (Tools + Resources) | v4.0      | 4/4            | Complete | 2026-02-22 |
 | 15. LLM Q&A + Advanced Features    | v4.0      | 2/2            | Complete | 2026-02-22 |
-| 16. Streaming QA Session Lifecycle | v5.0      | 0/TBD          | Not started | - |
+| 16. Streaming QA Session Lifecycle | 1/2 | In Progress|  | - |
 | 17. Local Embedding Provider Routing | v5.0    | 0/TBD          | Not started | - |
 | 18. Remote Regeneration Job Control | v5.0     | 0/TBD          | Not started | - |
 | 19. HTTP Transport Parity          | v5.0      | 0/TBD          | Not started | - |

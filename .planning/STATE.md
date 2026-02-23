@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** Phase 16 planning kickoff for v5.0 Remote & Advanced MCP
+**Current focus:** Phase 16 execution in progress for v5.0 Remote & Advanced MCP
 
 ## Current Position
 
 Phase: 16 of 20 (Streaming QA Session Lifecycle)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-02-23 - created v5.0 roadmap phases (16-20) and mapped all requirements
+Plan: 1 of 2 in current phase
+Status: In Progress
+Last activity: 2026-02-23 - completed 16-01 streaming QA session lifecycle core
 
-Progress: [████████████████████████] 100% (37/37 plans completed across shipped milestones; v5.0 plans not started)
+Progress: [███████████████████████░] 97% (38/39 plans completed; phase 16 plan 02 remaining)
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [███████████████████████
 - Average duration: ~4.4 min/plan
 - Total execution time: ~48 min
 - Timeline: 2 days (2026-02-21 to 2026-02-22)
+| Phase 16 P01 | 2 min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ v5.0 roadmap decisions:
 - Phase numbering continues from 16 through 20 (no reset)
 - Requirement coverage fixed at 17/17 mapped (RMT-05 through RMT-21)
 - Delivery order set to Streaming QA -> Local Embeddings -> Remote Regeneration -> HTTP Parity -> HTTP Security
+- [Phase 16]: Kept final stream payload as strict wrapper around AnswerQuestionResult to avoid contract drift.
+- [Phase 16]: Persisted events before publication so live streaming and replay share one source of truth.
+- [Phase 16]: Applied single terminal transition guard across manager and store to prevent double finalization.
 
 ### Pending Todos
 
@@ -108,5 +112,5 @@ v4.0 deferred runtime validation:
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Roadmap creation complete for v5.0 milestone; ready for /gsd-plan-phase 16
-Resume file: None (ready for /gsd-plan-phase 16)
+Stopped at: Completed 16-01-PLAN.md
+Resume file: .planning/phases/16-streaming-qa-session-lifecycle/16-02-PLAN.md
