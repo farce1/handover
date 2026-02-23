@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>handover docs</title>
+    <meta name="description" content="handover CLI documentation" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css" />
+    <style>
+      :root {
+        --theme-color: #1d4ed8;
+      }
+
+      .sidebar {
+        background-color: #f8fafc;
+      }
+
+      .app-name-link {
+        font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+
+      .markdown-section h1,
+      .markdown-section h2,
+      .markdown-section h3 {
+        scroll-margin-top: 24px;
+      }
+
+      .markdown-section pre {
+        border-radius: 12px;
+      }
+
+      .cover-main {
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script>
+      window.$docsify = {
+        name: 'handover',
+        repo: 'farce1/handover',
+        loadSidebar: true,
+        loadNavbar: true,
+        coverpage: true,
+        relativePath: true,
+        auto2top: true,
+        subMaxLevel: 3,
+        maxLevel: 4,
+        search: {
+          paths: 'auto',
+          placeholder: 'Search docs',
+          noData: 'No results',
+          depth: 4,
+        },
+      };
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  </body>
+</html>
