@@ -485,7 +485,11 @@ export function registerMcpTools(server: McpServer, options: RegisterMcpToolsOpt
   const regenerationManager =
     options.regenerationManager ??
     createRegenerationJobManager({
-      runner: async () => undefined,
+      runner: async () => ({
+        outcome: 'completed',
+        summary: 'No-op regeneration manager for MCP tool registration.',
+        steps: ['no-op'],
+      }),
     });
   const regenerationHandlers = createRegenerationToolHandlers({
     manager: regenerationManager,

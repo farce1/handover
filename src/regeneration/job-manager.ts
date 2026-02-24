@@ -29,7 +29,13 @@ interface RegenerationRunnerInput {
   target: RegenerationTargetRef;
 }
 
-type RegenerationRunner = (input: RegenerationRunnerInput) => Promise<void>;
+export interface RegenerationRunnerResult {
+  outcome: 'completed';
+  summary: string;
+  steps: string[];
+}
+
+type RegenerationRunner = (input: RegenerationRunnerInput) => Promise<RegenerationRunnerResult>;
 
 export interface RegenerationJobManager {
   trigger(input: TriggerRegenerationInput): RegenerationTriggerResponse;
@@ -108,10 +114,13 @@ export function createRegenerationJobManager(
         to: 'running',
       });
 
-      await options.runner({
+      const execution = await options.runner({
         jobId,
         target,
       });
+      if (execution.outcome !== 'completed') {
+        throw new Error(`Unexpected regeneration runner outcome: ${String(execution.outcome)}`);
+      }
 
       store.transitionJob({
         jobId,
