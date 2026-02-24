@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** Phase 18 planning for v5.0 Remote & Advanced MCP
+**Current focus:** Phase 18 execution for v5.0 Remote & Advanced MCP
 
 ## Current Position
 
-Phase: 17 of 20 (Local Embedding Provider Routing)
-Plan: 4 of 4 in current phase
-Status: Complete
-Last activity: 2026-02-24 - completed 17-04 reindex route provider visibility gap closure
+Phase: 18 of 20 (Remote Regeneration Job Control)
+Plan: 2 of 2 in current phase
+Status: In Progress
+Last activity: 2026-02-24 - completed 18-01 deterministic regeneration job core
 
-Progress: [█████████████████████████] 100% (42/42 plans completed)
+Progress: [████████████████████████░] 98% (43/44 plans completed)
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [███████████████████████
 | Phase 17-local-embedding-provider-routing P03 | 4 min | 2 tasks | 4 files |
 | Phase 17-local-embedding-provider-routing P02 | 5 min | 2 tasks | 2 files |
 | Phase 17-local-embedding-provider-routing P04 | 1 min | 2 tasks | 2 files |
+| Phase 18-remote-regeneration-job-control P01 | 4 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,9 @@ v5.0 roadmap decisions:
 - [Phase 17-local-embedding-provider-routing]: Retrieval now hard-blocks model/dimension metadata mismatches and directs users to reindex before retrying search.
 - [Phase 17-local-embedding-provider-routing]: Reindex result contract now carries resolved embedding route metadata so CLI output uses runtime route truth.
 - [Phase 17-local-embedding-provider-routing]: Reindex route metadata is returned for no-op, partial-failure, and success paths to keep provider visibility deterministic.
+- [Phase 18-remote-regeneration-job-control]: Normalized target aliases map to fixed canonical keys with remediation for unknown targets.
+- [Phase 18-remote-regeneration-job-control]: Regeneration jobs persist queued before execution, then transition running and exactly one terminal state.
+- [Phase 18-remote-regeneration-job-control]: Duplicate requests for the same normalized target join the existing in-flight job with explicit dedupe metadata.
 
 ### Pending Todos
 
@@ -129,5 +133,5 @@ v4.0 deferred runtime validation:
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Phase 18 context gathered
-Resume file: .planning/phases/18-remote-regeneration-job-control/18-CONTEXT.md
+Stopped at: Completed 18-01-PLAN.md
+Resume file: .planning/phases/18-remote-regeneration-job-control/18-02-PLAN.md

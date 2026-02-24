@@ -17,8 +17,8 @@ Requirements for the v5.0 milestone. Each requirement maps to exactly one roadma
 ### Remote Regeneration Tooling (RMT-01)
 
 - [ ] **RMT-09**: User can invoke `regenerate_docs` as an MCP tool from a remote MCP client
-- [ ] **RMT-10**: User can view deterministic regeneration job states (`queued`, `running`, `completed`, `failed`)
-- [ ] **RMT-11**: User submitting duplicate regeneration requests for the same target gets single-flight behavior instead of duplicate concurrent runs
+- [x] **RMT-10**: User can view deterministic regeneration job states (`queued`, `running`, `completed`, `failed`)
+- [x] **RMT-11**: User submitting duplicate regeneration requests for the same target gets single-flight behavior instead of duplicate concurrent runs
 
 ### HTTP Transport and Security (RMT-02)
 
@@ -71,8 +71,8 @@ Filled during roadmap creation.
 | RMT-07 | Phase 16 | Complete |
 | RMT-08 | Phase 16 | Complete |
 | RMT-09 | Phase 18 | Pending |
-| RMT-10 | Phase 18 | Pending |
-| RMT-11 | Phase 18 | Pending |
+| RMT-10 | Phase 18 | Complete |
+| RMT-11 | Phase 18 | Complete |
 | RMT-12 | Phase 19 | Pending |
 | RMT-13 | Phase 19 | Pending |
 | RMT-14 | Phase 20 | Pending |
