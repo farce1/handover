@@ -20,6 +20,7 @@ import { HandoverError } from '../utils/errors.js';
 import {
   DEFAULT_EMBEDDING_LOCALITY_MODE,
   EMBEDDING_MODELS,
+  type EmbeddingRouteMetadata,
   type EmbeddingLocalityMode,
 } from './types.js';
 import type { HandoverConfig } from '../config/schema.js';
@@ -203,6 +204,8 @@ export interface ReindexResult {
   embeddingModel: string;
   /** Embedding dimensions */
   embeddingDimensions: number;
+  /** Resolved embedding route for this run */
+  embeddingRoute: EmbeddingRouteMetadata;
   /** Non-fatal warnings encountered during indexing */
   warnings: string[];
 }
@@ -349,6 +352,7 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
     remoteProvider,
     localProvider,
   });
+  const embeddingRoute = route.metadata;
 
   logger.log(
     `Embedding route resolved: provider=${route.metadata.provider}, reason=${route.metadata.reason}`,
@@ -419,6 +423,7 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
         totalTokens: 0,
         embeddingModel,
         embeddingDimensions,
+        embeddingRoute,
         warnings,
       };
     }
@@ -472,6 +477,7 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
         totalTokens: 0,
         embeddingModel,
         embeddingDimensions,
+        embeddingRoute,
         warnings,
       };
     }
@@ -570,6 +576,7 @@ export async function reindexDocuments(options: ReindexOptions): Promise<Reindex
       totalTokens,
       embeddingModel,
       embeddingDimensions,
+      embeddingRoute,
       warnings,
     };
   } finally {
