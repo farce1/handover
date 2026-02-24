@@ -98,7 +98,11 @@ Plans:
   1. User can invoke `regenerate_docs` from a remote MCP client and receive a valid job reference.
   2. User can observe deterministic job state transitions (`queued`, `running`, `completed`, `failed`) for regeneration runs.
   3. User sending duplicate regeneration requests for the same target sees single-flight behavior instead of duplicate concurrent runs.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 18-01-PLAN.md - Build deterministic regeneration job core (contracts, target normalization, durable store, single-flight manager)
+- [ ] 18-02-PLAN.md - Expose regenerate_docs MCP trigger/status tools with shared executor wiring and remote usage docs
 
 ### Phase 19: HTTP Transport Parity
 **Goal**: Users can run MCP over optional Streamable HTTP with the same functional behavior they get from stdio.
