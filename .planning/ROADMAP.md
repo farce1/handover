@@ -111,7 +111,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can start MCP server in stdio mode by default and opt into Streamable HTTP mode through configuration.
   2. User can access the same MCP tools, resources, and prompts over HTTP and stdio with equivalent behavior and outputs.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 19-01-PLAN.md - Config schema extension, CLI flags, and serve transport branching
+- [ ] 19-02-PLAN.md - HTTP transport server implementation and docs update
 
 ### Phase 20: HTTP Security and Access Controls
 **Goal**: Users can deploy HTTP MCP endpoints with explicit origin and authentication controls that protect remote usage.
