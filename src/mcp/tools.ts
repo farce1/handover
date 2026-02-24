@@ -8,6 +8,16 @@ import {
   qaStreamEventSchema,
 } from '../qa/streaming-schema.js';
 import { createQaStreamingSessionManager } from '../qa/streaming-session.js';
+import {
+  regenerationFailureSchema,
+  regenerationJobStateSchema,
+  regenerationTargetRefSchema,
+  type RegenerationFailure,
+} from '../regeneration/schema.js';
+import {
+  createRegenerationJobManager,
+  type RegenerationJobManager,
+} from '../regeneration/job-manager.js';
 import { searchDocuments } from '../vector/query-engine.js';
 import { HandoverError } from '../utils/errors.js';
 import { createMcpStructuredError, type McpStructuredError } from './errors.js';
@@ -101,12 +111,77 @@ const qaCancelResponseSchema = z
   })
   .strict();
 
+const regenerationTriggerInputSchema = z
+  .object({
+    target: z.string().trim().min(1, { message: 'target must be a non-empty string' }).optional(),
+  })
+  .strict();
+
+const regenerationStatusInputSchema = z
+  .object({
+    jobId: z.string().trim().min(1, { message: 'jobId must be a non-empty string' }),
+  })
+  .strict();
+
+const regenerationTriggerToolResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    jobId: z.string().trim().min(1),
+    state: regenerationJobStateSchema,
+    target: regenerationTargetRefSchema,
+    createdAt: z.string().datetime({ offset: true }),
+    dedupe: z
+      .object({
+        joined: z.boolean(),
+        key: z.string().trim().min(1),
+        reason: z.enum(['none', 'in_flight_target']),
+      })
+      .strict(),
+    next: z
+      .object({
+        tool: z.literal('regenerate_docs_status'),
+        message: z.string().trim().min(1),
+        pollAfterMs: z.number().int().positive().optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
+const regenerationStatusToolResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    jobId: z.string().trim().min(1),
+    state: regenerationJobStateSchema,
+    target: regenerationTargetRefSchema,
+    createdAt: z.string().datetime({ offset: true }),
+    updatedAt: z.string().datetime({ offset: true }),
+    startedAt: z.string().datetime({ offset: true }).optional(),
+    terminalAt: z.string().datetime({ offset: true }).optional(),
+    failure: regenerationFailureSchema.optional(),
+    lifecycle: z
+      .object({
+        stage: regenerationJobStateSchema,
+        progressPercent: z.number().int().min(0).max(100),
+        summary: z.string().trim().min(1),
+      })
+      .strict(),
+    next: z
+      .object({
+        tool: z.enum(['regenerate_docs', 'regenerate_docs_status']),
+        message: z.string().trim().min(1),
+        pollAfterMs: z.number().int().positive().optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
 type SemanticSearchFn = (input: SearchDocumentsInput) => Promise<SearchDocumentsResult>;
 
 export interface RegisterMcpToolsOptions {
   config: HandoverConfig;
   outputDir?: string;
   searchFn?: SemanticSearchFn;
+  regenerationManager?: RegenerationJobManager;
 }
 
 function createInvalidInputError(details: string): McpStructuredError {
@@ -127,6 +202,20 @@ function createQaInvalidInputError(toolName: string, details: string): McpStruct
       details,
       `Review ${toolName} schema and provide required fields with valid values.`,
       'QA_STREAM_INVALID_INPUT',
+    ),
+  );
+}
+
+function createRegenerationInvalidInputError(
+  toolName: string,
+  details: string,
+): McpStructuredError {
+  return createMcpStructuredError(
+    new HandoverError(
+      `Invalid ${toolName} input`,
+      details,
+      `Provide required ${toolName} fields with valid values and retry the MCP tool call.`,
+      'REGENERATION_INVALID_INPUT',
     ),
   );
 }
@@ -196,6 +285,141 @@ function createToolSuccessPayload<T>(payload: T) {
   };
 }
 
+function mapRegenerationFailureToToolError(
+  failure: RegenerationFailure,
+  fallbackAction: string,
+): McpStructuredError {
+  return {
+    code: failure.code,
+    message: failure.reason,
+    action: failure.remediation || fallbackAction,
+  };
+}
+
+function getLifecycleSummary(state: z.infer<typeof regenerationJobStateSchema>): {
+  stage: z.infer<typeof regenerationJobStateSchema>;
+  progressPercent: number;
+  summary: string;
+} {
+  switch (state) {
+    case 'queued':
+      return {
+        stage: 'queued',
+        progressPercent: 5,
+        summary: 'Job accepted and queued for regeneration execution.',
+      };
+    case 'running':
+      return {
+        stage: 'running',
+        progressPercent: 50,
+        summary: 'Regeneration is actively running for the requested target.',
+      };
+    case 'completed':
+      return {
+        stage: 'completed',
+        progressPercent: 100,
+        summary: 'Regeneration completed and no longer requires polling.',
+      };
+    case 'failed':
+      return {
+        stage: 'failed',
+        progressPercent: 100,
+        summary: 'Regeneration reached terminal failure; inspect remediation and retry.',
+      };
+  }
+}
+
+interface CreateRegenerationToolHandlersOptions {
+  manager: RegenerationJobManager;
+}
+
+export function createRegenerationToolHandlers(options: CreateRegenerationToolHandlersOptions) {
+  const handleRegenerateDocs = async (input: unknown) => {
+    const parsed = regenerationTriggerInputSchema.safeParse(input);
+    if (!parsed.success) {
+      const details = parsed.error.issues
+        .map((issue) => `${issue.path.join('.') || 'input'}: ${issue.message}`)
+        .join('; ');
+      return createToolErrorPayload(
+        createRegenerationInvalidInputError('regenerate_docs', details),
+      );
+    }
+
+    const response = options.manager.trigger({
+      target: parsed.data.target,
+    });
+
+    if (!response.ok) {
+      return createToolErrorPayload(
+        mapRegenerationFailureToToolError(response.error, response.guidance.message),
+      );
+    }
+
+    return createToolSuccessPayload(
+      regenerationTriggerToolResponseSchema.parse({
+        ok: true,
+        jobId: response.job.id,
+        state: response.job.state,
+        target: response.job.target,
+        createdAt: response.job.createdAt,
+        dedupe: response.dedupe,
+        next: {
+          tool: 'regenerate_docs_status',
+          message: response.guidance.message,
+          pollAfterMs: response.guidance.pollAfterMs,
+        },
+      }),
+    );
+  };
+
+  const handleRegenerateDocsStatus = async (input: unknown) => {
+    const parsed = regenerationStatusInputSchema.safeParse(input);
+    if (!parsed.success) {
+      const details = parsed.error.issues
+        .map((issue) => `${issue.path.join('.') || 'input'}: ${issue.message}`)
+        .join('; ');
+      return createToolErrorPayload(
+        createRegenerationInvalidInputError('regenerate_docs_status', details),
+      );
+    }
+
+    const response = options.manager.getStatus({
+      jobId: parsed.data.jobId,
+    });
+
+    if (!response.ok) {
+      return createToolErrorPayload(
+        mapRegenerationFailureToToolError(response.error, response.guidance.message),
+      );
+    }
+
+    return createToolSuccessPayload(
+      regenerationStatusToolResponseSchema.parse({
+        ok: true,
+        jobId: response.job.id,
+        state: response.job.state,
+        target: response.job.target,
+        createdAt: response.job.createdAt,
+        updatedAt: response.job.updatedAt,
+        startedAt: response.job.startedAt,
+        terminalAt: response.job.terminalAt,
+        failure: response.job.state === 'failed' ? response.job.failure : undefined,
+        lifecycle: getLifecycleSummary(response.job.state),
+        next: {
+          tool: response.guidance.nextTool,
+          message: response.guidance.message,
+          pollAfterMs: response.guidance.pollAfterMs,
+        },
+      }),
+    );
+  };
+
+  return {
+    handleRegenerateDocs,
+    handleRegenerateDocsStatus,
+  };
+}
+
 function getProgressToken(extra: ToolRequestExtra): string | number | undefined {
   const token = (extra._meta as { progressToken?: unknown } | undefined)?.progressToken;
   if (typeof token === 'string' || typeof token === 'number') {
@@ -258,6 +482,14 @@ export function registerMcpTools(server: McpServer, options: RegisterMcpToolsOpt
   const sessionManager = createQaStreamingSessionManager({
     config: options.config,
   });
+  const regenerationManager =
+    options.regenerationManager ??
+    createRegenerationJobManager({
+      runner: async () => undefined,
+    });
+  const regenerationHandlers = createRegenerationToolHandlers({
+    manager: regenerationManager,
+  });
 
   server.registerTool(
     'semantic_search',
@@ -310,6 +542,32 @@ export function registerMcpTools(server: McpServer, options: RegisterMcpToolsOpt
         return createToolErrorPayload(createMcpStructuredError(error));
       }
     },
+  );
+
+  server.registerTool(
+    'regenerate_docs',
+    {
+      description:
+        'Trigger deterministic documentation regeneration and receive an opaque job reference for status polling.',
+      inputSchema: {
+        target: z.string().optional(),
+      },
+      outputSchema: regenerationTriggerToolResponseSchema,
+    },
+    regenerationHandlers.handleRegenerateDocs,
+  );
+
+  server.registerTool(
+    'regenerate_docs_status',
+    {
+      description:
+        'Get deterministic regeneration lifecycle status by job ID, including polling guidance.',
+      inputSchema: {
+        jobId: z.string(),
+      },
+      outputSchema: regenerationStatusToolResponseSchema,
+    },
+    regenerationHandlers.handleRegenerateDocsStatus,
   );
 
   server.registerTool(
