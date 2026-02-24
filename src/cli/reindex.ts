@@ -125,7 +125,9 @@ export async function runReindex(options: ReindexCommandOptions): Promise<void> 
     logger.info(
       `Embeddings: ${result.chunksCreated} stored chunks, ${result.totalTokens} tokens, model ${result.embeddingModel} (${result.embeddingDimensions}D).`,
     );
-    logger.info(`Embedding route: mode ${embeddingMode}, provider remote.`);
+    logger.info(
+      `Embedding route: mode ${result.embeddingRoute.mode}, provider ${result.embeddingRoute.provider}.`,
+    );
 
     if (result.documentsFailed > 0) {
       logger.warn('Reindex completed with partial failures.');
