@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 18 of 20 (Remote Regeneration Job Control)
-Plan: 2 of 2 in current phase
+Phase: 19 of 20 (HTTP Transport Parity)
+Plan: 1 of TBD in current phase
 Status: In Progress
-Last activity: 2026-02-24 - completed 18-01 deterministic regeneration job core
+Last activity: 2026-02-24 - completed 18-02 remote regeneration MCP surface
 
-Progress: [████████████████████████░] 98% (43/44 plans completed)
+Progress: [█████████████████████████] 100% (44/44 plans completed)
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [███████████████████████
 | Phase 17-local-embedding-provider-routing P02 | 5 min | 2 tasks | 2 files |
 | Phase 17-local-embedding-provider-routing P04 | 1 min | 2 tasks | 2 files |
 | Phase 18-remote-regeneration-job-control P01 | 4 min | 3 tasks | 4 files |
+| Phase 18-remote-regeneration-job-control P02 | 2 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,9 @@ v5.0 roadmap decisions:
 - [Phase 18-remote-regeneration-job-control]: Normalized target aliases map to fixed canonical keys with remediation for unknown targets.
 - [Phase 18-remote-regeneration-job-control]: Regeneration jobs persist queued before execution, then transition running and exactly one terminal state.
 - [Phase 18-remote-regeneration-job-control]: Duplicate requests for the same normalized target join the existing in-flight job with explicit dedupe metadata.
+- [Phase 18-remote-regeneration-job-control]: Status polling is job-ID only via regenerate_docs_status for deterministic remote automation.
+- [Phase 18-remote-regeneration-job-control]: Regeneration failures are mapped to MCP structured errors with code/message/action payloads.
+- [Phase 18-remote-regeneration-job-control]: Regeneration executor runs generate/reindex in subprocesses with piped stdio to protect MCP protocol output.
 
 ### Pending Todos
 
@@ -133,5 +137,5 @@ v4.0 deferred runtime validation:
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 18-01-PLAN.md
-Resume file: .planning/phases/18-remote-regeneration-job-control/18-02-PLAN.md
+Stopped at: Completed 18-02-PLAN.md
+Resume file: None

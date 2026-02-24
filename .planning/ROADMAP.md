@@ -53,7 +53,7 @@
 
 - [x] **Phase 16: Streaming QA Session Lifecycle** - Deliver resumable, cancellable QA streaming with stable final contract (completed 2026-02-23)
 - [x] **Phase 17: Local Embedding Provider Routing** - Add local embedding paths with strict index compatibility validation (completed 2026-02-23)
-- [ ] **Phase 18: Remote Regeneration Job Control** - Expose deterministic, deduplicated regeneration jobs for MCP clients
+- [x] **Phase 18: Remote Regeneration Job Control** - Expose deterministic, deduplicated regeneration jobs for MCP clients (completed 2026-02-24)
 - [ ] **Phase 19: HTTP Transport Parity** - Add optional Streamable HTTP transport with behavior parity to stdio
 - [ ] **Phase 20: HTTP Security and Access Controls** - Enforce origin, bind, and auth guardrails for non-local deployments
 
@@ -101,8 +101,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 18-01-PLAN.md - Build deterministic regeneration job core (contracts, target normalization, durable store, single-flight manager)
-- [ ] 18-02-PLAN.md - Expose regenerate_docs MCP trigger/status tools with shared executor wiring and remote usage docs
+- [x] 18-01-PLAN.md - Build deterministic regeneration job core (contracts, target normalization, durable store, single-flight manager)
+- [x] 18-02-PLAN.md - Expose regenerate_docs MCP trigger/status tools with shared executor wiring and remote usage docs
 
 ### Phase 19: HTTP Transport Parity
 **Goal**: Users can run MCP over optional Streamable HTTP with the same functional behavior they get from stdio.
@@ -145,6 +145,6 @@ Plans:
 | 15. LLM Q&A + Advanced Features    | v4.0      | 2/2            | Complete | 2026-02-22 |
 | 16. Streaming QA Session Lifecycle | v5.0      | 2/2            | Complete    | 2026-02-23 |
 | 17. Local Embedding Provider Routing | 4/4 | Complete    | 2026-02-24 | - |
-| 18. Remote Regeneration Job Control | 1/2 | In Progress|  | - |
+| 18. Remote Regeneration Job Control | 2/2 | Complete   | 2026-02-24 | - |
 | 19. HTTP Transport Parity          | v5.0      | 0/TBD          | Not started | - |
 | 20. HTTP Security and Access Controls | v5.0   | 0/TBD          | Not started | - |
