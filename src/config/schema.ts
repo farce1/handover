@@ -39,6 +39,12 @@ const ServeConfigSchema = z
         port: z.number().int().min(1).max(65535).default(3000),
         host: z.string().default('127.0.0.1'),
         path: z.string().regex(/^\//).default('/mcp'),
+        allowedOrigins: z.array(z.string().min(1)).optional(),
+        auth: z
+          .object({
+            token: z.string().min(1).optional(),
+          })
+          .optional(),
       })
       .default({}),
   })
