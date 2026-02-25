@@ -6,6 +6,9 @@ import {
   type SecurityRequest,
   type SecurityResponse,
 } from './http-security.js';
+import type { HandoverConfig } from '../config/schema.js';
+import { HandoverError } from '../utils/errors.js';
+import { isLoopbackHost, verifyHttpSecurityPrerequisites } from './preflight.js';
 
 interface MockContext {
   req: SecurityRequest;
@@ -285,5 +288,158 @@ describe('bearerAuth', () => {
     expect(() => middleware(ctx.req, ctx.res, ctx.next)).not.toThrow();
     expect(ctx.getStatus()).toBe(401);
     expect(hashToken('value').byteLength).toBe(32);
+  });
+});
+
+function createConfig(overrides: Partial<HandoverConfig> = {}): HandoverConfig {
+  return {
+    provider: 'anthropic',
+    output: './handover',
+    audience: 'human',
+    include: ['**/*'],
+    exclude: [],
+    analysis: {
+      concurrency: 4,
+      staticOnly: false,
+    },
+    project: {},
+    contextWindow: {
+      pin: [],
+      boost: [],
+    },
+    serve: {
+      transport: 'http',
+      http: {
+        port: 3000,
+        host: '127.0.0.1',
+        path: '/mcp',
+      },
+    },
+    ...overrides,
+  };
+}
+
+describe('verifyHttpSecurityPrerequisites', () => {
+  test('does nothing for stdio transport', () => {
+    const config = createConfig({
+      serve: {
+        transport: 'stdio',
+        http: {
+          port: 3000,
+          host: '0.0.0.0',
+          path: '/mcp',
+        },
+      },
+    });
+
+    expect(() => verifyHttpSecurityPrerequisites(config)).not.toThrow();
+  });
+
+  test.each(['localhost', '127.0.0.1', '::1'])('allows loopback host %s without auth', (host) => {
+    const config = createConfig({
+      serve: {
+        transport: 'http',
+        http: {
+          port: 3000,
+          host,
+          path: '/mcp',
+        },
+      },
+    });
+
+    expect(() => verifyHttpSecurityPrerequisites(config)).not.toThrow();
+  });
+
+  test('throws for non-loopback host without auth', () => {
+    const config = createConfig({
+      serve: {
+        transport: 'http',
+        http: {
+          port: 3000,
+          host: '0.0.0.0',
+          path: '/mcp',
+        },
+      },
+    });
+
+    try {
+      verifyHttpSecurityPrerequisites(config);
+      throw new Error('Expected verifyHttpSecurityPrerequisites to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HandoverError);
+      expect((error as HandoverError).code).toBe('MCP_HTTP_AUTH_REQUIRED');
+    }
+  });
+
+  test('allows non-loopback host with auth token in config', () => {
+    const config = createConfig({
+      serve: {
+        transport: 'http',
+        http: {
+          port: 3000,
+          host: '0.0.0.0',
+          path: '/mcp',
+          auth: {
+            token: 'configured-token',
+          },
+        },
+      },
+    });
+
+    expect(() => verifyHttpSecurityPrerequisites(config)).not.toThrow();
+  });
+
+  test('allows non-loopback host with HANDOVER_AUTH_TOKEN env var', () => {
+    const previous = process.env.HANDOVER_AUTH_TOKEN;
+    process.env.HANDOVER_AUTH_TOKEN = 'env-token';
+
+    try {
+      const config = createConfig({
+        serve: {
+          transport: 'http',
+          http: {
+            port: 3000,
+            host: '0.0.0.0',
+            path: '/mcp',
+          },
+        },
+      });
+
+      expect(() => verifyHttpSecurityPrerequisites(config)).not.toThrow();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.HANDOVER_AUTH_TOKEN;
+      } else {
+        process.env.HANDOVER_AUTH_TOKEN = previous;
+      }
+    }
+  });
+
+  test('throws for public IP without auth', () => {
+    const config = createConfig({
+      serve: {
+        transport: 'http',
+        http: {
+          port: 3000,
+          host: '192.168.1.100',
+          path: '/mcp',
+        },
+      },
+    });
+
+    expect(() => verifyHttpSecurityPrerequisites(config)).toThrowError(HandoverError);
+  });
+});
+
+describe('isLoopbackHost', () => {
+  test('returns true for loopback hosts', () => {
+    expect(isLoopbackHost('127.0.0.1')).toBe(true);
+    expect(isLoopbackHost('::1')).toBe(true);
+    expect(isLoopbackHost('localhost')).toBe(true);
+  });
+
+  test('returns false for non-loopback hosts', () => {
+    expect(isLoopbackHost('0.0.0.0')).toBe(false);
+    expect(isLoopbackHost('192.168.1.1')).toBe(false);
   });
 });
