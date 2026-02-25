@@ -32,6 +32,7 @@ export default defineConfig({
         'src/cli/search.ts',
         'src/cli/reindex.ts',
         'src/cli/serve.ts',
+        'src/cli/embedding-health.ts',
 
         // WASM grammar downloader and parsing layer
         'src/grammars/downloader.ts',
@@ -68,12 +69,18 @@ export default defineConfig({
 
         // Semantic search and MCP runtime surfaces — integration-only
         'src/vector/embedder.ts',
+        'src/vector/embedding-health.ts',
+        'src/vector/embedding-router.ts',
+        'src/vector/local-embedder.ts',
         'src/vector/query-engine.ts',
         'src/vector/reindex.ts',
         'src/vector/schema.ts',
         'src/vector/vector-store.ts',
         'src/mcp/**',
         'src/qa/**',
+
+        // Regeneration job runtime — filesystem/process orchestration
+        'src/regeneration/**',
 
         // Provider factory — imports real SDK constructors (integration-only)
         'src/providers/factory.ts',
