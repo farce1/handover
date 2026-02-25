@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** Phase 18 execution for v5.0 Remote & Advanced MCP
+**Current focus:** Phase 20 planning for v5.0 Remote & Advanced MCP
 
 ## Current Position
 
-Phase: 19 of 20 (HTTP Transport Parity)
+Phase: 20 of 20 (HTTP Security and Access Controls)
 Plan: 1 of TBD in current phase
-Status: In Progress
-Last activity: 2026-02-24 - completed 18-02 remote regeneration MCP surface
+Status: Ready for planning
+Last activity: 2026-02-24 - completed 19-02 HTTP transport implementation and docs
 
-Progress: [█████████████████████████] 100% (44/44 plans completed)
+Progress: [█████████████████████████] 100% (46/46 plans completed)
 
 ## Performance Metrics
 
@@ -67,6 +67,8 @@ Progress: [███████████████████████
 | Phase 17-local-embedding-provider-routing P04 | 1 min | 2 tasks | 2 files |
 | Phase 18-remote-regeneration-job-control P01 | 4 min | 3 tasks | 4 files |
 | Phase 18-remote-regeneration-job-control P02 | 2 min | 3 tasks | 5 files |
+| Phase 19-http-transport-parity P01 | 8 min | 2 tasks | 4 files |
+| Phase 19-http-transport-parity P02 | 6 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -114,6 +116,9 @@ v5.0 roadmap decisions:
 - [Phase 18-remote-regeneration-job-control]: Status polling is job-ID only via regenerate_docs_status for deterministic remote automation.
 - [Phase 18-remote-regeneration-job-control]: Regeneration failures are mapped to MCP structured errors with code/message/action payloads.
 - [Phase 18-remote-regeneration-job-control]: Regeneration executor runs generate/reindex in subprocesses with piped stdio to protect MCP protocol output.
+- [Phase 19-http-transport-parity]: `serve.transport` now defaults to `stdio` with optional HTTP mode via config and per-run CLI overrides.
+- [Phase 19-http-transport-parity]: Serve startup now branches by resolved transport and prints deterministic HTTP endpoint discovery lines when HTTP mode is active.
+- [Phase 19-http-transport-parity]: Streamable HTTP transport now serves POST/GET/DELETE on one configured MCP path and returns structured remediation for unknown paths.
 
 ### Pending Todos
 
@@ -136,6 +141,6 @@ v4.0 deferred runtime validation:
 
 ## Session Continuity
 
-Last session: 2026-02-24
-Stopped at: Phase 19 context gathered
-Resume file: .planning/phases/19-http-transport-parity/19-CONTEXT.md
+Last session: 2026-02-25
+Stopped at: Phase 20 context gathered
+Resume file: .planning/phases/20-http-security-and-access-controls/20-CONTEXT.md
