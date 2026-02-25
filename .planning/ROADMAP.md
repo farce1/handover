@@ -54,7 +54,7 @@
 - [x] **Phase 16: Streaming QA Session Lifecycle** - Deliver resumable, cancellable QA streaming with stable final contract (completed 2026-02-23)
 - [x] **Phase 17: Local Embedding Provider Routing** - Add local embedding paths with strict index compatibility validation (completed 2026-02-23)
 - [x] **Phase 18: Remote Regeneration Job Control** - Expose deterministic, deduplicated regeneration jobs for MCP clients (completed 2026-02-24)
-- [ ] **Phase 19: HTTP Transport Parity** - Add optional Streamable HTTP transport with behavior parity to stdio
+- [x] **Phase 19: HTTP Transport Parity** - Add optional Streamable HTTP transport with behavior parity to stdio (completed 2026-02-24)
 - [ ] **Phase 20: HTTP Security and Access Controls** - Enforce origin, bind, and auth guardrails for non-local deployments
 
 ## Phase Details
@@ -114,8 +114,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 19-01-PLAN.md - Config schema extension, CLI flags, and serve transport branching
-- [ ] 19-02-PLAN.md - HTTP transport server implementation and docs update
+- [x] 19-01-PLAN.md - Config schema extension, CLI flags, and serve transport branching
+- [x] 19-02-PLAN.md - HTTP transport server implementation and docs update
 
 ### Phase 20: HTTP Security and Access Controls
 **Goal**: Users can deploy HTTP MCP endpoints with explicit origin and authentication controls that protect remote usage.
@@ -126,7 +126,11 @@ Plans:
   2. User running HTTP mode locally gets localhost-safe bind defaults unless they explicitly override the bind settings.
   3. User can configure authentication hooks or credentials for non-localhost deployments.
   4. User receives clear unauthorized diagnostics when HTTP authentication fails.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 20-01-PLAN.md -- Config schema extension, security middleware (origin policy + bearer auth), and startup guard with TDD
+- [ ] 20-02-PLAN.md -- CLI --allow-origin flag, serve startup wiring, middleware insertion, and security docs
 
 ## Progress
 
@@ -150,5 +154,5 @@ Plans:
 | 16. Streaming QA Session Lifecycle | v5.0      | 2/2            | Complete    | 2026-02-23 |
 | 17. Local Embedding Provider Routing | 4/4 | Complete    | 2026-02-24 | - |
 | 18. Remote Regeneration Job Control | 2/2 | Complete    | 2026-02-24 | - |
-| 19. HTTP Transport Parity          | v5.0      | 0/TBD          | Not started | - |
-| 20. HTTP Security and Access Controls | v5.0   | 0/TBD          | Not started | - |
+| 19. HTTP Transport Parity          | v5.0      | 2/2            | Complete | 2026-02-24 |
+| 20. HTTP Security and Access Controls | v5.0   | 0/2            | Not started | - |
