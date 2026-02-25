@@ -55,7 +55,7 @@
 - [x] **Phase 17: Local Embedding Provider Routing** - Add local embedding paths with strict index compatibility validation (completed 2026-02-23)
 - [x] **Phase 18: Remote Regeneration Job Control** - Expose deterministic, deduplicated regeneration jobs for MCP clients (completed 2026-02-24)
 - [x] **Phase 19: HTTP Transport Parity** - Add optional Streamable HTTP transport with behavior parity to stdio (completed 2026-02-24)
-- [ ] **Phase 20: HTTP Security and Access Controls** - Enforce origin, bind, and auth guardrails for non-local deployments
+- [x] **Phase 20: HTTP Security and Access Controls** - Enforce origin, bind, and auth guardrails for non-local deployments (completed 2026-02-25)
 
 ## Phase Details
 
@@ -155,4 +155,4 @@ Plans:
 | 17. Local Embedding Provider Routing | 4/4 | Complete    | 2026-02-24 | - |
 | 18. Remote Regeneration Job Control | 2/2 | Complete    | 2026-02-24 | - |
 | 19. HTTP Transport Parity          | v5.0      | 2/2            | Complete | 2026-02-24 |
-| 20. HTTP Security and Access Controls | 1/2 | In Progress|  | - |
+| 20. HTTP Security and Access Controls | 2/2 | Complete   | 2026-02-25 | - |
