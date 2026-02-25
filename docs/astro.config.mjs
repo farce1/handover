@@ -22,32 +22,32 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Home',
-          link: '/handover/',
+          link: '/',
         },
         {
           label: 'User Guides',
           items: [
-            { label: 'Getting started', link: '/handover/user/getting-started/' },
-            { label: 'Configuration', link: '/handover/user/configuration/' },
-            { label: 'Providers', link: '/handover/user/providers/' },
-            { label: 'MCP setup', link: '/handover/user/mcp-setup/' },
-            { label: 'Output documents', link: '/handover/user/output-documents/' },
+            { label: 'Getting started', link: '/user/getting-started/' },
+            { label: 'Configuration', link: '/user/configuration/' },
+            { label: 'Providers', link: '/user/providers/' },
+            { label: 'MCP setup', link: '/user/mcp-setup/' },
+            { label: 'Output documents', link: '/user/output-documents/' },
           ],
         },
         {
           label: 'Contributor docs',
           items: [
-            { label: 'Development', link: '/handover/contributor/development/' },
-            { label: 'Architecture', link: '/handover/contributor/architecture/' },
-            { label: 'Adding providers', link: '/handover/contributor/adding-providers/' },
-            { label: 'Adding analyzers', link: '/handover/contributor/adding-analyzers/' },
+            { label: 'Development', link: '/contributor/development/' },
+            { label: 'Architecture', link: '/contributor/architecture/' },
+            { label: 'Adding providers', link: '/contributor/adding-providers/' },
+            { label: 'Adding analyzers', link: '/contributor/adding-analyzers/' },
           ],
         },
         {
           label: 'Reference',
           items: [
-            { label: 'Changelog', link: '/handover/reference/changelog/' },
-            { label: 'CLI commands', link: '/handover/reference/commands/' },
+            { label: 'Changelog', link: '/reference/changelog/' },
+            { label: 'CLI commands', link: '/reference/commands/' },
           ],
         },
       ],
