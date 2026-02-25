@@ -106,6 +106,14 @@ program
   .command('serve')
   .description('Start MCP server over stdio (default) or HTTP transport')
   .option('--transport <transport>', 'Transport mode: stdio (default) or http')
+  .option(
+    '--allow-origin <origin>',
+    'Allow cross-origin requests from this origin (repeatable, overrides config)',
+    (value: string, previous: string[]) => {
+      return [...previous, value];
+    },
+    [] as string[],
+  )
   .option('--port <port>', 'HTTP listen port (default: 3000)', (value) =>
     Number.parseInt(value, 10),
   )

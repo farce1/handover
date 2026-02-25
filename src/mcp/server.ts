@@ -3,6 +3,7 @@ import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer } from 'node:http';
+import { bearerAuth, originPolicy } from './http-security.js';
 
 export type McpRegisterHook = (server: McpServer) => void;
 
@@ -16,6 +17,8 @@ export interface StartMcpHttpServerOptions extends CreateMcpServerOptions {
   port?: number;
   host?: string;
   mcpPath?: string;
+  allowedOrigins?: string[];
+  authToken?: string;
 }
 
 export async function startMcpServer(options: CreateMcpServerOptions = {}): Promise<void> {
@@ -44,6 +47,11 @@ export async function startMcpHttpServer(options: StartMcpHttpServerOptions = {}
   };
 
   await server.connect(transport);
+
+  app.use(originPolicy({ allowedOrigins: options.allowedOrigins }));
+  if (options.authToken) {
+    app.use(bearerAuth({ token: options.authToken }));
+  }
 
   app.post(mcpPath, async (req: HttpRequest, res: HttpResponse) => {
     await transport.handleRequest(req, res, req.body);
