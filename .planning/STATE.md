@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 20 of 20 (HTTP Security and Access Controls)
-Plan: 1 of TBD in current phase
-Status: Ready for planning
-Last activity: 2026-02-24 - completed 19-02 HTTP transport implementation and docs
+Plan: 2 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-25 - completed 20-01 HTTP security primitives
 
-Progress: [█████████████████████████] 100% (46/46 plans completed)
+Progress: [████████████████████████░] 98% (47/48 plans completed)
 
 ## Performance Metrics
 
@@ -69,6 +69,7 @@ Progress: [███████████████████████
 | Phase 18-remote-regeneration-job-control P02 | 2 min | 3 tasks | 5 files |
 | Phase 19-http-transport-parity P01 | 8 min | 2 tasks | 4 files |
 | Phase 19-http-transport-parity P02 | 6 min | 2 tasks | 2 files |
+| Phase 20 P01 | 4 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -119,6 +120,9 @@ v5.0 roadmap decisions:
 - [Phase 19-http-transport-parity]: `serve.transport` now defaults to `stdio` with optional HTTP mode via config and per-run CLI overrides.
 - [Phase 19-http-transport-parity]: Serve startup now branches by resolved transport and prints deterministic HTTP endpoint discovery lines when HTTP mode is active.
 - [Phase 19-http-transport-parity]: Streamable HTTP transport now serves POST/GET/DELETE on one configured MCP path and returns structured remediation for unknown paths.
+- [Phase 20]: Default Origin policy denies cross-origin requests unless allowlisted or wildcarded explicitly.
+- [Phase 20]: Bearer auth token checks now use SHA-256 normalization with timingSafeEqual for constant-length comparison.
+- [Phase 20]: HTTP startup now fails on non-loopback hosts without HANDOVER_AUTH_TOKEN or serve.http.auth.token configured.
 
 ### Pending Todos
 
@@ -142,5 +146,5 @@ v4.0 deferred runtime validation:
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Phase 20 context gathered
-Resume file: .planning/phases/20-http-security-and-access-controls/20-CONTEXT.md
+Stopped at: Completed 20-01-PLAN.md
+Resume file: .planning/phases/20-http-security-and-access-controls/20-02-PLAN.md

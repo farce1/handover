@@ -155,4 +155,4 @@ Plans:
 | 17. Local Embedding Provider Routing | 4/4 | Complete    | 2026-02-24 | - |
 | 18. Remote Regeneration Job Control | 2/2 | Complete    | 2026-02-24 | - |
 | 19. HTTP Transport Parity          | v5.0      | 2/2            | Complete | 2026-02-24 |
-| 20. HTTP Security and Access Controls | v5.0   | 0/2            | Not started | - |
+| 20. HTTP Security and Access Controls | 1/2 | In Progress|  | - |
