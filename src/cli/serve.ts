@@ -5,7 +5,7 @@ import { verifyServePrerequisites } from '../mcp/preflight.js';
 import { registerMcpPrompts } from '../mcp/prompts.js';
 import { createRegenerationExecutor } from '../mcp/regeneration-executor.js';
 import { registerMcpResources } from '../mcp/resources.js';
-import { startMcpServer } from '../mcp/server.js';
+import { startMcpHttpServer, startMcpServer } from '../mcp/server.js';
 import { registerMcpTools } from '../mcp/tools.js';
 import { createRegenerationJobManager } from '../regeneration/job-manager.js';
 
@@ -13,9 +13,30 @@ function writeToStderr(message: string): void {
   process.stderr.write(`${message}\n`);
 }
 
-export async function runServe(): Promise<void> {
+interface ServeCliOptions {
+  transport?: string;
+  port?: number;
+  host?: string;
+}
+
+export async function runServe(opts: ServeCliOptions = {}): Promise<void> {
   try {
-    const config = loadConfig();
+    const baseConfig = loadConfig();
+    const existingServe = baseConfig.serve;
+    const cliOverrides: Record<string, unknown> = {};
+
+    if (opts.transport !== undefined || opts.port !== undefined || opts.host !== undefined) {
+      cliOverrides.serve = {
+        transport: opts.transport ?? existingServe.transport,
+        http: {
+          port: opts.port ?? existingServe.http.port,
+          host: opts.host ?? existingServe.http.host,
+          path: existingServe.http.path,
+        },
+      };
+    }
+
+    const config = loadConfig(cliOverrides);
     verifyServePrerequisites(config.output);
     const regenerationExecutor = createRegenerationExecutor({
       config,
@@ -35,12 +56,30 @@ export async function runServe(): Promise<void> {
       (server: McpServer) => registerMcpPrompts(server, { config, outputDir: config.output }),
     ];
 
-    await startMcpServer({
-      registerHooks,
-    });
+    if (config.serve.transport === 'stdio') {
+      await startMcpServer({
+        registerHooks,
+      });
 
-    writeToStderr('MCP server listening on stdio.');
-    writeToStderr('Ready: stdout is reserved for JSON-RPC protocol frames only.');
+      writeToStderr('MCP server listening on stdio.');
+      writeToStderr('Ready: stdout is reserved for JSON-RPC protocol frames only.');
+    } else {
+      await startMcpHttpServer({
+        registerHooks,
+        port: config.serve.http.port,
+        host: config.serve.http.host,
+        mcpPath: config.serve.http.path,
+      });
+
+      writeToStderr('MCP server listening over HTTP.');
+      writeToStderr('Transport: http');
+      writeToStderr(`Base URL: http://${config.serve.http.host}:${config.serve.http.port}`);
+      writeToStderr(`MCP path: ${config.serve.http.path}`);
+      writeToStderr(
+        `Endpoint: http://${config.serve.http.host}:${config.serve.http.port}${config.serve.http.path}`,
+      );
+      writeToStderr('Ready: POST/GET/DELETE requests accepted at MCP endpoint.');
+    }
   } catch (error) {
     const structured = createMcpStructuredError(error);
     writeToStderr('Failed to start MCP server.');

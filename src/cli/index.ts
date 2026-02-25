@@ -104,10 +104,15 @@ program
 
 program
   .command('serve')
-  .description('Start MCP server over stdio transport')
-  .action(async () => {
+  .description('Start MCP server over stdio (default) or HTTP transport')
+  .option('--transport <transport>', 'Transport mode: stdio (default) or http')
+  .option('--port <port>', 'HTTP listen port (default: 3000)', (value) =>
+    Number.parseInt(value, 10),
+  )
+  .option('--host <host>', 'HTTP listen host (default: 127.0.0.1)')
+  .action(async (opts) => {
     const { runServe } = await import('./serve.js');
-    await runServe();
+    await runServe(opts);
   });
 
 // Default action: run generate when no command specified

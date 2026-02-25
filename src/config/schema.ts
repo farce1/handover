@@ -31,6 +31,19 @@ const EmbeddingConfigSchema = z
     }
   });
 
+const ServeConfigSchema = z
+  .object({
+    transport: z.enum(['stdio', 'http']).default('stdio'),
+    http: z
+      .object({
+        port: z.number().int().min(1).max(65535).default(3000),
+        host: z.string().default('127.0.0.1'),
+        path: z.string().regex(/^\//).default('/mcp'),
+      })
+      .default({}),
+  })
+  .default({});
+
 /**
  * Zod schema for .handover.yml configuration.
  * Defaults make zero-config mode work — only ANTHROPIC_API_KEY is needed.
@@ -81,6 +94,7 @@ export const HandoverConfigSchema = z.object({
     .default({ pin: [], boost: [] }),
   costWarningThreshold: z.number().positive().optional(),
   embedding: EmbeddingConfigSchema.optional(),
+  serve: ServeConfigSchema,
 });
 
 export type HandoverConfig = z.infer<typeof HandoverConfigSchema>;

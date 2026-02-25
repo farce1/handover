@@ -231,6 +231,49 @@ Failed job:
 }
 ```
 
+## HTTP transport mode
+
+`handover serve` uses stdio by default, but you can run Streamable HTTP when you want to connect over a networked endpoint.
+
+Start HTTP mode:
+
+```bash
+# Start with HTTP transport
+handover serve --transport http
+
+# Customize port and host
+handover serve --transport http --port 8080
+handover serve --transport http --host 0.0.0.0 --port 8080
+```
+
+Or configure `.handover.yml`:
+
+```yaml
+serve:
+  transport: http
+  http:
+    port: 3000
+    host: 127.0.0.1
+    path: /mcp
+```
+
+When HTTP mode starts, stderr includes endpoint discovery details:
+
+```text
+MCP server listening over HTTP.
+Transport: http
+Base URL: http://127.0.0.1:3000
+MCP path: /mcp
+Endpoint: http://127.0.0.1:3000/mcp
+Ready: POST/GET/DELETE requests accepted at MCP endpoint.
+```
+
+Use any MCP client that supports Streamable HTTP and point it to `http://127.0.0.1:3000/mcp` (or your configured host/port/path).
+
+HTTP and stdio expose the same tools, resources, and prompts.
+
+For the current run, CLI flags override config values from `.handover.yml` (for example, `--transport` and `--port`).
+
 ## Troubleshooting
 
 | Symptom                                                                  | Likely cause                                                          | Fix                                                                                |
