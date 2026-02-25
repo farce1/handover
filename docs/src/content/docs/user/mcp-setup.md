@@ -274,6 +274,108 @@ HTTP and stdio expose the same tools, resources, and prompts.
 
 For the current run, CLI flags override config values from `.handover.yml` (for example, `--transport` and `--port`).
 
+## HTTP security configuration
+
+Configure these controls when running `handover serve --transport http`.
+
+### CORS origin policy
+
+Cross-origin requests are denied by default. Requests without an `Origin` header (such as same-origin or non-browser requests) continue normally.
+
+Set an explicit allowlist in `.handover.yml`:
+
+```yaml
+serve:
+  transport: http
+  http:
+    allowedOrigins:
+      - https://example.com
+      - https://app.example.com
+```
+
+For local development, you can override allowed origins for the current run:
+
+```bash
+handover serve --transport http --allow-origin http://localhost:5173
+```
+
+- `--allow-origin` is repeatable and replaces (does not merge with) `serve.http.allowedOrigins` for that run.
+- Wildcard mode is development-only and logs a startup warning: `serve.http.allowedOrigins: ['*']`.
+
+Disallowed origins receive this shape:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "MCP_HTTP_ORIGIN_REJECTED",
+    "message": "Cross-origin request from 'https://evil.example' is not allowed.",
+    "action": "Add 'https://evil.example' to serve.http.allowedOrigins in .handover.yml, or set serve.http.allowedOrigins: ['*'] for development."
+  }
+}
+```
+
+### Authentication
+
+Enable bearer token auth with either `HANDOVER_AUTH_TOKEN` or `serve.http.auth.token` in config.
+
+Environment variable example:
+
+```bash
+HANDOVER_AUTH_TOKEN=mysecret handover serve --transport http
+```
+
+Config file example:
+
+```yaml
+serve:
+  transport: http
+  http:
+    auth:
+      token: mysecret
+```
+
+- `HANDOVER_AUTH_TOKEN` takes precedence over `serve.http.auth.token`.
+- Auth is required when binding to non-loopback addresses.
+- Auth is optional (but still recommended) for localhost.
+
+Missing or invalid tokens receive this shape:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "MCP_HTTP_UNAUTHORIZED",
+    "message": "Missing Authorization header.",
+    "action": "Include an Authorization: Bearer <token> header. Set the token via HANDOVER_AUTH_TOKEN env var or serve.http.auth.token in .handover.yml."
+  }
+}
+```
+
+### Bind safety
+
+The default bind host is `127.0.0.1` (localhost-only access).
+
+When you bind to `0.0.0.0` or another non-loopback host, auth must be configured. Startup is refused without auth:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "MCP_HTTP_AUTH_REQUIRED",
+    "message": "HTTP server cannot start on '0.0.0.0' without authentication configured.",
+    "action": "Set the HANDOVER_AUTH_TOKEN environment variable, or add 'serve.http.auth.token' to .handover.yml."
+  }
+}
+```
+
+With auth configured on a non-loopback host, startup continues and stderr includes:
+
+```text
+Warning: HTTP endpoint is network-accessible (binding to 0.0.0.0).
+Warning: Ensure HANDOVER_AUTH_TOKEN and serve.http.allowedOrigins are configured.
+```
+
 ## Troubleshooting
 
 | Symptom                                                                  | Likely cause                                                          | Fix                                                                                |
@@ -286,6 +388,10 @@ For the current run, CLI flags override config values from `.handover.yml` (for 
 | `regenerate_docs` returns `REGENERATION_TARGET_UNKNOWN`                  | Unknown target passed to tool call                                    | Retry with one of `full-project`, `docs`, or `search-index`                        |
 | `regenerate_docs_status` returns `JOB_NOT_FOUND`                         | Unknown or expired job reference                                      | Trigger a new run with `regenerate_docs` and poll the returned `jobId`             |
 | Regeneration status reaches `failed`                                     | Generate/reindex subcommand failed in executor                        | Follow `error.action`, fix root issue, then call `regenerate_docs` again           |
+| Origin rejected (403 `MCP_HTTP_ORIGIN_REJECTED`)                         | Request origin is not allowlisted                                     | Add origin to `serve.http.allowedOrigins` or use `--allow-origin` for that run     |
+| Auth failed (401 `MCP_HTTP_UNAUTHORIZED`)                                | Missing/invalid bearer token                                          | Check `HANDOVER_AUTH_TOKEN` or `serve.http.auth.token`                             |
+| Server refuses to start (`MCP_HTTP_AUTH_REQUIRED`)                       | Non-loopback bind without configured auth                             | Set auth token before binding to non-loopback host                                 |
+| CORS preflight fails in browser                                          | Browser origin not included in allowlist                              | Ensure the browser origin is in `serve.http.allowedOrigins`                        |
 
 ## Verification checklist
 
