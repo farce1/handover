@@ -11,9 +11,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 Milestone: v6.0 Codex Auth & Validation
 Phase: 21 of 26 (Auth Infrastructure)
-Plan: 02 of 02
+Plan: 03 of 03
 Status: Complete
-Last activity: 2026-02-26 - completed 21-02 auth resolver + schema constraints
+Last activity: 2026-02-26 - completed 21-03 auth wiring into factory and runtime call sites
 
 Progress: [██████████] 100%
 
@@ -27,9 +27,9 @@ Progress: [██████████] 100%
 - Timeline: 3 days (2026-02-23 to 2026-02-25)
 
 **v6.0 Velocity:**
-- Total plans completed: 2
-- Average duration: ~2.5 min/plan
-- Total execution time: ~5 min
+- Total plans completed: 3
+- Average duration: ~2.3 min/plan
+- Total execution time: ~7 min
 
 ## Accumulated Context
 
@@ -49,6 +49,8 @@ Key decisions from research locked for v6.0:
 - [Phase 21]: Credential reads are fail-closed: invalid payloads are deleted and treated as unauthenticated.
 - [Phase 21]: resolveAuth precedence is fixed as CLI flag > env var > credential store (subscription only) > interactive prompt.
 - [Phase 21]: HandoverConfigSchema now defaults authMethod to api-key and rejects anthropic+subscription during validation.
+- [Phase 21]: validateProviderConfig now performs structural checks only; resolveAuth callers own credential validation.
+- [Phase 21]: Auth-dependent runtime paths import resolveAuth from src/auth/index.ts and pass AuthResult into createProvider.
 
 ### Pending Todos
 
@@ -70,5 +72,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 21-02-PLAN.md
+Stopped at: Completed 21-03-PLAN.md
 Resume file: None
