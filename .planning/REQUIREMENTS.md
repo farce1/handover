@@ -92,42 +92,42 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | — | Pending |
-| AUTH-02 | — | Pending |
-| AUTH-03 | — | Pending |
-| AUTH-04 | — | Pending |
-| ONB-01 | — | Pending |
-| ONB-02 | — | Pending |
-| ONB-03 | — | Pending |
-| CDX-01 | — | Pending |
-| CDX-02 | — | Pending |
-| CDX-03 | — | Pending |
-| CDX-04 | — | Pending |
-| CDX-05 | — | Pending |
-| GEM-01 | — | Pending |
-| GEM-02 | — | Pending |
-| GEM-03 | — | Pending |
-| GEM-04 | — | Pending |
-| GEN-01 | — | Pending |
-| GEN-02 | — | Pending |
-| GEN-03 | — | Pending |
-| GEN-04 | — | Pending |
-| GEN-05 | — | Pending |
-| SEC-01 | — | Pending |
-| SEC-02 | — | Pending |
-| SEC-03 | — | Pending |
-| VAL-01 | — | Pending |
-| VAL-02 | — | Pending |
-| VAL-03 | — | Pending |
-| VAL-04 | — | Pending |
-| VAL-05 | — | Pending |
-| VAL-06 | — | Pending |
+| AUTH-01 | Phase 21 | Pending |
+| AUTH-02 | Phase 21 | Pending |
+| AUTH-03 | Phase 21 | Pending |
+| AUTH-04 | Phase 21 | Pending |
+| GEM-01 | Phase 22 | Pending |
+| GEM-02 | Phase 22 | Pending |
+| GEM-03 | Phase 22 | Pending |
+| GEM-04 | Phase 22 | Pending |
+| CDX-01 | Phase 23 | Pending |
+| CDX-02 | Phase 23 | Pending |
+| CDX-03 | Phase 23 | Pending |
+| CDX-04 | Phase 23 | Pending |
+| CDX-05 | Phase 23 | Pending |
+| GEN-01 | Phase 24 | Pending |
+| GEN-02 | Phase 24 | Pending |
+| GEN-03 | Phase 24 | Pending |
+| GEN-04 | Phase 24 | Pending |
+| GEN-05 | Phase 24 | Pending |
+| ONB-01 | Phase 24 | Pending |
+| ONB-02 | Phase 24 | Pending |
+| ONB-03 | Phase 24 | Pending |
+| SEC-01 | Phase 25 | Pending |
+| SEC-02 | Phase 25 | Pending |
+| SEC-03 | Phase 25 | Pending |
+| VAL-01 | Phase 26 | Pending |
+| VAL-02 | Phase 26 | Pending |
+| VAL-03 | Phase 26 | Pending |
+| VAL-04 | Phase 26 | Pending |
+| VAL-05 | Phase 26 | Pending |
+| VAL-06 | Phase 26 | Pending |
 
 **Coverage:**
 - v6.0 requirements: 30 total
-- Mapped to phases: 0
-- Unmapped: 30 ⚠️
+- Mapped to phases: 30
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after initial definition*
+*Last updated: 2026-02-26 after roadmap creation (phases 21-26 assigned)*
