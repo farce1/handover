@@ -141,4 +141,78 @@ describe('HandoverConfigSchema', () => {
       expect(result.data.analysis.staticOnly).toBe(false);
     });
   });
+
+  describe('authMethod field', () => {
+    test('defaults to api-key when not specified', () => {
+      const result = HandoverConfigSchema.safeParse({});
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.authMethod).toBe('api-key');
+    });
+
+    test('accepts api-key value', () => {
+      const result = HandoverConfigSchema.safeParse({ authMethod: 'api-key' });
+      expect(result.success).toBe(true);
+    });
+
+    test('accepts subscription value', () => {
+      const result = HandoverConfigSchema.safeParse({
+        provider: 'openai',
+        authMethod: 'subscription',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    test('rejects invalid authMethod values', () => {
+      const result = HandoverConfigSchema.safeParse({ authMethod: 'oauth' });
+      expect(result.success).toBe(false);
+    });
+
+    test('rejects anthropic with subscription auth', () => {
+      const result = HandoverConfigSchema.safeParse({
+        provider: 'anthropic',
+        authMethod: 'subscription',
+      });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+
+      const issue = result.error.issues.find((candidate) =>
+        candidate.message.includes('Anthropic does not support subscription auth'),
+      );
+
+      expect(issue).toBeDefined();
+      expect(issue?.path).toEqual(['authMethod']);
+    });
+
+    test('accepts anthropic with api-key auth', () => {
+      const result = HandoverConfigSchema.safeParse({
+        provider: 'anthropic',
+        authMethod: 'api-key',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    test('accepts openai with subscription auth', () => {
+      const result = HandoverConfigSchema.safeParse({
+        provider: 'openai',
+        authMethod: 'subscription',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    test('safeParse({}) keeps backward-compatible defaults', () => {
+      const result = HandoverConfigSchema.safeParse({});
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      expect(result.data.provider).toBe('anthropic');
+      expect(result.data.authMethod).toBe('api-key');
+      expect(result.data.output).toBe('./handover');
+      expect(result.data.audience).toBe('human');
+      expect(result.data.analysis.concurrency).toBe(4);
+      expect(result.data.analysis.staticOnly).toBe(false);
+      expect(result.data.include).toEqual(['**/*']);
+      expect(result.data.exclude).toEqual([]);
+    });
+  });
 });
