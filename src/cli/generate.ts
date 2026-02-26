@@ -1,7 +1,8 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { hashContent, AnalysisCache } from '../analyzers/cache.js';
-import { loadConfig, resolveApiKey } from '../config/loader.js';
+import { resolveAuth } from '../auth/index.js';
+import { loadConfig } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
 import { HandoverError, handleCliError } from '../utils/errors.js';
 import { DAGOrchestrator } from '../orchestrator/dag.js';
@@ -222,8 +223,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     // 2. Validate provider config (structural check — PROV-05)
     validateProviderConfig(config);
 
-    // 3. Resolve API key (environment-dependent — fail fast)
-    resolveApiKey(config);
+    // 3. Resolve auth (environment-dependent — fail fast)
+    const authResult = await resolveAuth(config);
 
     // Initialize round cache for crash recovery
     const roundCache = new RoundCache(undefined, resolve(process.cwd()));
@@ -241,7 +242,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     const rootDir = resolve(process.cwd());
 
     // Create the LLM provider and token tracker
-    const provider = createProvider(config);
+    const provider = createProvider(config, authResult);
     const tracker = new TokenUsageTracker(0.85, config.model ?? 'claude-opus-4-6');
     const estimateTokensFn = (text: string) => provider.estimateTokens(text);
 

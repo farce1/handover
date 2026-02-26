@@ -1,3 +1,4 @@
+import { resolveAuth } from '../auth/index.js';
 import { createProvider } from '../providers/factory.js';
 import { searchDocuments, type SearchDocumentMatch } from '../vector/query-engine.js';
 import type { HandoverConfig } from '../config/schema.js';
@@ -126,7 +127,8 @@ export async function answerQuestion(input: AnswerQuestionInput): Promise<Answer
     };
   }
 
-  const provider = createProvider(input.config);
+  const authResult = await resolveAuth(input.config);
+  const provider = createProvider(input.config, authResult);
   const context = buildQaPromptContext(searchResult.matches);
   const synthesis = await provider.complete(
     {

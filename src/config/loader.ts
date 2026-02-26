@@ -1,8 +1,8 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { parse as parseYaml } from 'yaml';
 import { HandoverConfigSchema, type HandoverConfig } from './schema.js';
-import { DEFAULT_API_KEY_ENV, DEFAULT_MODEL } from './defaults.js';
-import { ConfigError, ProviderError } from '../utils/errors.js';
+import { DEFAULT_MODEL } from './defaults.js';
+import { ConfigError } from '../utils/errors.js';
 
 /**
  * Load configuration with precedence layering:
@@ -70,31 +70,4 @@ export function loadConfig(cliOverrides: Record<string, unknown> = {}): Handover
   }
 
   return config;
-}
-
-/**
- * Resolve the actual API key value from environment.
- * SEC-02: API keys read from env only, never stored in config.
- *
- * @returns The API key string
- * @throws ProviderError if key not found in environment
- */
-export function resolveApiKey(config: HandoverConfig): string {
-  // Ollama doesn't need an API key
-  if (config.provider === 'ollama') {
-    return '';
-  }
-
-  const envVarName = config.apiKeyEnv ?? DEFAULT_API_KEY_ENV[config.provider] ?? '';
-
-  if (!envVarName) {
-    throw ProviderError.missingApiKey(config.provider);
-  }
-
-  const apiKey = process.env[envVarName];
-  if (!apiKey) {
-    throw ProviderError.missingApiKey(config.provider);
-  }
-
-  return apiKey;
 }
