@@ -65,5 +65,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: v6.0 roadmap created, all 30 requirements mapped across phases 21-26
-Resume file: None — start with `/gsd:plan-phase 21`
+Stopped at: Phase 21 context gathered
+Resume file: .planning/phases/21-auth-infrastructure/21-CONTEXT.md
