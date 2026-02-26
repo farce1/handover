@@ -8,6 +8,18 @@ An open source TypeScript CLI that generates comprehensive, AI-powered codebase 
 
 Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
 
+## Current State
+
+- v5.0 Remote & Advanced MCP is shipped and archived.
+- MCP now supports streaming QA lifecycle control, remote regeneration job control, local embedding routing, Streamable HTTP transport, and HTTP security guardrails.
+- Milestone audit result is `tech_debt`: shipped requirements are satisfied, with deferred human runtime validation follow-ups.
+
+## Next Milestone Goals
+
+- Define v6.0 scope, requirements, and roadmap from fresh planning inputs.
+- Convert deferred v5.0 runtime validation items into explicit executable requirements.
+- Continue preserving stdio-first compatibility while expanding hosted and remote operability.
+
 ## Requirements
 
 ### Validated
@@ -54,28 +66,31 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - ✓ `handover serve` MCP stdio server with startup preflight and structured remediation errors — v4.0
 - ✓ MCP resources for generated docs and raw analyzer outputs with deterministic pagination — v4.0
 - ✓ Grounded QA mode with source citations and MCP workflow prompts with resume checkpoints — v4.0
+- ✓ Streaming QA lifecycle tools with progress, cancellation, and cursor-safe resume (`qa_stream_*`) — v5.0
+- ✓ Embedding locality routing modes with fail-fast compatibility checks and CLI health diagnostics — v5.0
+- ✓ Remote regeneration MCP lifecycle (`regenerate_docs`, `regenerate_docs_status`) with single-flight dedupe — v5.0
+- ✓ Optional Streamable HTTP MCP transport with stdio parity and canonical endpoint routing — v5.0
+- ✓ HTTP origin/auth security middleware with non-loopback startup auth guardrails — v5.0
 
 ### Active
 
-## Current Milestone: v5.0 Remote & Advanced MCP
+- [ ] Define v6.0 milestone scope and success criteria (`/gsd-new-milestone`)
+- [ ] Create fresh v6.0 requirements and roadmap artifacts (new `.planning/REQUIREMENTS.md` and updated `.planning/ROADMAP.md`)
+- [ ] Schedule deferred v5.0 human runtime validation work as explicit v6.0 requirements
 
-**Goal:** Add remote-capable MCP execution paths and stronger UX for remote users, while preserving local CLI and MCP stability.
+<details>
+<summary>Archived v5.0 planning notes (pre-ship)</summary>
 
-**Current priority:** Deliver streaming MCP QA responses first, then expand remote operations.
+Goal: Add remote-capable MCP execution paths and stronger UX for remote users, while preserving local CLI and MCP stability.
 
-**Target features:**
+Planned feature set:
 
 - Streaming MCP responses for long-form QA interactions (RMT-04)
 - MCP tool to trigger documentation regeneration remotely (RMT-01)
 - Optional HTTP MCP transport for hosted/remote deployment scenarios (RMT-02)
 - Local embedding provider path (for example Ollama) for offline workflows (RMT-03)
 
-### Active Requirements
-
-- [ ] RMT-01: Remote MCP tool triggers doc regeneration
-- [ ] RMT-02: Optional HTTP MCP transport supports hosted/remote deployment
-- [ ] RMT-03: Local embedding provider path (example: Ollama) available
-- [ ] RMT-04: MCP responses stream for long-form QA interactions
+</details>
 
 ### Out of Scope
 
@@ -94,10 +109,11 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - v2.0 Performance milestone shipped: 4 phases, 8 plans, caching, streaming, incremental analysis, prompt caching
 - v3.0 Robustness milestone shipped: 4 phases, 10 plans, CI fix, scorecard hardening, 254 unit tests, 80% coverage gate
 - v4.0 MCP Server & Semantic Search: shipped 2026-02-22 (4 phases, 11 plans)
-- v4.0 audit status: tech_debt (implementation complete; runtime human-validation matrix pending)
+- v5.0 Remote & Advanced MCP: shipped 2026-02-26 (5 phases, 12 plans, 28 tasks)
+- v5.0 audit status: tech_debt (17/17 requirements satisfied; deferred human runtime validation follow-ups)
 - Architecture: DAG orchestrator, 8 static analyzers, 6 AI rounds, 14 document renderers, Zod-first domain model
 - CI runs on every PR; release-please automates versioning; OIDC publishes to npm with provenance
-- Codebase: ~24.8K LOC TypeScript across 90+ source files, 254 tests, 92%+ coverage
+- Codebase: ~31.7K LOC TypeScript across 151 source/test files, 254 tests, 92%+ coverage
 - External setup still needed: CODECOV_TOKEN, RELEASE_PLEASE_TOKEN (PAT), npm trusted publishing OIDC config, GitHub Sponsors enrollment
 
 ## Constraints
@@ -143,7 +159,12 @@ Every person (or LLM) who encounters this repo should understand what handover d
 | Route MCP diagnostics to stderr only             | Prevent JSON-RPC/stdout protocol corruption during tool execution       | ✓ Good  |
 | Reuse configured provider for QA synthesis       | Avoid separate credential surface and reduce setup friction             | ✓ Good  |
 | Persist MCP workflow checkpoints under .handover | Resume prompts safely across sessions with explicit load/save/clear     | ✓ Good  |
+| Persist streaming QA events before publish       | Replay and live streams use one canonical source of truth               | ✓ Good  |
+| Use explicit embedding locality policy router    | Deterministic local/remote provider behavior across CLI and MCP paths   | ✓ Good  |
+| Use single-flight regeneration by target key     | Prevent duplicate concurrent runs and ensure deterministic job references | ✓ Good  |
+| Add Streamable HTTP as optional transport        | Preserve stdio backward compatibility while enabling remote deployment  | ✓ Good  |
+| Deny cross-origin by default in HTTP mode        | Secure baseline for browser-origin access unless explicitly allowlisted | ✓ Good  |
 
 ---
 
-_Last updated: 2026-02-23 after v5.0 milestone start_
+_Last updated: 2026-02-26 after v5.0 milestone completion_

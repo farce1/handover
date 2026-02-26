@@ -2,17 +2,18 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-23)
+See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** Phase 20 planning for v5.0 Remote & Advanced MCP
+**Current focus:** Planning next milestone after v5.0 archival
 
 ## Current Position
 
-Phase: 20 of 20 (HTTP Security and Access Controls)
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-02-25 - completed 20-02 HTTP security wiring and docs
+Milestone: v5.0 Remote & Advanced MCP (shipped)
+Phase: 16-20 complete
+Plan: 12/12 complete in milestone (48/48 overall)
+Status: Archived
+Last activity: 2026-02-26 - archived v5.0 roadmap/requirements and prepared v6.0 planning handoff
 
 Progress: [█████████████████████████] 100% (48/48 plans completed)
 
@@ -59,18 +60,14 @@ Progress: [███████████████████████
 - Average duration: ~4.4 min/plan
 - Total execution time: ~48 min
 - Timeline: 2 days (2026-02-21 to 2026-02-22)
-| Phase 16 P01 | 2 min | 3 tasks | 3 files |
-| Phase 16 P02 | 4 min | 3 tasks | 3 files |
-| Phase 17-local-embedding-provider-routing P01 | 3 min | 2 tasks | 6 files |
-| Phase 17-local-embedding-provider-routing P03 | 4 min | 2 tasks | 4 files |
-| Phase 17-local-embedding-provider-routing P02 | 5 min | 2 tasks | 2 files |
-| Phase 17-local-embedding-provider-routing P04 | 1 min | 2 tasks | 2 files |
-| Phase 18-remote-regeneration-job-control P01 | 4 min | 3 tasks | 4 files |
-| Phase 18-remote-regeneration-job-control P02 | 2 min | 3 tasks | 5 files |
-| Phase 19-http-transport-parity P01 | 8 min | 2 tasks | 4 files |
-| Phase 19-http-transport-parity P02 | 6 min | 2 tasks | 2 files |
-| Phase 20 P01 | 4 min | 2 tasks | 4 files |
-| Phase 20 P02 | 2 min | 2 tasks | 4 files |
+
+**v5.0 Velocity:**
+
+- Total plans completed: 12
+- Total tasks completed: 28
+- Average duration: ~3.8 min/plan
+- Total execution time: ~45 min
+- Timeline: 3 days (2026-02-23 to 2026-02-25)
 
 ## Accumulated Context
 
@@ -147,8 +144,15 @@ v4.0 deferred runtime validation:
 - Semantic relevance quality checks on populated real indexes
 - MCP client interoperability matrix (Claude Desktop/Cursor/VS Code)
 
+v5.0 deferred runtime validation:
+
+- Real-client streaming QA timing and reconnect/resume behavior checks
+- Local embedding runtime fallback and route-visibility checks in provider-backed environments
+- End-to-end remote regeneration trigger/status lifecycle against live MCP clients
+- Add formal `19-VERIFICATION.md` artifact to close phase verification documentation gap
+
 ## Session Continuity
 
-Last session: 2026-02-25
-Stopped at: Completed 20-02-PLAN.md
-Resume file: None - all plans complete
+Last session: 2026-02-26
+Stopped at: Completed v5.0 milestone archival and release tagging prep
+Resume file: Start `/gsd-new-milestone` for fresh v6.0 requirements and roadmap planning

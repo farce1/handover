@@ -71,3 +71,25 @@
 - Runtime human-validation matrix pending for provider-backed reindex, semantic relevance quality, and MCP client interoperability
 
 ---
+
+## v5.0 Remote & Advanced MCP (Shipped: 2026-02-26)
+
+**Phases completed:** 5 phases, 12 plans, 28 tasks
+**Timeline:** 3 days (2026-02-23 -> 2026-02-25)
+**Git range:** feat(16-01) -> docs(20-02)
+**Code delta:** 45 files changed, 6127 insertions(+), 118 deletions(-)
+
+**Key accomplishments:**
+
+- Added durable streaming QA lifecycle sessions with deterministic replay, cancellation, and cursor-safe resume MCP tools
+- Added local embedding routing (`local-only`, `local-preferred`, `remote-only`) with fail-fast compatibility validation and operator health diagnostics
+- Added remote regeneration job control with deterministic lifecycle state transitions, single-flight dedupe, and MCP trigger/status tools
+- Added optional Streamable HTTP MCP transport with stdio parity, canonical endpoint routing, and structured unknown-path remediation
+- Added HTTP security controls: default-deny cross-origin policy, bearer auth middleware, non-loopback startup auth guard, and secure deployment docs
+
+**Known gaps / tech debt:**
+
+- Runtime human validation matrix deferred for selected Phase 16/17/18 flows
+- Phase 19 verification artifact gap (`19-VERIFICATION.md` missing) despite integration coverage and shipped behavior
+
+---
