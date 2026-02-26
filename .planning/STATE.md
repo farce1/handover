@@ -72,5 +72,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 21-03-PLAN.md
-Resume file: None
+Stopped at: Phase 22 context gathered
+Resume file: .planning/phases/22-gemini-provider/22-CONTEXT.md
