@@ -12,10 +12,10 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 Milestone: v6.0 Codex Auth & Validation
 Phase: 21 of 26 (Auth Infrastructure)
 Plan: 02 of 02
-Status: In progress
-Last activity: 2026-02-26 — completed 21-01 auth types + token store foundation
+Status: Complete
+Last activity: 2026-02-26 - completed 21-02 auth resolver + schema constraints
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -27,9 +27,9 @@ Progress: [█████░░░░░] 50%
 - Timeline: 3 days (2026-02-23 to 2026-02-25)
 
 **v6.0 Velocity:**
-- Total plans completed: 1
-- Average duration: ~2 min/plan
-- Total execution time: ~2 min
+- Total plans completed: 2
+- Average duration: ~2.5 min/plan
+- Total execution time: ~5 min
 
 ## Accumulated Context
 
@@ -47,6 +47,8 @@ Key decisions from research locked for v6.0:
 - [Phase 21]: AuthError.noCredential now always lists env export, auth login, and handover init remediation paths.
 - [Phase 21]: TokenStore enforces chmod(0o600) after every write so existing credential files remain restricted.
 - [Phase 21]: Credential reads are fail-closed: invalid payloads are deleted and treated as unauthenticated.
+- [Phase 21]: resolveAuth precedence is fixed as CLI flag > env var > credential store (subscription only) > interactive prompt.
+- [Phase 21]: HandoverConfigSchema now defaults authMethod to api-key and rejects anthropic+subscription during validation.
 
 ### Pending Todos
 
@@ -68,5 +70,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 21-01-PLAN.md
-Resume file: .planning/phases/21-auth-infrastructure/21-02-PLAN.md
+Stopped at: Completed 21-02-PLAN.md
+Resume file: None

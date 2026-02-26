@@ -15,7 +15,7 @@
 
 **Milestone Goal:** Add OpenAI Codex subscription-based auth as an alternative to API keys and close deferred runtime validation gaps from v4.0/v5.0.
 
-- [ ] **Phase 21: Auth Infrastructure** - Shared auth types, token store, and resolution layer that all auth-dependent code imports
+- [x] **Phase 21: Auth Infrastructure** - Shared auth types, token store, and resolution layer that all auth-dependent code imports (completed 2026-02-26)
 - [ ] **Phase 22: Gemini Provider** - Google Gemini as a fully supported LLM provider via API key
 - [ ] **Phase 23: Codex Auth Commands** - PKCE browser OAuth flow and `handover auth` CLI command group
 - [ ] **Phase 24: Generate Integration & Onboarding** - Wire subscription auth into `generate` and deliver first-run interactive setup
@@ -33,7 +33,7 @@
   2. Credentials written to `~/.handover/credentials.json` have 0600 permissions and are separate from project config
   3. Auth resolution applies the correct precedence: CLI `--api-key` flag overrides env var, which overrides credential store, which overrides interactive prompt
   4. `src/auth/` module exports types, token store, and `resolveAuth()` as importable units with no circular dependencies
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 21-01-PLAN.md — Auth types (AuthError, AuthResult, StoredCredential) and TokenStore with TDD
@@ -124,7 +124,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25 → 26
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 21. Auth Infrastructure | 1/2 | In Progress|  | - |
+| 21. Auth Infrastructure | 2/2 | Complete   | 2026-02-26 | - |
 | 22. Gemini Provider | v6.0 | 0/2 | Not started | - |
 | 23. Codex Auth Commands | v6.0 | 0/2 | Not started | - |
 | 24. Generate Integration & Onboarding | v6.0 | 0/3 | Not started | - |
