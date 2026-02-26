@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 Milestone: v6.0 Codex Auth & Validation
 Phase: 21 of 26 (Auth Infrastructure)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-02-26 — v6.0 roadmap created (phases 21-26, 30 requirements mapped)
+Plan: 02 of 02
+Status: In progress
+Last activity: 2026-02-26 — completed 21-01 auth types + token store foundation
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -27,9 +27,9 @@ Progress: [░░░░░░░░░░] 0%
 - Timeline: 3 days (2026-02-23 to 2026-02-25)
 
 **v6.0 Velocity:**
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: —
+- Total plans completed: 1
+- Average duration: ~2 min/plan
+- Total execution time: ~2 min
 
 ## Accumulated Context
 
@@ -44,6 +44,9 @@ Key decisions from research locked for v6.0:
 - Proactive token refresh: 5-minute buffer before each LLM round to prevent mid-run expiry
 - Gemini provider is independent of auth work; can proceed in parallel or after Phase 21
 - Phase 22 (Gemini) depends on Phase 21 foundation for config schema consistency
+- [Phase 21]: AuthError.noCredential now always lists env export, auth login, and handover init remediation paths.
+- [Phase 21]: TokenStore enforces chmod(0o600) after every write so existing credential files remain restricted.
+- [Phase 21]: Credential reads are fail-closed: invalid payloads are deleted and treated as unauthenticated.
 
 ### Pending Todos
 
@@ -65,5 +68,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Phase 21 context gathered
-Resume file: .planning/phases/21-auth-infrastructure/21-CONTEXT.md
+Stopped at: Completed 21-01-PLAN.md
+Resume file: .planning/phases/21-auth-infrastructure/21-02-PLAN.md

@@ -33,7 +33,7 @@
   2. Credentials written to `~/.handover/credentials.json` have 0600 permissions and are separate from project config
   3. Auth resolution applies the correct precedence: CLI `--api-key` flag overrides env var, which overrides credential store, which overrides interactive prompt
   4. `src/auth/` module exports types, token store, and `resolveAuth()` as importable units with no circular dependencies
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 21-01-PLAN.md — Auth types (AuthError, AuthResult, StoredCredential) and TokenStore with TDD
@@ -124,7 +124,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25 → 26
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 21. Auth Infrastructure | v6.0 | 0/2 | Not started | - |
+| 21. Auth Infrastructure | 1/2 | In Progress|  | - |
 | 22. Gemini Provider | v6.0 | 0/2 | Not started | - |
 | 23. Codex Auth Commands | v6.0 | 0/2 | Not started | - |
 | 24. Generate Integration & Onboarding | v6.0 | 0/3 | Not started | - |
