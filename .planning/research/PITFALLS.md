@@ -1,200 +1,202 @@
 # Pitfalls Research
 
-**Domain:** v5.0 Remote and Advanced MCP for an existing TypeScript CLI and MCP server
-**Researched:** 2026-02-23
-**Confidence:** HIGH
+**Domain:** Subscription-based provider auth (Claude Max, OpenAI Plus/Pro, Codex) added to existing TypeScript CLI with API key auth
+**Researched:** 2026-02-26
+**Confidence:** HIGH — Critical TOS findings from official Anthropic policy and The Register reporting; token security from Google, Auth0, and RFC 9700; rate limit details from official provider docs
+
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Streaming QA Without Cancellation and Progress Control
+### Pitfall 1: Using Claude Subscription OAuth Tokens in Any Third-Party Tool is a TOS Violation
 
 **What goes wrong:**
-Long-running QA streams keep generating after users move on, creating duplicate work, stalled UX, and provider cost spikes.
+Developers implement OAuth flows to exchange Claude Free/Pro/Max subscription credentials for access tokens and use them to make programmatic API calls. The integration works initially, then Anthropic server-side blocks it without notice. Accounts face potential suspension.
 
 **Why it happens:**
-Teams implement token streaming but skip MCP `notifications/cancelled` and progress semantics, assuming transport disconnect equals cancel.
+Claude Code itself is an open-source CLI that authenticates via OAuth to Anthropic's backend. Developers observe this mechanism, extract the pattern, and replicate it in other tools. The integration looks legitimate — it uses the same OAuth flow, same endpoints, same tokens.
+
+**The hard constraint:**
+Anthropic's Consumer Terms of Service explicitly state: "Using OAuth tokens obtained through Claude Free, Pro, or Max accounts in any other product, tool, or service — including the Agent SDK — is not permitted and constitutes a violation of the Consumer Terms of Service."
+
+Anthropic enforced this with a silent server-side block on January 9, 2026 — no advance notice — and formally documented the ban on February 17-18, 2026. Tools including OpenCode, OpenClaw, and Cline lost Claude subscription access immediately. This is a real risk, not hypothetical.
 
 **How to avoid:**
-- Implement MCP cancellation handling end-to-end for streamed QA requests.
-- Treat disconnect as transport failure, not business-level cancel.
-- Emit periodic MCP progress notifications for long tool calls.
-- Enforce request max timeout even when progress arrives.
+- Do NOT implement Claude subscription OAuth flows in Handover.
+- The only permitted programmatic access to Claude from a third-party tool is via API keys (`ANTHROPIC_API_KEY`) through the official REST API.
+- If users ask about using their Max subscription instead of paying for API tokens, explain the policy explicitly and link to the official Anthropic guidance.
+- API keys remain fully supported with no restrictions.
 
 **Warning signs:**
-- CPU/API usage remains high after client closes stream.
-- Users see delayed or duplicate final answers.
-- Server logs show continued generation for abandoned request IDs.
+- Any code that initiates `https://claude.ai/oauth` or `https://claude.ai/auth` flows.
+- Any code storing tokens to `~/.claude/oauth_token.json` or equivalent.
+- Any PR or feature request titled "support Claude Max/Pro subscription auth."
 
 **Phase to address:**
-RMT-04 (streaming MCP QA responses)
+Auth implementation phase — establish a clear decision: Claude support = API key only, no subscription OAuth.
 
 ---
 
-### Pitfall 2: Broken JSON-RPC Correlation Across SSE and JSON Modes
+### Pitfall 2: OpenAI ChatGPT Plus/Pro Subscription Access Does Not Include API Access — These Are Separate Products
 
 **What goes wrong:**
-Responses get attached to the wrong request, streams close early, or clients hang waiting for a response that never arrives.
+Developers assume that a user's ChatGPT Plus or Pro subscription grants programmatic API access. They build a "use your ChatGPT subscription" auth flow. Users configure it, and calls fail with authentication errors because subscription credentials don't work against the OpenAI API.
 
 **Why it happens:**
-When adding optional HTTP transport, implementation mixes request/notification/response handling and does not preserve strict JSON-RPC ID correlation under concurrent streams.
+OpenAI pricing pages emphasize "access to GPT-4o" and "advanced models" for Plus subscribers. This is for the ChatGPT web/app product. The OpenAI API is entirely separate with its own billing. There is no token exchange, no OAuth bridge, and no way to route API calls through a ChatGPT subscription.
+
+**The hard constraint:**
+ChatGPT Plus ($20/month) and the OpenAI API have completely separate billing, separate authentication, and separate feature sets. OpenAI's Services Agreement also prohibits buying, selling, or transferring API keys to third parties, and prohibits circumventing rate limits or restrictions.
 
 **How to avoid:**
-- Guarantee one authoritative request lifecycle map keyed by JSON-RPC `id`.
-- In Streamable HTTP mode, keep SSE stream open until the response for the originating request is sent.
-- In JSON-response mode, explicitly return 405 for GET SSE attempts.
-- Add protocol tests for concurrent streamed requests and out-of-order event delivery.
+- OpenAI support in Handover = API key auth only (`OPENAI_API_KEY`).
+- If implementing "OpenAI Plus" support, this is not feasible. The feature is simply not possible without violating TOS.
+- Document clearly for users: "You need an OpenAI API key, not a ChatGPT subscription."
 
 **Warning signs:**
-- Intermittent client timeouts despite server completing work.
-- "Unknown request id" or orphaned-response logs.
-- Reproducible failures only under concurrent tool calls.
+- Feature requests to "use ChatGPT credentials instead of API key."
+- Any code attempting to authenticate against `https://chat.openai.com/` endpoints.
+- Confusion in issues where users provide ChatGPT credentials and report auth failures.
 
 **Phase to address:**
-RMT-04 first, then harden in RMT-02
+Provider configuration and documentation phase — state clearly which auth method is supported per provider.
 
 ---
 
-### Pitfall 3: HTTP Transport Enabled Without Rebinding and Origin Protections
+### Pitfall 3: OAuth Refresh Token Stored in Plaintext Config File
 
 **What goes wrong:**
-Local/hosted MCP endpoint is reachable from malicious web origins, enabling DNS rebinding or unauthorized browser-mediated tool calls.
+Subscription OAuth flows produce both a short-lived access token and a long-lived refresh token. Developers store both in a JSON config file (e.g., `~/.handover/credentials.json`). The refresh token persists indefinitely. If a user's machine is compromised, the attacker gains persistent access to the LLM provider account — not just a short window.
 
 **Why it happens:**
-Teams expose HTTP quickly for remote use and skip mandatory header validation and host binding controls.
+Saving to a JSON config file is the path of least resistance for CLI credential storage. API keys are already stored this way (and have the same problem), so developers apply the same pattern to OAuth tokens without recognizing that refresh tokens have different security characteristics: they are long-lived, revocable only via the provider, and represent full account access rather than limited API scope.
 
 **How to avoid:**
-- Validate `Origin` on all Streamable HTTP requests.
-- Bind local defaults to `127.0.0.1`/`localhost`, not `0.0.0.0`.
-- Require auth for all remote HTTP MCP connections.
-- Add explicit allowed-host allowlist when binding to public interfaces.
+- For any OAuth tokens, use the OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service via `keytar` or `@keytar/node`) rather than plaintext files.
+- If OS keychain is unavailable (e.g., headless server), warn the user explicitly and fall back to a clearly-marked insecure storage path.
+- Apply the same best practice to API keys: they should not be in plaintext config files committed to git.
+- Ensure `.gitignore` excludes credential files.
+- Follow RFC 9700 (January 2025): access tokens should expire in 5-15 minutes; refresh tokens should expire within 7-30 days maximum.
 
 **Warning signs:**
-- Endpoint works from unrelated browser tabs/sites.
-- Server started with `0.0.0.0` and no auth in non-dev mode.
-- Security scans detect permissive host/origin policy.
+- `credentials.json` or `auth.json` containing token fields stored under the project directory.
+- No keytar/keychain dependency in `package.json` when OAuth is supported.
+- CI logs showing token values.
+- Missing `.gitignore` entries for credential files.
 
 **Phase to address:**
-RMT-02 (optional HTTP transport)
+Auth implementation phase — choose secure storage before writing any credential persistence code.
 
 ---
 
-### Pitfall 4: Session IDs Treated as Authentication
+### Pitfall 4: Silent Mid-Run Auth Failures Corrupt 6-Round Analysis Output
 
 **What goes wrong:**
-Any caller holding or guessing a session ID can act as another client session, inject events, or resume streams incorrectly.
+Handover runs 6 sequential LLM rounds. An OAuth access token expires mid-run (e.g., after round 3). The API returns 401. The CLI doesn't handle this gracefully — it either crashes with an unhelpful error, silently truncates output, or retries indefinitely. The partially-generated handover document is either not saved or saved in an incomplete state the user doesn't know is broken.
 
 **Why it happens:**
-MCP session lifecycle is confused with auth lifecycle; session identifiers are used as trust proof instead of request-scoped auth checks.
+OAuth access tokens are short-lived (Anthropic's Claude Code tokens have been observed expiring in hours; RFC 9700 recommends 5-15 minutes for sensitive APIs). API key auth is stateless — it doesn't expire mid-run. Developers design error handling around API key patterns (401 = wrong key, don't retry) and don't account for token refresh mid-sequence.
 
 **How to avoid:**
-- Keep auth and session concerns separate; authorize every inbound request.
-- Generate cryptographically strong, non-deterministic session IDs.
-- Bind session state to authenticated principal, not session ID alone.
-- Expire and rotate sessions; handle HTTP 404 session expiry by re-init.
+- Implement proactive token refresh: refresh the access token before each round (not just at startup) if token expiry is within a safe margin (e.g., 2 minutes).
+- Classify 401 errors: if using OAuth, attempt one token refresh and retry. If still 401, surface a clear re-auth message.
+- If mid-run refresh fails, save partial output with an explicit `[INCOMPLETE: auth failed at round N]` marker.
+- Test the token-expiry-during-run scenario explicitly.
 
 **Warning signs:**
-- Successful requests with only `Mcp-Session-Id` and no auth checks.
-- Session IDs visible in logs and reused across identities.
-- Multi-node deployments show cross-user event leakage.
+- Error handler for 401 that just throws without attempting refresh.
+- Token loaded once at startup, never rechecked during multi-round runs.
+- No partial output save on auth failure.
 
 **Phase to address:**
-RMT-02
+Auth implementation phase, and validated during multi-round integration testing.
 
 ---
 
-### Pitfall 5: Remote Regeneration Tool Is Non-Idempotent and Unbounded
+### Pitfall 5: Rate Limit Mismatch — Subscription Limits Are Message-Based, Not Token-Based
 
 **What goes wrong:**
-Multiple remote `generate` triggers overlap, causing race conditions in output docs, stale index state, or prolonged lock contention.
+A developer implements subscription auth and assumes rate limits behave like API rate limits (tokens/minute, requests/minute). They implement the same retry-with-backoff logic. But subscription rate limits count weighted "messages" in 5-hour rolling windows, not raw requests. A single 6-round Handover analysis may consume 6-60+ message units depending on context length — and the user hits their weekly limit after only a few runs without warning.
+
+**How it differs:**
+
+| Auth Type | Rate Limit Unit | Window | Notes |
+|-----------|----------------|--------|-------|
+| API key (Tier 1) | 50 requests/min, 40K tokens/min | Per minute | Token-based, resets every minute |
+| Claude Pro subscription | ~45 Opus 4 messages | 5-hour rolling | Message = weighted token consumption |
+| Claude Max 5x ($100/mo) | ~225 Opus 4 messages | 5-hour rolling | 5x Pro capacity |
+| Claude Max 20x ($200/mo) | ~900 Opus 4 messages | 5-hour rolling | Professional tier |
+| OpenAI Codex Plus | 30-150 messages | 5-hour window | Platform-specific |
+| OpenAI Codex Pro | 300-1,500 messages | 5-hour window | |
+
+A 6-round Handover run on long codebase context could consume 60-90+ weighted message units (context grows each round). On Claude Pro that is ~1/3 to 2/3 of a 5-hour window per single run.
 
 **Why it happens:**
-RMT-01 is implemented as a direct shell-style execution path without job control, dedupe keys, or per-request guardrails.
+Developers test with short prompts where subscription limits don't bite. Multi-round analysis with growing context is exactly the worst case for message-weighted rate limits.
 
 **How to avoid:**
-- Make regeneration a queued job with single-flight deduplication.
-- Define idempotency behavior (same request key returns existing in-flight/completed job).
-- Return structured job status and progress; avoid blocking tool calls indefinitely.
-- Enforce max runtime, cancellation hooks, and clear error states.
+- Surface the auth method to users prominently, including its limit characteristics.
+- Add a pre-run estimate: "This analysis may consume approximately N context tokens across 6 rounds. Your current tier allows approximately M message units per 5 hours."
+- On 429 errors from subscription endpoints, return a user-friendly message explaining remaining window time, not just a generic "rate limited, retry in Xs."
+- Do NOT assume the same retry logic works for subscription 429s as for API key 429s — subscription 429s may require waiting hours, not seconds.
 
 **Warning signs:**
-- Two quick regenerate calls produce inconsistent outputs.
-- Persistent `cache`/index mismatch after remote trigger.
-- "Works locally, flakes remotely" reports tied to parallel invocations.
+- Same `retryWithBackoff` function used for both subscription and API key 429s.
+- No distinction between "rate limited for 30 seconds" (API) and "rate limited for 4.5 hours" (subscription window).
+- No token estimation before multi-round runs.
 
 **Phase to address:**
-RMT-01 (with streaming progress surfaced in RMT-04)
+Rate limit handling phase — implement provider-aware error handling, not generic retry logic.
 
 ---
 
-### Pitfall 6: Remote Tool Surface Lacks High-Risk Confirmation and Scope Guardrails
+### Pitfall 6: Users Confused About Which Auth Method Is Active
 
 **What goes wrong:**
-The model can invoke destructive/expensive tools (like full regeneration) without explicit user acknowledgment, causing surprise cost and trust failures.
+User configures both an API key and subscription auth "just in case." The tool silently picks one. The wrong one gets used — either the user pays API costs thinking they're using their subscription, or subscription limits get consumed thinking the API key is active. Support requests become impossible to diagnose because auth state is implicit.
 
 **Why it happens:**
-Tool security guidance is treated as UI-only concern; server accepts any authenticated tool call without operation-level policy.
+Adding a second auth method to a tool that previously had one creates a precedence question the developer answers implicitly in code. Users don't see which method was selected. When something goes wrong, both user and developer are debugging without a shared understanding of which auth path ran.
 
 **How to avoid:**
-- Mark high-impact tools with explicit confirmation policy in client UX.
-- Enforce server-side permission checks by operation, not only connection-level auth.
-- Rate-limit and audit high-cost tool invocations.
-- Fail closed on unknown/malformed arguments.
+- Always print which auth method is active at the start of a run: `[auth] Using API key for claude-3-5-sonnet-20241022` or `[auth] Using subscription (Claude Max) for claude-3-5-sonnet-20241022`.
+- Make precedence explicit and documented: e.g., "API key takes precedence over subscription auth if both are configured."
+- Add a `handover auth status` command that shows which credentials are configured, which will be used, and their current validity.
+- Never silently fall back from one auth method to another — if the configured method fails, surface the failure with the method name.
 
 **Warning signs:**
-- Unexpected regeneration events in logs.
-- Users report actions they did not intend to authorize.
-- Tool call volume spikes from automated prompt loops.
+- No logging of which auth path was taken.
+- Fallback logic with no user notification.
+- Users opening issues with "it's not using my API key" or "it's not using my subscription."
 
 **Phase to address:**
-RMT-01 and RMT-02
+Auth implementation phase — design the auth selection UX before writing the provider logic.
 
 ---
 
-### Pitfall 7: Local Embedding Path Drifts From Index Contract
+### Pitfall 7: Credential Files Inadvertently Published in npm Package
 
 **What goes wrong:**
-Search quality collapses or indexing fails after switching to local embeddings because vector dimensions/model behavior no longer match existing index assumptions.
+A Handover contributor adds credential or config files to the project root during development. The `.npmignore` or `files` field in `package.json` is not configured to exclude them. A release publishes `credentials.json`, `~/.handover/config.json` or test fixture files containing real API keys to npm. The keys are immediately scraped by automated bots that watch npm publish feeds.
 
 **Why it happens:**
-RMT-03 adds Ollama path but omits strict embedding metadata validation and migration rules when model/dimensions change.
+npm publishes everything in the package directory by default unless explicitly excluded. Development config files accumulate in the project root. The `files` field in `package.json` is often not set, relying on `.npmignore` which may not be complete. Security scanning tools targeting AI assistant CLIs (McpInject, credential harvesting npm packages) specifically target `.claude/`, `.env`, and config files.
 
 **How to avoid:**
-- Persist embedding provider, model, dimensions, and truncate policy as index metadata.
-- Fail fast when metadata differs; require explicit reindex.
-- Use `/api/embed` (current endpoint) and treat `/api/embeddings` as legacy.
-- Validate multi-input embedding output shape before write.
+- Use the `files` allowlist in `package.json` (explicit inclusion is safer than exclusion): only include `dist/`, `bin/`, `README.md`, `LICENSE`.
+- Add to `.npmignore`: `*.json` (all JSON at root except package.json), `.env*`, `credentials*`, `config*`, `.handover/`.
+- Run `npm pack --dry-run` in CI to audit what would be published before every release.
+- Never commit test fixtures containing real credentials.
+- Rotate any key that may have been exposed immediately — even briefly published secrets are scraped.
 
 **Warning signs:**
-- Sudden drop in semantic retrieval relevance after provider switch.
-- Mixed-dimension errors or silent empty-result retrieval.
-- Index works only after manual DB wipe/rebuild.
+- No `files` field in `package.json`.
+- `.npmignore` does not exist or does not explicitly exclude config/credential patterns.
+- `npm pack --dry-run` not in the release checklist.
+- Credential files present in the project root.
 
 **Phase to address:**
-RMT-03
-
----
-
-### Pitfall 8: Local Embedding Fallback Leaks Privacy and Breaks Offline Promise
-
-**What goes wrong:**
-When local model is missing/unloaded, system silently falls back to remote provider, violating offline expectations and potentially leaking sensitive docs.
-
-**Why it happens:**
-Fallback logic prioritizes "always succeed" over explicit data locality policy.
-
-**How to avoid:**
-- Add explicit `embeddingMode` policy (`local-only`, `local-preferred`, `remote-only`).
-- In `local-only`, fail with actionable remediation (pull model, start service).
-- Surface endpoint/model identity in logs and status output.
-- Add preflight checks for Ollama reachability and model availability.
-
-**Warning signs:**
-- Network egress during supposedly offline indexing.
-- Different retrieval quality between runs with same corpus.
-- Users discover cloud usage only from billing/traffic logs.
-
-**Phase to address:**
-RMT-03
+Pre-release security phase — add npm publish audit to CI before any release that includes new auth features.
 
 ---
 
@@ -204,11 +206,14 @@ Shortcuts that seem reasonable but create long-term problems.
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Implement streaming as plain text chunks outside MCP notifications | Fast demo output | Protocol drift, client incompatibility, brittle parsing | Never |
-| Add HTTP transport without auth because "internal network only" | Faster rollout | Security incidents, blocked enterprise adoption | Never |
-| Treat remote regeneration as synchronous tool call | Simpler implementation | Timeouts, retries causing duplicate runs, poor UX | MVP demo only, not release |
-| Auto-fallback from local embeddings to remote without explicit policy | Fewer immediate failures | Privacy violations, non-deterministic behavior | Never |
-| Reuse one timeout for all operations | Easy config | Either premature aborts or runaway long jobs | Only in early prototype |
+| Store OAuth tokens in same JSON file as API keys | One credential store, simple code | Refresh token persists indefinitely in plaintext; different security requirements get same weak treatment | Never |
+| One generic `retryWithBackoff` for all 429s | Simple code | Subscription 429s require hours-long wait, not seconds; wrong backoff confuses users and wastes time | Never in production |
+| Implement Claude subscription OAuth "because users want it" | Feature request satisfied | Active TOS violation; Anthropic will server-block it with no notice; user accounts at risk | Never |
+| Check auth method only at startup, not per-round | Simpler startup flow | OAuth token expires mid-run, round 4-6 fail silently with 401 | MVP only if tokens are long-lived (24h+), never for OAuth |
+| Display "using Claude" without specifying which auth method | Less verbose output | User cannot diagnose billing/limit issues; "it's charging my API key when I set up subscription" complaints | Never |
+| Skip `handover auth status` command | Saves implementation time | Users cannot verify their configuration; first sign of problems is a failed run | Acceptable to defer until v2, but ship before subscription auth goes stable |
+
+---
 
 ## Integration Gotchas
 
@@ -216,11 +221,14 @@ Common mistakes when connecting to external services.
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| MCP Streamable HTTP | Missing `MCP-Protocol-Version` on subsequent HTTP requests | Send negotiated protocol header on all post-init requests |
-| MCP Streamable HTTP | Assuming GET SSE is always available | Support both: SSE GET when enabled, or 405 in JSON-only mode |
-| MCP Sessions | Using session ID as auth credential | Authenticate every request and treat session as state cursor only |
-| Ollama embeddings | Using deprecated `/api/embeddings` path in new code | Use `/api/embed` and support list input + dimensions contract |
-| Remote regenerate tool | No idempotency key / dedupe key | Queue and dedupe jobs; return status handle |
+| Anthropic subscription auth | Implementing OAuth token exchange for Claude Max/Pro | Use API keys only for third-party tools; subscription OAuth is blocked server-side and violates TOS |
+| OpenAI subscription auth | Assuming ChatGPT Plus credentials work with the API | OpenAI API and ChatGPT are completely separate products with separate billing; no bridge exists |
+| OAuth token refresh | Loading token once at startup, assuming it's valid for the run | Validate and refresh before each LLM round; short-lived tokens can expire in minutes |
+| Subscription 429 errors | Treating subscription rate limits like API rate limits (seconds-long backoff) | Subscription 429s may mean a 5-hour window is exhausted; backoff logic must be provider-and-auth-method-aware |
+| Credential file storage | Writing tokens to plaintext JSON alongside project files | Use OS keychain for OAuth tokens; use scoped dotfiles with restrictive permissions for API keys |
+| npm publish with credentials | Relying on default publish behavior or incomplete .npmignore | Use explicit `files` allowlist in package.json; run `npm pack --dry-run` in CI |
+
+---
 
 ## Performance Traps
 
@@ -228,10 +236,11 @@ Patterns that work at small scale but fail as usage grows.
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Streaming token event on every tiny delta without rate control | High CPU, chatty logs, jittery UX | Coalesce output updates and throttle progress notifications | Noticeable at >20 concurrent streams |
-| Full regeneration triggered for minor remote actions | Long queue times, wasted compute | Detect no-op state, incremental regenerate/reindex paths | Obvious beyond medium repos |
-| HTTP transport with no backpressure strategy | Memory growth during long responses | Bound buffers and enforce per-session in-flight limits | Reproducible under parallel remote clients |
-| Local embedding model cold-start on each request | First query latency spikes | Preflight warm model and tune `keep_alive` | Painful for interactive remote workflows |
+| 6-round analysis with growing context on subscription auth | 3rd or 4th run in a day hits 5-hour message limit | Estimate token usage before runs; warn user; use API key for heavy workloads | Immediately visible on Claude Pro; Max 5x gives more headroom |
+| Same token used across concurrent Handover runs | First run depletes window; second fails mid-analysis | Subscription auth is inherently single-user, single-session; document this constraint | Any parallel usage scenario |
+| No pre-run auth validation | Failure at round 3 of 6 with no partial save | Validate credentials before starting; surface expiry warnings before committing to run | Every token expiry event |
+
+---
 
 ## Security Mistakes
 
@@ -239,10 +248,13 @@ Domain-specific security issues beyond general web security.
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| No Origin validation on HTTP MCP | DNS rebinding and browser-driven abuse | Validate Origin and restrict allowed hosts |
-| Exposing remote regenerate without operation-level authorization | Unauthorized expensive/critical actions | Enforce per-tool authz and confirmation flows |
-| Logging session IDs, tokens, or full tool arguments | Credential and data leakage | Redact sensitive headers/arguments in logs |
-| Trusting tool annotations from untrusted servers/clients | Policy bypass via spoofed metadata | Treat annotations as untrusted hints, enforce server policy |
+| Storing OAuth refresh tokens in plaintext dotfiles | Persistent account compromise if file is read (supply chain attack, shared machine, git leak) | Use OS keychain via `keytar`; warn explicitly when falling back to plaintext |
+| Publishing credential fixtures to npm | Immediate automated scraping by bots monitoring npm publish feed | Use `files` allowlist in `package.json`; `npm pack --dry-run` in CI |
+| Implementing Claude subscription OAuth | TOS violation; Anthropic server-block; account suspension risk | API key only for Claude in third-party tools |
+| No distinction between auth methods in logs | Cannot audit which auth was used; security incident investigation fails | Always log auth method (not credential value) at run start |
+| Logging full API keys or tokens in debug output | Key exposure in CI logs, shared terminals | Redact tokens in all log output; never log credential values, only last 4 chars or `[redacted]` |
+
+---
 
 ## UX Pitfalls
 
@@ -250,22 +262,27 @@ Common user experience mistakes in this domain.
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Streaming appears frozen for long operations | Users cancel healthy jobs | Send periodic progress and heartbeat updates |
-| Regeneration returns immediately with no status | Users cannot tell if action succeeded | Return job ID + status endpoint + completion notification |
-| Transport mode is implicit | Hard-to-debug client/server mismatch | Surface active transport and protocol version in diagnostics |
-| Local embedding errors are low-level socket text | Users cannot self-recover | Show actionable remediation (`ollama pull ...`, start service, reindex) |
+| No indication of which auth method is active | User pays API costs when they believe subscription is being used; impossible to diagnose billing disputes | Print `[auth] method: API key (claude-3-5-sonnet-20241022)` at run start |
+| Generic "rate limited" error on subscription 429 | User retries in 10 seconds; fails again; retries indefinitely | Surface remaining window time: "Rate limit reached. Your subscription window resets in 4h 12m." |
+| No per-provider auth configuration documentation | Users configure wrong credential type (ChatGPT account for OpenAI API, Max subscription for Claude) | Provide per-provider setup guide: "Claude requires an API key from console.anthropic.com. Subscription plans are not supported." |
+| Silent fallback to API key when subscription fails | User thinks subscription worked; gets an unexpected API bill | Never silently switch auth methods; fail explicitly with which method failed and why |
+| No `auth status` command | User cannot verify configuration before running an expensive multi-round analysis | Implement `handover auth status` showing configured providers, active method, and validity state |
+
+---
 
 ## "Looks Done But Isn't" Checklist
 
 Things that appear complete but are missing critical pieces.
 
-- [ ] **RMT-04 Streaming QA:** Stream works on happy path, but cancellation race handling untested — verify cancel during active generation and ignore late responses.
-- [ ] **RMT-04 Streaming QA:** Progress is emitted, but token/progress flood control missing — verify bounded notification rate.
-- [ ] **RMT-02 HTTP transport:** Endpoint responds, but Origin/Host validation absent — verify rebinding protections in local and hosted modes.
-- [ ] **RMT-02 HTTP transport:** Sessions work single-node, but resume/reconnect behavior fails in multi-node — verify deterministic session handling.
-- [ ] **RMT-01 Remote regenerate:** Tool triggers generate, but concurrent triggers conflict — verify queueing and idempotency behavior.
-- [ ] **RMT-03 Local embeddings:** Ollama path works, but metadata mismatch does not force reindex — verify fail-fast and remediation path.
-- [ ] **RMT-03 Local embeddings:** Offline mode documented, but hidden remote fallback still enabled — verify explicit policy and egress tests.
+- [ ] **Subscription auth for Claude:** "It works" may mean TOS violation — verify that no OAuth flows are used, only API keys, and document this constraint for users explicitly.
+- [ ] **OAuth token refresh:** Token refresh at startup is not enough — verify that refresh is checked before each LLM round in the 6-round sequence.
+- [ ] **Rate limit handling:** Generic 429 retry works for API keys — verify that subscription-mode 429s surface the remaining window time, not just "retry in Xs."
+- [ ] **Auth method display:** Output shows "using Claude" — verify that the specific auth method (API key vs subscription) is printed, not just the provider name.
+- [ ] **Credential file security:** Config file exists — verify that OAuth refresh tokens use OS keychain, not plaintext JSON; verify API key files have restrictive permissions (chmod 600).
+- [ ] **npm publish safety:** Build succeeds — verify `npm pack --dry-run` output contains no credential or config files; verify `files` field in `package.json` is an explicit allowlist.
+- [ ] **Multi-round auth failure:** 6-round analysis completes on valid credentials — verify that partial output is saved with clear incomplete marker when auth fails mid-run.
+
+---
 
 ## Recovery Strategies
 
@@ -273,11 +290,13 @@ When pitfalls occur despite prevention, how to recover.
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Streaming jobs continue after client cancel | MEDIUM | Add cancellation propagation; terminate provider call; add regression test for cancel-mid-stream |
-| HTTP transport exposed insecurely | HIGH | Disable remote endpoint, patch Origin/host/auth checks, rotate credentials, audit access logs |
-| Remote regenerate race corruption | MEDIUM | Stop concurrent jobs, rebuild generated docs and index, deploy queue + single-flight guard |
-| Embedding/index contract mismatch | MEDIUM | Persist new metadata schema, force full reindex, block mixed-dimension writes |
-| Silent local->remote fallback leakage | HIGH | Disable fallback by policy, notify users, rotate/clean logs if sensitive text may have egressed |
+| TOS violation via Claude subscription OAuth | HIGH | Remove OAuth code immediately; communicate to users that API keys are required; monitor for account suspension notifications from Anthropic |
+| Credentials published to npm | HIGH | Immediately revoke all exposed keys; publish a new clean version; audit all npm publish history; notify users to rotate their credentials if any were in test fixtures |
+| OAuth refresh token in plaintext file leaked | HIGH | User must revoke token at provider dashboard; rotate to new credentials; migrate storage to OS keychain |
+| Mid-run auth failure corrupts output | MEDIUM | Add partial-save recovery; mark incomplete output clearly; implement pre-run auth validation |
+| User confusion about active auth method | LOW | Add `auth status` command; add auth method to run output; update documentation |
+
+---
 
 ## Pitfall-to-Phase Mapping
 
@@ -285,27 +304,37 @@ How roadmap phases should address these pitfalls.
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Streaming without cancellation/progress control | RMT-04 | Cancel active stream; assert no post-cancel generation or late answer rendering |
-| JSON-RPC correlation errors across SSE/JSON | RMT-04 + RMT-02 | Run concurrent streamed calls; verify every response maps to correct request ID |
-| HTTP transport without rebinding/origin protection | RMT-02 | Security test: cross-origin request rejected; localhost binding defaults confirmed |
-| Session IDs treated as auth | RMT-02 | Requests with valid session but invalid auth are rejected |
-| Non-idempotent/unbounded remote regenerate | RMT-01 | Fire duplicate trigger requests; confirm dedupe and stable final artifacts |
-| Missing high-risk tool guardrails | RMT-01 + RMT-02 | Verify permission checks and confirmation flow for regeneration tool |
-| Local embedding/index contract drift | RMT-03 | Change embedding model; verify fail-fast and explicit reindex requirement |
-| Silent local embedding fallback | RMT-03 | In local-only mode with offline network, verify hard failure and no outbound calls |
+| Claude subscription OAuth TOS violation | Auth design phase (decision: API key only for Claude) | No OAuth code paths exist in codebase for Claude; documented in README |
+| OpenAI subscription confusion | Auth design phase + documentation | Provider setup docs explicitly state API key requirement per provider |
+| OAuth tokens in plaintext config | Auth implementation phase | keytar dependency present; plaintext fallback emits security warning |
+| Token expiry mid-run | Auth implementation + integration testing | Integration test: run with token that expires after round 2; verify graceful failure and partial save |
+| Subscription vs API rate limit confusion | Rate limit handling phase | Subscription 429 error messages include window reset time; separate retry logic per auth type |
+| Credential file in npm publish | Pre-release security phase | CI includes `npm pack --dry-run` output check; `files` field verified in package.json |
+| Auth method invisible to user | Auth UX phase | Auth method printed at run start; `auth status` command exits 0 with clear output |
+
+---
 
 ## Sources
 
-- MCP Specification (2025-06-18): Transports — https://modelcontextprotocol.io/specification/2025-06-18/basic/transports
-- MCP Specification (2025-06-18): Lifecycle — https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle
-- MCP Specification (2025-06-18): Cancellation — https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation
-- MCP Specification (2025-06-18): Progress — https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress
-- MCP Specification (2025-06-18): Tools — https://modelcontextprotocol.io/specification/2025-06-18/server/tools
-- MCP Specification (2025-06-18): Pagination — https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination
-- MCP Specification (latest): Security Best Practices — https://modelcontextprotocol.io/specification/latest/basic/security_best_practices
-- MCP TypeScript SDK Server Guide (main, fetched 2026-02-23) — https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/main/docs/server.md
-- Ollama API (main, fetched 2026-02-23) — https://raw.githubusercontent.com/ollama/ollama/main/docs/api.md
+- Anthropic Consumer Terms of Service + Legal and Compliance: https://support.claude.com/en/articles/11145838-using-claude-code-with-your-pro-or-max-plan
+- The Register: "Anthropic clarifies ban on third-party tool access to Claude" (2026-02-20): https://www.theregister.com/2026/02/20/anthropic_clarifies_ban_third_party_claude_access/
+- Natural20: "Anthropic Banned OpenClaw: The OAuth Lockdown" (2026): https://natural20.com/coverage/anthropic-banned-openclaw-oauth-claude-code-third-party
+- Hacker News discussion on Anthropic subscription auth ban (2026): https://news.ycombinator.com/item?id=47069299
+- Groundy: "Anthropic Bans Third-Party Use of Subscription Auth" (2026): https://groundy.com/articles/anthropic-bans-third-party-use-subscription-auth-what-it/
+- OpenAI Terms of Use: https://openai.com/policies/row-terms-of-use/
+- OpenAI Services Agreement: https://openai.com/policies/services-agreement/
+- Roo-Code GitHub Issue #6993 — community discussion on OpenAI Plus for API provider: https://github.com/RooCodeInc/Roo-Code/issues/6993
+- Claude Pro & Max Weekly Rate Limits Guide (2026): https://hypereal.tech/a/weekly-rate-limits-claude-pro-max-guide
+- RFC 9700 OAuth Token Lifetime Guidance (January 2025): https://www.obsidiansecurity.com/blog/refresh-token-security-best-practices
+- Google OAuth Best Practices: https://developers.google.com/identity/protocols/oauth2/resources/best-practices
+- Auth0 Token Storage guidance: https://auth0.com/docs/secure/security-guidance/data-security/token-storage
+- GitHub CLI OAuth keychain issue #449: https://github.com/cli/cli/issues/449
+- Semgrep Security Advisory: npm packages using secret scanning tools to steal credentials (2025): https://semgrep.dev/blog/2025/security-advisory-npm-packages-using-secret-scanning-tools-to-steal-credentials/
+- The Hacker News: "Malicious npm Packages Harvest Crypto Keys, CI Secrets, and API Tokens" (February 2026): https://thehackernews.com/2026/02/malicious-npm-packages-harvest-crypto.html
+- npm classic tokens revoked, session-based auth (December 2025): https://github.blog/changelog/2025-12-09-npm-classic-tokens-revoked-session-based-auth-and-cli-token-management-now-available/
+- Portkey: "Retries, fallbacks, and circuit breakers in LLM apps": https://portkey.ai/blog/retries-fallbacks-and-circuit-breakers-in-llm-apps/
+- OpenAI Codex usage limits: https://community.openai.com/t/codex-usage-after-the-limit-reset-update-single-prompt-eats-7-of-weekly-limits-plus-tier/1365284
 
 ---
-*Pitfalls research for: v5.0 Remote and Advanced MCP (RMT-01..RMT-04)*
-*Researched: 2026-02-23*
+*Pitfalls research for: Subscription-based provider auth added to existing Handover CLI (Claude Max, OpenAI Plus/Pro, Codex)*
+*Researched: 2026-02-26*

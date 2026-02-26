@@ -1,23 +1,48 @@
 # Feature Research
 
-**Domain:** Remote-capable MCP server for documentation regeneration and QA
-**Researched:** 2026-02-23
-**Confidence:** HIGH
+**Domain:** Subscription-based provider authentication for CLI tools
+**Researched:** 2026-02-26
+**Confidence:** HIGH (subscription policies and CLI auth patterns verified against official sources and live policy enforcement)
+
+## Context: What Already Exists
+
+The existing Handover CLI (v0.1.x) already has:
+- API key-based auth for 8 providers (`anthropic`, `openai`, `ollama`, `groq`, `together`, `deepseek`, `azure-openai`, `custom`)
+- Config loading via `.handover.yml` + env vars + CLI flags (layered precedence)
+- `resolveApiKey()` reads API key from environment variable at runtime
+- `validateProviderConfig()` fails fast if key not set
+- `createProvider()` instantiates provider from config
+- No auth storage, no auth commands, no session management
+
+Everything below describes only features needed for the NEW subscription auth milestone.
+
+---
+
+## Critical Finding: Anthropic Policy (HIGH confidence)
+
+**Claude Max/Pro subscription OAuth is banned for third-party tools.** Anthropic updated terms on 2026-02-19 to explicitly prohibit using OAuth tokens obtained through Claude Free, Pro, or Max accounts in any tool other than the official Claude Code CLI and Claude.ai. Server-side fingerprinting was deployed on 2026-01-09 to detect and block non-official clients.
+
+**What this means for handover:** The `anthropic` provider with subscription auth is NOT implementable without violating Anthropic's terms. OpenAI Codex (ChatGPT Plus/Pro) subscription auth IS implementable and actively supported. This shapes what the feature set can deliver.
+
+---
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist. Missing these = product feels incomplete.
+Features users assume exist in a CLI with subscription auth. Missing these = product feels incomplete.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **RMT-04: Long-running QA calls show progress + stream over MCP transport** | Mature MCP clients expect responsiveness on long operations; MCP spec defines progress and cancellation for in-flight requests | HIGH | Implement `notifications/progress` with monotonic progress and support `notifications/cancelled`; return final tool result only when complete |
-| **RMT-01: Remote regeneration exposed as a tool with safe async behavior** | Mature MCP servers expose high-value actions as tools, not ad-hoc commands | HIGH | Regeneration is multi-minute; design as job-oriented tool execution with clear status messages and idempotent run semantics |
-| **RMT-02: Optional Streamable HTTP transport in addition to stdio** | Remote MCP deployments now standardize on Streamable HTTP while local tools still rely on stdio | HIGH | Keep stdio default for compatibility; add HTTP endpoint that supports both `application/json` and `text/event-stream` |
-| **Remote transport security baseline (Origin validation + auth-ready path)** | Mature hosted MCP requires transport hardening by default | HIGH | For HTTP mode: validate `Origin`, prefer localhost binding for local runs, and support auth headers/OAuth-compatible flow |
-| **RMT-03: Local embedding provider path (Ollama-class)** | Mature tools offer cloud + local embedding options for privacy, offline work, and cost control | MEDIUM | Add local provider path using `/api/embed`, model configurability, and embedding dimension validation against vector index schema |
-| **Transport parity for existing MCP resources/tools/prompts** | Users expect same server behavior regardless of transport | MEDIUM | Stdio and HTTP must expose identical capabilities and tool contracts; transport changes should not change semantics |
+| **`handover auth login [provider]` command** | Every CLI with subscription auth (gh, codex, claude) exposes `auth login`; users copy this pattern | MEDIUM | Opens browser OAuth flow (PKCE); for headless, fall back to device code flow. Returns success/error message. |
+| **`handover auth logout [provider]` command** | Paired with login; users expect to clear credentials | LOW | Deletes stored token for named provider; warns if no active session |
+| **`handover auth status` command** | Users need to verify what is authenticated without running a generate job | LOW | Shows: provider name, auth method (api-key vs subscription), subscription tier if discoverable, token expiry if applicable |
+| **Auth method selector in config** | When user has both an API key env var AND subscription auth, the tool needs to know which to use | LOW | Add `authMethod: "api-key" \| "subscription"` field to `.handover.yml` / config schema; default to `"api-key"` to not break existing users |
+| **Subscription auth path through `generate` command** | The whole point is that `handover generate` works without an API key if subscription auth is active | MEDIUM | `generate` must check credential store before checking env var API key; provider factory wires the right client |
+| **Graceful error when no auth exists** | Current error is "missing API key" — this is confusing to subscription users who have never set a key | LOW | Detect subscription auth attempt in config, provide clear message: "Run `handover auth login openai` to authenticate with your subscription" |
+| **Secure credential storage** | Users expect tokens not stored in plaintext in config files | MEDIUM | macOS Keychain preferred; fallback to `~/.handover/credentials.json` with 0600 permissions; never write tokens to `.handover.yml` |
+| **Token refresh on 401** | Subscription tokens expire (OpenAI Codex tokens auto-refresh on active sessions) | MEDIUM | On HTTP 401 from provider: attempt token refresh before surfacing error to user; refresh is transparent |
+| **Precedence: env var API key overrides subscription** | Power users and CI pipelines must be able to override subscription auth with an explicit API key | LOW | Auth resolution order: CLI `--api-key` flag > env var (`OPENAI_API_KEY`) > subscription token from credential store. This matches how Codex handles it (they have an issue where the reverse caused problems, so explicit ordering matters). |
 
 ### Differentiators (Competitive Advantage)
 
@@ -25,10 +50,11 @@ Features that set the product apart. Not required, but valuable.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Regeneration with resumable remote UX** | Better remote reliability than fire-once tools when network drops | HIGH | Use Streamable HTTP SSE event IDs + resumable patterns so clients can recover from disconnects during long regeneration |
-| **Offline-first embeddings (local default path when configured)** | Teams with compliance/privacy limits can use semantic features without cloud keys | MEDIUM | Support local Ollama embeddings as first-class provider path; cloud embedding remains optional fallback |
-| **User-trust guardrails for remote mutations** | Safer than many MCP servers that over-automate write operations | MEDIUM | Keep explicit user confirmation for mutation tools (regeneration) and clear tool descriptions indicating side effects |
-| **Backward-compatible protocol behavior across MCP revisions** | Reduces integration breakage across fast-moving MCP clients | MEDIUM | Honor negotiated protocol version and required HTTP headers; maintain compatibility with non-streaming clients |
+| **Clear "free tier vs subscription" cost display** | Subscription users do not pay per-token; showing a $0.00 cost or "subscription" badge instead of a dollar amount is genuinely useful and removes confusion | LOW | When auth method is `subscription`, suppress cost tracker output and show "subscription credits" label instead of dollar cost |
+| **Multi-provider subscription auth in one tool** | Other CLI tools authenticate with only their own provider; handover supports multiple providers — users can pick the subscription they already pay for | MEDIUM | Auth store keyed by provider; each provider holds its own token independently; no conflicts |
+| **Auth method visible in startup banner** | Users can see at a glance whether a run is consuming API credits vs subscription credits | LOW | Extend existing banner display with auth method indicator alongside provider/model |
+| **Headless device code flow support** | Developers running handover over SSH or in containers can authenticate via device code without browser access on the target machine | MEDIUM | Device code flow is in beta for Codex; support `--device-code` flag in `auth login`; poll token endpoint until user completes browser flow on another device |
+| **`handover auth token` command** | CI/CD users need a way to export a long-lived token to inject via env var | LOW | Prints the current access token to stdout; user can set `HANDOVER_AUTH_TOKEN` in CI secrets; follows claude `setup-token` pattern |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
@@ -36,125 +62,180 @@ Features that seem good but create problems.
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| **Make HTTP transport mandatory and drop stdio** | "Remote is the future" simplification | Breaks mature local IDE workflows and violates MCP guidance that clients should support stdio where possible | Keep stdio-first baseline; add HTTP as opt-in (`--transport http`) |
-| **Pass through third-party bearer tokens directly from client to upstream APIs** | "Simpler auth plumbing" | Explicit MCP security anti-pattern (token passthrough); weakens trust boundaries and auditability | Validate tokens for MCP server audience only; mint/use separate upstream credentials as needed |
-| **Fire-and-forget regeneration without progress/cancel** | Faster implementation | Poor UX for long tasks; users cannot tell if run is alive, stuck, or safe to retry | Emit progress notifications, support cancellation, and surface deterministic terminal state |
-| **Always-on background auto-regeneration daemon** | "Always fresh docs" appeal | Adds race conditions, extra resource usage, and operational complexity for little milestone value | Keep explicit regeneration tool invocation; optionally add scheduled automation later |
-| **Streaming partial markdown artifacts while regeneration is still running** | Perceived immediate output | Produces partial, inconsistent docs and complicates validation | Stream status/progress only; publish artifacts when full run is complete |
+| **Claude Max/Pro subscription OAuth support** | Claude Max is the most popular subscription; developers want to use $100-$200/month plans they already pay for | Explicitly prohibited by Anthropic's updated Terms of Service (Feb 2026); server-side fingerprinting blocks non-official clients regardless of technical implementation | Support only providers that explicitly permit third-party subscription auth (OpenAI Codex); document Anthropic restriction clearly |
+| **Proxy/relay architecture to "launder" subscription tokens** | Workaround for Anthropic ban via CLIProxyAPI-style relay | Still violates Anthropic ToS; accounts get banned; project becomes legally exposed | Do not implement; document why in code comments and help text |
+| **Store subscription tokens in `.handover.yml`** | "Simple" config-file-centric design | Tokens in YAML committed to git = immediate credential exposure; YAML config is meant to be committed | Store in OS keychain or `~/.handover/credentials.json` (separate from project config, in home dir) |
+| **Auto-login on first `generate` run without any auth configured** | "Zero friction" onboarding | Unexpected browser pop-ups during automated runs (CI, pre-commit hooks) are disruptive; user may be mid-run | Fail fast with a clear message directing user to run `handover auth login [provider]` explicitly |
+| **Subscription rate limit retry with automatic backoff hiding from user** | "Just works" expectation | Subscription rate limits (5-hour rolling windows) can pause jobs for minutes; silent retry obscures this from users who may think the tool hung | Show explicit "Rate limited — waiting Xs (subscription limit)" message; let user cancel; do not silently sleep for >30s without feedback |
+
+---
 
 ## Feature Dependencies
 
 ```
-[RMT-04 Streaming MCP QA]
-    └──requires──> [Progress Notifications]
-                       └──requires──> [Request Metadata with progressToken]
-    └──requires──> [Cancellation Handling]
+[Auth Method Config Field]
+    └──required-by──> [generate: subscription auth path]
+    └──required-by──> [auth login command]
+    └──required-by──> [auth status command]
 
-[RMT-01 Remote Regeneration Tool]
-    └──requires──> [Tool Contract + Input Schema]
-    └──requires──> [Async Job Lifecycle]
-                       └──requires──> [Progress + Cancellation]
-    └──enhances──> [RMT-04 Streaming UX]
+[auth login command]
+    └──requires──> [OAuth PKCE browser flow]
+                       └──optional-fallback──> [Device code flow]
+    └──requires──> [Credential storage layer]
+                       └──requires──> [OS keychain OR ~/.handover/credentials.json]
+    └──produces──> [Stored token (access + refresh + expiry)]
 
-[RMT-02 Optional HTTP Transport]
-    └──requires──> [MCP Lifecycle Negotiation]
-    └──requires──> [Streamable HTTP Endpoint]
-                       └──requires──> [SSE + JSON Response Handling]
-    └──requires──> [Origin Validation + Auth Hooks]
-    └──must-not-conflict-with──> [Existing stdio transport]
+[generate: subscription auth path]
+    └──requires──> [Auth method selector in config]
+    └──requires──> [Credential storage layer] (read)
+    └──requires──> [Token refresh on 401]
+    └──requires──> [Auth resolution precedence logic]
 
-[RMT-03 Local Embedding Provider Path]
-    └──requires──> [Provider Abstraction for Embeddings]
-    └──requires──> [Ollama /api/embed Integration]
-    └──requires──> [Embedding Dimension Validation]
-    └──enhances──> [Remote regeneration + QA freshness]
+[Token refresh on 401]
+    └──requires──> [Stored refresh token] (from auth login)
+
+[auth token command]
+    └──requires──> [Credential storage layer] (read)
+
+[auth logout command]
+    └──requires──> [Credential storage layer] (delete)
+
+[Cost display suppression]
+    └──requires──> [Auth method selector in config]
+    └──enhances──> [generate: startup banner]
 ```
 
 ### Dependency Notes
 
-- **RMT-04 requires progress tokens:** MCP progress is keyed by `progressToken`; without it, long operations degrade to opaque waits.
-- **RMT-01 depends on async lifecycle:** remote regeneration should not block without visibility; it should expose deterministic running/completed/failed states.
-- **RMT-02 depends on strict HTTP protocol handling:** clients send `Accept: application/json, text/event-stream`; servers must support both and preserve MCP version semantics.
-- **RMT-02 must coexist with stdio:** remote support is additive for v5.0, not a replacement.
-- **RMT-03 depends on vector compatibility checks:** local embedding models can change dimension/model identity; index writes must validate dimensions before upsert.
+- **Auth method config field is the root dependency:** everything else gates on knowing whether the user intends subscription or api-key auth. This field must be added to the Zod schema before any other auth work.
+- **Credential storage is shared infrastructure:** `auth login`, `auth logout`, `auth status`, `auth token`, and `generate` all depend on a credential store abstraction. Build it once as a module used by all auth commands.
+- **Auth resolution precedence must not break existing users:** the default `authMethod` must be `"api-key"`, so zero existing users are affected unless they explicitly set `authMethod: "subscription"`.
+- **Token refresh depends on login having stored a refresh token:** if user logged in before refresh was supported, refresh will fail gracefully and prompt re-login.
+
+---
 
 ## MVP Definition
 
-### Launch With (v5.0)
+### Launch With (v1, this milestone)
 
-Minimum viable milestone to validate remote + advanced MCP scope.
+Minimum viable product — lets a user with an OpenAI Plus/Pro subscription run `handover generate` without an API key.
 
-- [ ] **RMT-04 streaming QA path** — long-form QA emits progress updates and supports cancellation
-- [ ] **RMT-01 regeneration tool (remote-capable)** — tool trigger for doc regeneration with deterministic status
-- [ ] **RMT-02 optional Streamable HTTP transport** — stdio unchanged, HTTP available for hosted/remote clients
-- [ ] **HTTP transport hardening baseline** — Origin checks, localhost-safe defaults for local run mode, auth-ready request handling
-- [ ] **RMT-03 local embeddings path** — configurable Ollama embedding model via local endpoint
-- [ ] **Embedding/index validation guardrails** — reject incompatible vector dimensions with actionable remediation
+- [ ] **`authMethod` config field** — schema addition; defaults to `"api-key"`; required before all other work
+- [ ] **Credential storage module** — `~/.handover/credentials.json` with 0600 perms as baseline; OS keychain as stretch goal
+- [ ] **`handover auth login openai`** — browser OAuth PKCE flow; stores access + refresh + expiry
+- [ ] **`handover auth logout openai`** — clears credential store entry
+- [ ] **`handover auth status`** — shows auth method and login state per configured provider
+- [ ] **Auth resolution in `generate`** — reads credential store when `authMethod: subscription`; respects env var override precedence
+- [ ] **Clear error for missing subscription auth** — "Run `handover auth login openai` to authenticate" instead of generic API key error
+- [ ] **Cost display suppression for subscription mode** — shows "subscription credits" instead of dollar amount
 
-### Add After Validation (v5.x)
+### Add After Validation (v1.x)
 
-Features to add once the v5 core proves stable in real remote usage.
+Features to add once core subscription auth is working and users are testing it.
 
-- [ ] **Resumable regeneration streams** — trigger when users report dropped remote sessions during long runs
-- [ ] **Remote auth UX polish (OAuth flow helpers)** — trigger when hosted deployments become common
-- [ ] **Transport-aware diagnostics** — trigger when support load rises for mixed stdio/http environments
-- [ ] **Embedding provider auto-health checks** — trigger when local model startup and availability become common failures
+- [ ] **Token refresh on 401** — trigger: first report of session expiry during a generate run
+- [ ] **OS keychain storage (macOS Keychain, Windows Credential Manager)** — trigger: user reports `credentials.json` security concern
+- [ ] **Headless device code flow** — trigger: first user running handover over SSH hits browser-open failure
+- [ ] **`handover auth token` command for CI export** — trigger: first CI/CD integration request
 
-### Future Consideration (v6+)
+### Future Consideration (v2+)
 
-Features to defer until remote usage patterns are mature.
+Features to defer until subscription auth is stable and adoption is visible.
 
-- [ ] **Multi-tenant hosted control plane** — defer until there is sustained hosted demand
-- [ ] **Automated schedule-based regeneration** — defer until explicit user demand exceeds manual tool invocation
-- [ ] **Advanced queue orchestration for parallel regeneration jobs** — defer until concurrency pressure is real
+- [ ] **Team/workspace shared auth tokens** — defer: complex; requires org-level OAuth scope negotiation
+- [ ] **Multiple simultaneous subscription sessions (personal + work)** — defer: profile/workspace concept not yet in handover
+- [ ] **Automatic subscription tier detection and model selection** — defer: requires plan introspection API that may not exist in stable form
+
+---
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| RMT-04 streaming QA (progress + cancel) | HIGH | HIGH | P1 |
-| RMT-01 remote regeneration tool | HIGH | HIGH | P1 |
-| RMT-02 optional Streamable HTTP transport | HIGH | HIGH | P1 |
-| HTTP hardening baseline (Origin/auth-ready) | HIGH | MEDIUM | P1 |
-| RMT-03 local embeddings path (Ollama) | MEDIUM | MEDIUM | P1 |
-| Embedding dimension/index validation | HIGH | LOW | P1 |
-| Resumable regeneration stream support | MEDIUM | MEDIUM | P2 |
-| Auth UX polish for hosted remotes | MEDIUM | MEDIUM | P2 |
-| Transport-aware diagnostics | MEDIUM | LOW | P2 |
-| Embedding provider health checks | MEDIUM | LOW | P2 |
-| Schedule-based auto-regeneration | LOW | MEDIUM | P3 |
-| Parallel job orchestration control plane | LOW | HIGH | P3 |
+| `authMethod` config field | HIGH | LOW | P1 |
+| Credential storage module | HIGH | MEDIUM | P1 |
+| `auth login openai` command | HIGH | MEDIUM | P1 |
+| `auth logout openai` command | HIGH | LOW | P1 |
+| `auth status` command | HIGH | LOW | P1 |
+| Auth resolution in `generate` | HIGH | MEDIUM | P1 |
+| Clear error for missing subscription auth | HIGH | LOW | P1 |
+| Cost display suppression for subscription | MEDIUM | LOW | P1 |
+| Token refresh on 401 | HIGH | MEDIUM | P2 |
+| OS keychain storage | MEDIUM | MEDIUM | P2 |
+| Headless device code flow | MEDIUM | MEDIUM | P2 |
+| `auth token` command for CI | MEDIUM | LOW | P2 |
+| Team/workspace shared tokens | LOW | HIGH | P3 |
+| Multiple simultaneous sessions | LOW | HIGH | P3 |
+| Automatic tier detection | LOW | HIGH | P3 |
 
 **Priority key:**
 - P1: Must have for milestone acceptance
-- P2: Should have after initial validation
-- P3: Defer unless demand is clear
+- P2: Should have, add when core is working
+- P3: Defer until subscription auth has real adoption
+
+---
+
+## User Journey: "I Have a ChatGPT Plus Subscription"
+
+This is the complete flow from zero to working `handover generate` with subscription credits:
+
+```
+1. User has ChatGPT Plus ($20/month), no OPENAI_API_KEY set
+2. User sets authMethod: subscription in .handover.yml
+3. User runs: handover auth login openai
+   → Browser opens to accounts.openai.com OAuth consent screen
+   → User grants access
+   → Browser redirects to localhost:PORT/callback
+   → CLI captures code, exchanges for access+refresh tokens
+   → Tokens written to ~/.handover/credentials.json (mode 0600)
+   → Terminal: "Logged in to OpenAI (ChatGPT Plus)"
+4. User runs: handover auth status
+   → Terminal: "openai  subscription (ChatGPT Plus)  active  expires 2026-04-01"
+5. User runs: handover generate
+   → Config loaded; authMethod=subscription detected for openai
+   → Credential store read; valid token found
+   → AnthropicProvider/OpenAICompatProvider instantiated with subscription token
+   → Banner shows: "OpenAI  gpt-4o  subscription credits"
+   → Pipeline runs normally
+   → Completion shows: "subscription credits" (not "$X.XX")
+6. Token expires mid-session
+   → HTTP 401 received from OpenAI
+   → Refresh token used to obtain new access token
+   → Credentials.json updated
+   → Request retried transparently
+   → User sees no interruption
+```
+
+---
 
 ## Competitor Feature Analysis
 
-| Feature | Claude Code MCP | Continue | Cloudflare MCP | Our Approach |
-|---------|------------------|----------|----------------|--------------|
-| **Remote transport** | Recommends HTTP transport for remote MCP; SSE marked deprecated in docs | Supports MCP integrations in IDE workflows, including remote endpoints | Remote MCP architecture centered on Streamable HTTP + OAuth | Keep stdio compatibility and add optional Streamable HTTP |
-| **Long-running UX** | Exposes operational limits and expects practical handling for large MCP outputs | Emphasizes practical model-role separation, but less MCP job-lifecycle guidance | Emphasizes production deployment patterns for remote MCP | Use explicit progress + cancel semantics for QA and regeneration |
-| **Local embeddings** | Not a built-in focus in MCP transport docs | Explicitly recommends local embeddings (e.g., Ollama `nomic-embed-text`) for local generation | Not the primary focus; docs center remote server infra | Add first-class local embedding provider path with validation |
-| **Remote safety model** | Strong emphasis on auth, scopes, and user-in-loop tool safety | Focuses model/provider config safety in IDE context | Recommends scoped tools and OAuth for remote connections | Mutation tools require clear side-effect metadata and safe execution boundaries |
+| Feature | GitHub CLI (`gh auth`) | Claude Code (`claude auth`) | OpenAI Codex CLI | Our Approach |
+|---------|------------------------|------------------------------|------------------|--------------|
+| **Login command** | `gh auth login` (browser + device code) | `claude auth login` (browser only) | `codex login` (browser + device code `--device-auth`) | `handover auth login [provider]` with browser + `--device-code` flag |
+| **Logout command** | `gh auth logout` | `/logout` slash command (in REPL) | `codex logout` | `handover auth logout [provider]` |
+| **Status command** | `gh auth status` (shows token scopes, expiry) | `claude auth status` | `codex auth status` | `handover auth status` (shows method + expiry per provider) |
+| **Token storage** | OS keychain (default), falls back to `~/.config/gh/hosts.yml` | macOS Keychain | `~/.codex/auth.json` or OS keychain (configurable) | `~/.handover/credentials.json` (baseline), OS keychain (v1.x upgrade) |
+| **CI/CD export** | `GH_TOKEN` env var; `gh auth token` prints token | `CLAUDE_CODE_OAUTH_TOKEN` env var | `OPENAI_API_KEY` env var override | `handover auth token` prints token; `HANDOVER_AUTH_TOKEN` env var |
+| **Precedence** | Env var `GH_TOKEN` beats stored token | `ANTHROPIC_API_KEY` env var = API mode; no env var = subscription | Env var `OPENAI_API_KEY` conflicts with stored session (known bug) | Env var always wins; `authMethod: subscription` only used when no env var present |
+
+---
 
 ## Sources
 
-- [MCP Specification 2025-06-18: Transports](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports)
-- [MCP Specification 2025-06-18: Progress](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress)
-- [MCP Specification 2025-06-18: Cancellation](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation)
-- [MCP Specification 2025-06-18: Lifecycle](https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle)
-- [MCP Specification 2025-06-18: Tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools)
-- [MCP Specification 2025-06-18: Authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization)
-- [MCP Specification: Security Best Practices](https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices)
-- [Anthropic Claude Code MCP docs](https://docs.anthropic.com/en/docs/claude-code/mcp)
-- [Cloudflare Agents: Model Context Protocol](https://developers.cloudflare.com/agents/model-context-protocol/)
-- [Ollama API (official)](https://raw.githubusercontent.com/ollama/ollama/main/docs/api.md)
-- [Ollama embedding models blog](https://ollama.com/blog/embedding-models)
-- [Continue docs: Embed role](https://docs.continue.dev/customize/model-roles/embeddings)
-- [Continue docs: Ollama provider](https://docs.continue.dev/customize/model-providers/top-level/ollama)
+- [Using Claude Code with Pro or Max plan — Claude Help Center](https://support.claude.com/en/articles/11145838-using-claude-code-with-your-pro-or-max-plan)
+- [Anthropic clarifies ban on third-party tool access to Claude — The Register (2026-02-20)](https://www.theregister.com/2026/02/20/anthropic_clarifies_ban_third_party_claude_access/)
+- [Claude Code Authentication docs](https://code.claude.com/docs/en/authentication)
+- [OpenAI Codex CLI Authentication — developers.openai.com](https://developers.openai.com/codex/auth/)
+- [OpenAI Codex CLI docs](https://developers.openai.com/codex/cli/)
+- [Claude Code CLI 2.1.41 changelog — added `claude auth login/status/logout`](https://x.com/ClaudeCodeLog/status/2022191647996416304)
+- [GitHub CLI gh auth login manual](https://cli.github.com/manual/gh_auth_login)
+- [WorkOS: Best practices for CLI authentication](https://workos.com/guide/best-practices-for-cli-authentication-a-technical-guide)
+- [PKCE for CLI OAuth — kevcodez.de](https://kevcodez.de/posts/2020-06-07-pkce-oauth2-auth-flow-cli-desktop-app/)
+- [Sign in with API key via env variable conflicts with ChatGPT login — openai/codex#3286](https://github.com/openai/codex/issues/3286)
+- [Claude Max subscription rate limits — IntuitionLabs](https://intuitionlabs.ai/articles/claude-max-plan-pricing-usage-limits)
+- [keyring-node: keytar alternative — Brooooooklyn/keyring-node](https://github.com/Brooooooklyn/keyring-node)
 
 ---
-*Feature research for: Remote-capable MCP server for documentation regeneration and QA*
-*Researched: 2026-02-23*
+*Feature research for: Subscription-based provider auth (Claude Max, OpenAI Plus/Pro, Codex)*
+*Researched: 2026-02-26*

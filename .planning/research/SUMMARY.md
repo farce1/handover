@@ -1,161 +1,182 @@
 # Project Research Summary
 
-**Project:** Handover v5.0 Remote & Advanced MCP
-**Domain:** Remote-capable MCP server enhancements for a TypeScript documentation CLI
-**Researched:** 2026-02-23
+**Project:** Handover CLI — Subscription-based Provider Auth
+**Domain:** OAuth subscription auth for TypeScript CLI tools (LLM providers)
+**Researched:** 2026-02-26
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Handover v5.0 is an additive milestone that upgrades an existing MCP-first documentation workflow for remote operation, long-running UX, and local embedding flexibility without breaking current local stdio usage. The research is consistent across stack, feature, architecture, and pitfalls: keep the current stable core (`@modelcontextprotocol/sdk` v1.x, Node 20/22, existing `openai` client, SQLite vector path), then layer in optional Streamable HTTP transport, streaming QA progress/cancellation, remote regeneration tooling, and an Ollama-compatible local embedding route.
+This milestone was originally scoped to add subscription-based authentication (Claude Max, OpenAI Plus/Pro) to the Handover CLI. Research uncovered a hard constraint that fundamentally reshapes its scope: **Anthropic explicitly prohibits using Claude Max/Pro OAuth tokens in any third-party tool**, including the `@anthropic-ai/sdk`. This is not a technical limitation — it is an active ToS policy with server-side enforcement active since January 9, 2026. Any implementation of Claude subscription OAuth will result in server-blocked requests and risks account suspension. The Anthropic provider must remain API-key-only. This is non-negotiable and must be documented explicitly in code comments, help text, and user-facing docs.
 
-The recommended implementation strategy is service-first and transport-agnostic: extract reusable generate/QA services, keep MCP registrations semantically identical across stdio and HTTP, and drive long operations through MCP progress/cancellation primitives instead of CLI-style terminal output. This preserves compatibility, reduces duplication, and creates a clean execution seam for both local and hosted usage.
+The viable path is OpenAI-only subscription auth via the Codex OAuth flow. OpenAI permits third-party tools to implement the ChatGPT Plus/Pro subscription login using PKCE, as evidenced by Cline and OpenCode shipping it officially with OpenAI coordination. The recommended stack adds `@openai/codex-sdk` (or implements the PKCE flow directly using `openid-client`) alongside `@napi-rs/keyring` for secure credential storage. The existing `commander`-based CLI, `vitest` test suite, and provider factory are extended — no new frameworks are introduced. Auth is a construction-time concern: the access token is resolved once at startup and passed to provider constructors as a string, leaving all downstream runner/DAG/round code completely untouched.
 
-The key risks are not feature novelty but operational correctness and security discipline: JSON-RPC request correlation under concurrent streams, cancellation propagation, origin/auth hardening for HTTP transport, regeneration idempotency, and embedding/index contract drift. The mitigation is to sequence roadmap phases around these dependencies, enforce explicit guardrails (single-flight jobs, fail-fast metadata checks, localhost defaults, per-request auth), and treat remote capabilities as opt-in rather than default behavior.
+The critical risks are operational: tokens expire in ~1 hour and must be refreshed proactively before each LLM round; subscription rate limits are message-weighted over 5-hour rolling windows (not per-minute token limits like API keys); and parallel `handover` invocations risk refresh token race conditions since OpenAI uses single-use refresh token rotation. The architecture must enforce concurrency = 1 for subscription auth, implement a clean auth resolution layer between config loading and provider construction, and always display which auth method is active at runtime so users can diagnose billing and limit issues.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-Research strongly supports reusing the existing runtime and dependency footprint instead of introducing new frameworks. The milestone can be delivered with current primitives plus small additive modules for services, job control, and transport wiring.
+The existing stack requires minimal additions. The `openai` SDK (`^6.25.0`) is already present and handles Codex API calls. New requirements are: `@openai/codex-sdk` for the official OpenAI subscription auth flow, and `@napi-rs/keyring` for OS keychain storage of OAuth tokens (the actively maintained replacement for the archived `keytar`). `openid-client@^6.8.2` is an alternative if implementing the PKCE flow from scratch rather than delegating to the Codex SDK, but requires Node `>=20.19.0`. The existing `commander` CLI and `vitest` suite need no replacement.
 
 **Core technologies:**
-- `@modelcontextprotocol/sdk@^1.26.0`: MCP runtime with stdio + Streamable HTTP in one SDK; avoids protocol rewrites.
-- Node `node:http` on Node 20/22: optional HTTP endpoint hosting with no new web framework dependency.
-- `openai@^6.22.0`: single embedding client for OpenAI cloud and OpenAI-compatible local endpoints via `baseURL`.
-- `zod@^3.25.76`: strict validation for new config and tool contracts.
-- Ollama runtime (optional): local/private embedding path when explicitly configured.
+- `@openai/codex-sdk` (latest): OpenAI subscription auth entry point — the only officially supported third-party subscription auth SDK in this domain; wraps the Codex CLI over stdin/stdout
+- `@napi-rs/keyring@^1.2.0`: OS keychain storage for OAuth tokens — actively maintained `keytar` replacement; prebuilt binaries, no native compilation required
+- `openid-client@^6.8.2`: PKCE OAuth 2.0 client (use if building the auth flow from scratch); requires Node `>=20.19.0`
+- `openai@^6.25.0`: Already in repo at `^6.22.0`; minor version bump handles all Codex API calls
+- `@anthropic-ai/sdk@0.78.0`: Unchanged — API key auth only; no subscription path is compliant or technically possible
 
-**Critical version requirements:**
-- Stay on MCP SDK v1.x for v5 scope; defer v2 package-split migration.
-- Preserve CI/runtime targets on Node 20/22.
-- Implement MCP Streamable HTTP behavior per 2025-06-18 spec semantics.
+**What NOT to use:**
+- Claude Max/Pro OAuth tokens in any third-party code — ToS violation, server-side blocked since Jan 9, 2026
+- `node-keytar` / `keytar` — archived December 2022; native build failures on newer Node versions
+- Tokens stored in `.handover.yml` — project-scoped config files get committed to git
 
 ### Expected Features
 
-v5.0 P1 scope is clear: all four RMT tracks (RMT-01..RMT-04) are table stakes for this milestone definition, with security baseline and vector guardrails included as non-negotiable acceptance criteria.
+The MVP delivers end-to-end OpenAI subscription auth: a user with ChatGPT Plus/Pro can run `handover generate` without an API key by completing a one-time browser login. All table-stakes auth CLI patterns follow the established `gh auth` / `claude auth` / `codex auth` conventions users already know.
 
-**Must have (table stakes):**
-- RMT-04 streaming QA with progress notifications and cancellation handling.
-- RMT-01 remote-capable regeneration as a safe, status-aware MCP tool.
-- RMT-02 optional Streamable HTTP transport while keeping stdio default.
-- HTTP security baseline (Origin validation, localhost-safe defaults, auth-ready hooks).
-- RMT-03 local embedding provider path (Ollama-class) plus dimension/index validation.
-- Transport parity for existing tools/resources/prompts across stdio and HTTP.
+**Must have (table stakes — P1):**
+- `authMethod` config field in `.handover.yml` (`"api-key"` | `"subscription"`) — root dependency for all other auth work; defaults to `"api-key"` to protect existing users without any migration
+- Credential storage module — `~/.handover/credentials.json` at 0600 permissions as baseline; OS keychain as the secure target
+- `handover auth login openai` — PKCE browser OAuth flow; stores access + refresh + expiry
+- `handover auth logout openai` — clears credential store entry
+- `handover auth status` — shows provider, auth method, validity, and expiry per configured provider
+- Auth resolution in `generate` — reads credential store when `authMethod: subscription`; CLI flag and env var override take strict precedence
+- Clear error for missing subscription auth — "Run `handover auth login openai`" instead of generic API key error
+- Cost display suppression — shows "subscription credits" instead of dollar amount in subscription mode
 
-**Should have (competitive):**
-- Resumable regeneration stream UX for dropped remote sessions.
-- Strong user-trust guardrails for mutating tools (confirmation + operation-level policy).
-- Backward-compatible behavior across evolving MCP client expectations.
+**Should have (v1.x after validation — P2):**
+- Token refresh on HTTP 401 mid-generation — transparent retry with new access token
+- OS keychain storage via `@napi-rs/keyring` — upgrade from file-based fallback
+- Headless device code flow (`--device-code` flag) — for SSH/container environments
+- `handover auth token` command — prints access token for CI injection via env var
 
-**Defer (v2+/later):**
-- Multi-tenant hosted control plane.
-- Schedule-based auto-regeneration daemon.
-- Advanced queue orchestration for high parallelism.
+**Defer (v2+ — P3):**
+- Team/workspace shared auth tokens
+- Multiple simultaneous subscription sessions (personal + work)
+- Automatic subscription tier detection and model selection
 
 ### Architecture Approach
 
-The recommended architecture is to keep `mcp/` protocol-focused, add `services/` as the business-logic seam, and isolate transport selection to server bootstrap. That yields a single behavior model for CLI and MCP while enabling remote-safe execution.
+The integration adds a new **Auth Resolution Layer** sitting between config loading and provider construction, keeping the `LLMProvider` interface and all downstream runner/round/DAG code completely untouched. `createProvider()` becomes `async`, calls `resolveAuth(config)` once at startup, and passes the resulting `accessToken` string to the provider constructor — indistinguishable from an API key at the SDK level. The `OpenAICompatibleProvider` gains an optional `refreshCallback` to handle mid-generation 401s without surfacing token expiry to the base retry logic.
 
 **Major components:**
-1. `src/services/generate-service.ts` and `src/services/qa-service.ts` — shared execution core for CLI + MCP.
-2. `src/mcp/job-runner.ts` — long-running job orchestration with progress, cancellation, and concurrency controls.
-3. `src/mcp/transports/http.ts` + `src/mcp/server.ts` — transport adapter boundary (stdio/http) with consistent registrations.
-4. `src/vector/embedder.ts` + `src/vector/embedding-router.ts` + config schema updates — provider routing and embedding contract enforcement.
+1. `src/auth/types.ts` — `AuthToken`, `AuthMode`, `ProviderCredentials`, `OAuthTokenResponse` shared types; foundation for all auth components
+2. `src/auth/token-store.ts` — `TokenStore.read()` / `write()` / `clear()`; keychain-first via `@napi-rs/keyring`, file fallback at 0600 permissions
+3. `src/auth/token-refresher.ts` — `ensureFresh()` with 5-minute proactive refresh window; `refresh()` posting to token endpoint and updating the store
+4. `src/auth/oauth-flow.ts` — PKCE browser flow with local redirect server on ephemeral port; 5-minute timeout before abandoning
+5. `src/auth/index.ts` — `resolveAuth(config)`: dispatches API key vs OAuth path; the single entry point for all auth resolution
+6. `src/cli/auth.ts` — new `handover auth` subcommand group (login / logout / status)
+7. `src/providers/factory.ts` (modified) — async `createProvider()`; enforces `concurrency = 1` for subscription mode; logs override at startup
+8. `src/providers/openai-compat.ts` (modified) — optional `refreshCallback` constructor parameter; handles 401 with one refresh-and-retry before surfacing error
+
+**Build order constraint (hard dependency chain):** Types and storage (Phase 1) → token lifecycle and OAuth flow (Phase 2) → auth entry point and CLI commands (Phase 2) → config schema additions (Phase 3) → factory async change (Phase 3) → provider 401 handling and callsite `await` updates (Phase 3).
 
 ### Critical Pitfalls
 
-1. **Streaming without real cancellation/progress control** — propagate cancel end-to-end, emit bounded progress, enforce max runtime.
-2. **JSON-RPC/SSE correlation errors under concurrency** — maintain authoritative request lifecycle mapping by JSON-RPC `id` and protocol-mode tests.
-3. **HTTP transport exposed without rebinding/origin/auth safeguards** — localhost defaults, strict `Origin` policy, auth required for remote access.
-4. **Remote regeneration races and non-idempotent runs** — queue + single-flight dedupe + deterministic job status model.
-5. **Embedding/index contract drift and silent local->remote fallback** — persist model/dimension metadata, fail fast on mismatch, explicit locality policy modes.
+1. **Claude subscription OAuth is a ToS violation enforced server-side** — Anthropic blocks `sk-ant-oat01-...` tokens in any third-party tool since January 9, 2026. Any implementation attempt fails at runtime regardless of technical quality. Establish the decision explicitly in code comments and documentation: Claude support = API key only, permanently.
+
+2. **OAuth refresh tokens must not be stored in plaintext project config files** — Refresh tokens are long-lived and represent full account access, unlike API keys which can be scoped. They must go into the OS keychain (`@napi-rs/keyring`) or a user-scoped home-directory file at 0600 permissions — never in `.handover.yml` or any project-scoped config that could be committed to git.
+
+3. **Token expiry mid-run corrupts 6-round analysis output** — OAuth access tokens expire in ~1 hour. Loading once at startup is insufficient for long analyses. Implement proactive refresh (5-minute buffer) before each round; classify 401 responses as refresh opportunities with one retry; save partial output with an `[INCOMPLETE: auth failed at round N]` marker if refresh fails.
+
+4. **Subscription rate limits are not API rate limits — they require different handling** — ChatGPT Plus allows ~30-150 messages per 5-hour rolling window; a single 6-round analysis can consume 60-90+ weighted message units depending on context length. The existing `retryWithBackoff` logic (seconds-scale backoff) is wrong for subscription 429s that may require a 4+ hour wait. Surface remaining window time explicitly to users; never silently sleep >30 seconds without feedback.
+
+5. **Credential files can be inadvertently published to npm** — npm publishes everything in the package directory unless explicitly excluded. Use the `files` allowlist in `package.json` and add `npm pack --dry-run` to the CI release workflow before any release containing new auth features. Automated bots specifically target `.claude/`, `.env`, and credential files on npm publish feeds.
+
+---
 
 ## Implications for Roadmap
 
-Based on cross-document dependencies and risk concentration, use a five-phase structure:
+The architecture's build-order dependency chain and the feature prioritization matrix suggest a natural 4-phase structure. The "Anthropic = API key only" decision is made in Phase 1 and is not revisited.
 
-### Phase 1: Service Foundation and Execution Seams
-**Rationale:** Every remote feature depends on CLI-independent services and structured execution.
-**Delivers:** `generate-service` and `qa-service`; MCP handlers call services, not CLI command paths.
-**Addresses:** Prerequisite for RMT-01 and RMT-04.
-**Avoids:** CLI stdout/protocol leakage and duplicated logic drift.
+### Phase 1: Auth Foundation
+**Rationale:** All auth commands and generate-path changes depend on the credential storage abstraction and config schema. These have zero external service dependencies and must exist before any other auth component. This is also where the Claude OAuth non-decision is locked in code and docs to prevent future scope creep.
+**Delivers:** `AuthToken` types, `TokenStore` implementation, `resolveAuth()` entry point, `authMethod` config field in Zod schema; no user-facing commands yet
+**Addresses:** `authMethod` config field (P1), credential storage module (P1)
+**Avoids:** Pitfall 1 (Claude OAuth) — decision documented here; Pitfall 2 (plaintext token storage) — storage strategy chosen here; Pitfall 5 (npm credential publish) — `files` field and `.npmignore` established here
 
-### Phase 2: Streaming QA Core (RMT-04)
-**Rationale:** Highest priority milestone feature and enables shared progress/cancel primitives.
-**Delivers:** Token/progress notifications, cancellation propagation, bounded stream behavior with stable final response contract.
-**Addresses:** RMT-04 table-stakes requirement.
-**Avoids:** Runaway generation, stuck UX, and orphaned remote compute.
+### Phase 2: Auth Commands (Login / Logout / Status)
+**Rationale:** The PKCE OAuth flow and auth CLI commands are the user-facing entry point and depend on Phase 1's storage layer. Users must be able to authenticate before the `generate` wiring can be tested end-to-end.
+**Delivers:** `handover auth login openai` (PKCE browser flow + token storage), `handover auth logout openai`, `handover auth status`; developers can verify the full OAuth cycle before it is required by `generate`
+**Uses:** `@openai/codex-sdk` or `openid-client` for the PKCE flow; `@napi-rs/keyring` for secure token persistence
+**Implements:** `OAuthFlow`, `TokenRefresher`, `src/cli/auth.ts` (new CLI command group)
+**Avoids:** Pitfall 2 (plaintext storage) — OS keychain implemented here; Pitfall 6 (auth method invisible) — `auth status` addresses this directly
 
-### Phase 3: Local Embedding Provider + Contract Guardrails (RMT-03)
-**Rationale:** Medium build complexity with high safety impact; unblock offline/private workflows early.
-**Delivers:** `openai|ollama` provider routing, base URL support, model/dimension metadata validation, explicit reindex-on-mismatch path.
-**Addresses:** RMT-03 plus embedding/index validation requirements.
-**Avoids:** Mixed-vector corruption and privacy-breaking implicit fallback.
+### Phase 3: Generate Integration + Rate Limit Handling
+**Rationale:** Once auth commands work and tokens are verified to persist and refresh correctly, `generate` is wired to use subscription tokens. This phase also enforces concurrency = 1 and implements subscription-aware rate limit messaging — both depend on the auth layer being complete and tested.
+**Delivers:** `handover generate` working end-to-end on ChatGPT Plus/Pro with no API key; cost display suppression; startup auth method banner; subscription-aware 429 messaging distinct from API key 429 handling; partial-output save on mid-run auth failure
+**Uses:** Async `createProvider()`, `refreshCallback` in `OpenAICompatibleProvider`, proactive `ensureFresh()` before each LLM round
+**Implements:** Factory async change and all callsite `await` updates (mechanical); subscription 429 handling distinct from API key retry logic
+**Avoids:** Pitfall 3 (mid-run token expiry) — proactive refresh before each round; Pitfall 4 (subscription 429 treated as API 429) — separate handling with window reset messaging
 
-### Phase 4: Remote Regeneration Tooling (RMT-01)
-**Rationale:** Depends on services and benefits from existing progress/cancel infrastructure.
-**Delivers:** `regenerate_docs` with queued/single-flight execution, idempotent semantics, structured status lifecycle.
-**Addresses:** RMT-01 table-stakes requirement.
-**Avoids:** Race conditions, duplicate runs, stale docs/index divergence.
-
-### Phase 5: Optional HTTP Transport + Security Hardening (RMT-02)
-**Rationale:** Introduce remote surface after behavior is stable; security-critical and protocol-sensitive.
-**Delivers:** Streamable HTTP endpoint with stdio parity, origin checks, localhost defaults, auth hooks, protocol negotiation correctness.
-**Addresses:** RMT-02 plus remote security baseline and transport parity requirements.
-**Avoids:** Rebinding exposure, session/auth confusion, and request-correlation breakage.
+### Phase 4: Security Hardening + Release Prep
+**Rationale:** Auth features are the most security-sensitive addition to date. Before releasing, verify no credential data leaks into npm publish, logs, or git. This phase applies retrospectively across all three previous phases and should be completed end-to-end before shipping to users.
+**Delivers:** CI `npm pack --dry-run` check in release workflow; auth method logged at run start (method name only, never credential value); `.npmignore` / `package.json` `files` field verified; documentation of Claude API-key-only constraint in README and provider setup guides
+**Avoids:** Pitfall 5 (npm credential publish); security mistake of logging full token values in debug output; Pitfall 3 (no partial save on mid-run auth failure — verified by integration test)
 
 ### Phase Ordering Rationale
 
-- Shared services first reduce rework and keep transport changes additive.
-- Streaming primitives before regeneration let both long-running flows share tested progress/cancel mechanisms.
-- Embedding safety before broad remote rollout prevents difficult-to-debug retrieval regressions.
-- HTTP transport last contains security blast radius until tool semantics are stable.
+- **Types and storage before commands:** `TokenStore` and `AuthToken` are imported by all auth commands and the generate path; building them first avoids circular dependencies and allows isolated unit testing of storage logic.
+- **Commands before generate wiring:** Auth commands let developers verify the full OAuth flow end-to-end before it becomes a hard requirement for `generate`. Wiring `generate` to an untested auth path creates hard-to-debug integration failures on first run.
+- **Security hardening last but mandatory:** The security phase validates the entire feature surface retrospectively. Placing it at the end allows it to cover all newly introduced auth code in one sweep rather than repeatedly across phases.
+- **Concurrency forced to 1 in Phase 3:** This constraint belongs in the factory alongside the `generate` integration — they are causally linked and should be implemented and tested together.
 
 ### Research Flags
 
-Phases likely needing deeper `/gsd-research-phase` work:
-- **Phase 5 (HTTP transport/security):** highest protocol and security nuance (Origin, auth lifecycle, session handling, SSE/JSON mode interplay).
-- **Phase 4 (remote regeneration job semantics):** idempotency and queue behavior need concrete policy choices for retries/deduping.
+Phases likely needing deeper research during planning:
+- **Phase 2 (Auth Commands):** The `@openai/codex-sdk` exact API surface for initiating OAuth login needs verification against the published npm package before implementation begins. The SDK may expose a direct login method or may require wrapping `openid-client` manually. Recommend a 30-minute technical spike: install the SDK, inspect exported types, confirm whether the login flow is encapsulated or must be built separately.
+- **Phase 3 (Generate Integration):** The `refreshCallback` design for mid-generation 401s during streaming responses needs validation. Streaming + token replacement mid-stream is a known edge case in the OpenAI SDK — verify whether the SDK allows it or whether the stream must be abandoned and the request retried from the beginning with the new token.
 
-Phases with standard patterns (can likely skip extra research):
-- **Phase 1 (service extraction):** straightforward internal refactor pattern.
-- **Phase 2 (MCP progress/cancel wiring):** strongly specified by MCP docs and SDK patterns.
-- **Phase 3 (embedding provider routing):** well-documented OpenAI-compatible endpoint strategy with clear validation rules.
+Phases with standard patterns (skip deep research):
+- **Phase 1 (Auth Foundation):** Credential file storage with 0600 permissions and Zod schema additions are established CLI patterns with clear implementation paths. No research needed.
+- **Phase 4 (Security Hardening):** npm publish safety (files allowlist, pack --dry-run) and log redaction patterns are well-documented across the npm and security ecosystems.
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Strong official-source alignment (MCP spec/SDK, OpenAI client behavior, Ollama compatibility docs). |
-| Features | HIGH | Feature priorities are explicit, internally consistent, and mapped to milestone RMT requirements. |
-| Architecture | HIGH | Internal integration seams are concrete; only remote hardening specifics remain implementation-sensitive. |
-| Pitfalls | HIGH | Risks are specific, actionable, and tightly mapped to phases with verification criteria. |
+| Stack | HIGH | Anthropic ban confirmed via official docs and The Register; OpenAI Codex OAuth confirmed via official developer docs and live implementations (Cline, OpenCode). `@napi-rs/keyring` confirmed via npm and GitHub as the active `keytar` replacement. |
+| Features | HIGH | Feature set modeled on `gh auth`, `claude auth`, `codex auth` — all well-documented with consistent conventions. MVP scope is conservative and matches what Cline/OpenCode shipped for Codex OAuth. |
+| Architecture | HIGH | Existing codebase read directly; all integration points confirmed from source files. Build-order dependency chain derived from code, not inference. Pattern of auth-at-construction-time is well established in CLI tooling. |
+| Pitfalls | HIGH | ToS violation risk confirmed via multiple primary sources (Anthropic official, The Register, community enforcement reports from affected tools). Token security best practices from RFC 9700, Google, Auth0. Rate limit data from official OpenAI Codex pricing docs. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Remote auth model finalization:** choose concrete auth mechanism for non-localhost HTTP deployments during phase planning.
-- **Resumability scope boundary:** decide whether resumable regeneration streams stay post-v5 validation or are pulled into late v5.x.
-- **Concurrency policy defaults:** set explicit per-session/global in-flight limits for hosted scenarios.
-- **Embedding locality policy UX:** define exact config semantics (`local-only`, `local-preferred`, `remote-only`) and failure messaging.
+- **`@openai/codex-sdk` exact API surface:** The SDK exists and is confirmed as the correct dependency, but the exact method signatures for initiating OAuth login need verification against the published npm package before Phase 2 begins. Do a 30-minute technical spike during Phase 2 planning.
+- **OpenAI refresh token rotation behavior in practice:** ARCHITECTURE.md confirms single-use refresh token rotation causes concurrent-process race conditions (GitHub issue #9634). The severity depends on whether this applies to CLI-scoped tokens or only to server-side sessions. Verify against the Codex CLI open-source repository before Phase 3.
+- **Headless device code flow stability:** Described as "in beta" for Codex. Defer implementation until the flow is stable; document the limitation for SSH users in Phase 3 docs. Do not block Phase 3 shipping on this.
+- **Subscription token lifetime confirmation:** ARCHITECTURE.md cites ~1 hour for OpenAI Codex access tokens. Verify the actual `expires_in` value returned by the token endpoint during the Phase 2 technical spike — it determines the proactive refresh window and the "runs remaining before reset" estimate surfaced to users.
+
+---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- MCP Specification 2025-06-18 (transports, progress, cancellation, lifecycle, tools, authorization, security best practices)
-- MCP TypeScript SDK docs and repository (`v1.x` server/protocol guidance)
-- OpenAI Node SDK documentation (`baseURL`, retries, timeout, compatibility behavior)
-- Ollama official docs (`/api/embed`, OpenAI-compatible `/v1/embeddings`)
-- Internal code and milestone context (`.planning/PROJECT.md`, `src/mcp/*`, `src/cli/*`, `src/vector/*`, `src/qa/*`)
+- https://code.claude.com/docs/en/legal-and-compliance — Official Anthropic ban on third-party subscription OAuth
+- https://developers.openai.com/codex/auth/ — Official OpenAI Codex authentication documentation (PKCE flow, token storage format)
+- https://developers.openai.com/codex/pricing/ — Official Codex subscription tier limits per 5-hour window
+- https://support.claude.com/en/articles/9876003-... — Anthropic official: API and subscription are separate products with separate billing
+- https://github.com/anthropics/claude-code/issues/6536 — SDK does not accept Max OAuth tokens (official repo, Anthropic response)
+- https://openai.com/policies/row-terms-of-use/ — OpenAI prohibits credential sharing and account resale
+- Internal codebase files read directly: `src/providers/factory.ts`, `src/providers/base-provider.ts`, `src/providers/openai-compat.ts`, `src/config/schema.ts`, `src/mcp/server.ts`, `src/mcp/tools.ts`, `src/cli/generate.ts`
 
 ### Secondary (MEDIUM confidence)
-- Competitor pattern references: Anthropic Claude Code MCP docs, Cloudflare Agents MCP docs, Continue embedding guidance.
+- https://cline.bot/blog/introducing-openai-codex-oauth — Cline's official Codex OAuth integration confirming third-party use is permitted
+- https://docs.cline.bot/provider-config/openai-codex — Cline docs confirming Codex OAuth as a first-class supported provider
+- https://github.com/openai/codex/issues/9634 — Single-use refresh token behavior in concurrent session scenarios (community-verified)
+- https://github.com/anthropics/claude-code/issues/22602 — Claude Code token refresh and expiry behavior (community-verified, matches official behavior)
+- https://www.theregister.com/2026/02/20/anthropic_clarifies_ban_third_party_claude_access/ — Coverage of enforcement and ToS update (confirmed against official docs)
 
 ### Tertiary (LOW confidence)
-- None required for core roadmap decisions.
+- https://www.alif.web.id/posts/claude-oauth-api-key — Claude OAuth token format details (unofficial; useful for token structure verification only)
 
 ---
-*Research completed: 2026-02-23*
+*Research completed: 2026-02-26*
 *Ready for roadmap: yes*
