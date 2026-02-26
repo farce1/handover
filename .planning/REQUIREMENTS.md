@@ -1,0 +1,133 @@
+# Requirements: Handover v6.0
+
+**Defined:** 2026-02-26
+**Core Value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
+
+## v6.0 Requirements
+
+Requirements for the Codex Auth & Validation milestone. Each maps to roadmap phases.
+
+### Auth Infrastructure
+
+- [ ] **AUTH-01**: User can configure auth method per provider (`authMethod: "api-key" | "subscription"` in `.handover.yml`)
+- [ ] **AUTH-02**: Auth credentials are stored securely in `~/.handover/credentials.json` with 0600 permissions, separate from project config
+- [ ] **AUTH-03**: Auth resolution follows strict precedence: CLI `--api-key` flag > env var > credential store > interactive prompt
+- [ ] **AUTH-04**: Auth types, token store, and resolution logic exist as a shared `src/auth/` module used by all auth-dependent code
+
+### Onboarding
+
+- [ ] **ONB-01**: User running `handover generate` for the first time with no provider configured is guided through interactive provider selection and auth setup
+- [ ] **ONB-02**: User can select from available providers (OpenAI, Anthropic, Gemini, Codex subscription, etc.) during first-run onboarding
+- [ ] **ONB-03**: Onboarding flow detects existing env vars (e.g. `OPENAI_API_KEY`) and skips setup for already-configured providers
+
+### Codex Subscription Auth
+
+- [ ] **CDX-01**: User can authenticate with OpenAI Codex subscription via PKCE browser OAuth flow
+- [ ] **CDX-02**: User can run `handover auth login openai` to initiate subscription auth independently of onboarding
+- [ ] **CDX-03**: User can run `handover auth status` to see current auth method, provider, and token validity per configured provider
+- [ ] **CDX-04**: Subscription tokens are refreshed proactively before each LLM round to prevent mid-run expiry
+- [ ] **CDX-05**: Subscription mode enforces concurrency=1 to respect subscription rate limits
+
+### Gemini Provider
+
+- [ ] **GEM-01**: User can select Google Gemini as an LLM provider in config
+- [ ] **GEM-02**: User can use Gemini via Google AI Studio API key (free tier available)
+- [ ] **GEM-03**: Gemini provider supports chat completion for all 6 analysis rounds
+- [ ] **GEM-04**: Gemini provider supports embedding generation for reindex/search
+
+### Generate Integration
+
+- [ ] **GEN-01**: `handover generate` works end-to-end with Codex subscription auth (no API key required)
+- [ ] **GEN-02**: Startup banner shows active auth method (api-key vs subscription) alongside provider/model
+- [ ] **GEN-03**: Cost display shows "subscription credits" instead of dollar amount when using subscription auth
+- [ ] **GEN-04**: Missing subscription auth produces clear error: "Run `handover auth login openai` to authenticate"
+- [ ] **GEN-05**: Subscription 429 errors show remaining rate limit window time, distinct from API key 429 retry logic
+
+### Security
+
+- [ ] **SEC-01**: No credential data is included in npm publish (`files` allowlist or `.npmignore` verified)
+- [ ] **SEC-02**: Auth tokens are never logged in debug/info output — only auth method name is logged
+- [ ] **SEC-03**: Anthropic subscription OAuth restriction is documented in provider setup docs (API key only, permanently)
+
+### Runtime Validation
+
+- [ ] **VAL-01**: Full provider-backed generate then reindex pipeline validated end-to-end
+- [ ] **VAL-02**: Semantic relevance quality checked on populated real indexes (not just synthetic test data)
+- [ ] **VAL-03**: MCP client interoperability verified against Claude Desktop, Cursor, and VS Code
+- [ ] **VAL-04**: Streaming QA timing and reconnect/resume behavior validated with real MCP clients
+- [ ] **VAL-05**: Local embedding runtime fallback and route-visibility verified in provider-backed environments
+- [ ] **VAL-06**: End-to-end remote regeneration trigger/status lifecycle validated against live MCP clients
+
+## v7.0 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Auth Enhancements
+
+- **AUTH-05**: User can store credentials in OS keychain (macOS Keychain, Windows Credential Manager) via `@napi-rs/keyring`
+- **AUTH-06**: User can authenticate via headless device code flow for SSH/container environments
+- **AUTH-07**: User can run `handover auth token` to export access token for CI/CD injection
+- **AUTH-08**: User can run `handover auth logout` to clear stored credentials
+
+### Advanced Features
+
+- **ADV-01**: Team/workspace shared auth tokens
+- **ADV-02**: Multiple simultaneous subscription sessions (personal + work profiles)
+- **ADV-03**: Automatic subscription tier detection and model selection
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Claude Max/Pro subscription OAuth | Anthropic explicitly prohibits third-party subscription auth (ToS updated Feb 2026, server-side enforcement since Jan 9, 2026). Account bans are active. |
+| ChatGPT Plus/Pro direct API access | ChatGPT Plus subscription does not include OpenAI API credits — separate billing. Codex subscription is the viable path. |
+| Proxy/relay to "launder" subscription tokens | Still violates provider ToS; project becomes legally exposed |
+| Store tokens in `.handover.yml` | Project config files get committed to git — credential exposure risk |
+| Auto-login on first run without user consent | Unexpected browser pop-ups during automated runs (CI, hooks) are disruptive |
+| Silent subscription rate limit retry >30s | Subscription limits use 5-hour windows; silent long waits appear as hangs |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| AUTH-01 | — | Pending |
+| AUTH-02 | — | Pending |
+| AUTH-03 | — | Pending |
+| AUTH-04 | — | Pending |
+| ONB-01 | — | Pending |
+| ONB-02 | — | Pending |
+| ONB-03 | — | Pending |
+| CDX-01 | — | Pending |
+| CDX-02 | — | Pending |
+| CDX-03 | — | Pending |
+| CDX-04 | — | Pending |
+| CDX-05 | — | Pending |
+| GEM-01 | — | Pending |
+| GEM-02 | — | Pending |
+| GEM-03 | — | Pending |
+| GEM-04 | — | Pending |
+| GEN-01 | — | Pending |
+| GEN-02 | — | Pending |
+| GEN-03 | — | Pending |
+| GEN-04 | — | Pending |
+| GEN-05 | — | Pending |
+| SEC-01 | — | Pending |
+| SEC-02 | — | Pending |
+| SEC-03 | — | Pending |
+| VAL-01 | — | Pending |
+| VAL-02 | — | Pending |
+| VAL-03 | — | Pending |
+| VAL-04 | — | Pending |
+| VAL-05 | — | Pending |
+| VAL-06 | — | Pending |
+
+**Coverage:**
+- v6.0 requirements: 30 total
+- Mapped to phases: 0
+- Unmapped: 30 ⚠️
+
+---
+*Requirements defined: 2026-02-26*
+*Last updated: 2026-02-26 after initial definition*
