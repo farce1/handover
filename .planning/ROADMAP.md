@@ -49,11 +49,11 @@ Plans:
   2. User can authenticate Gemini via a Google AI Studio API key (free tier key accepted)
   3. All 6 analysis rounds complete successfully using the Gemini provider
   4. `handover reindex` and `handover search` work when Gemini is configured as the embedding provider
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 22-01: Gemini provider implementation (chat completion + embedding)
-- [ ] 22-02: Gemini config registration and provider factory wiring
+- [ ] 22-01-PLAN.md — GeminiProvider (chat completion) + GeminiEmbeddingProvider (embedding) + @google/genai SDK
+- [ ] 22-02-PLAN.md — Config schema, defaults, presets, factory, auth, embedding factory, and init flow wiring
 
 ### Phase 23: Codex Auth Commands
 **Goal**: Users can authenticate with OpenAI Codex subscription via browser OAuth and manage credentials through the `handover auth` CLI
