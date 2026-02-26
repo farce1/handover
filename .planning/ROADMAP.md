@@ -33,11 +33,11 @@
   2. Credentials written to `~/.handover/credentials.json` have 0600 permissions and are separate from project config
   3. Auth resolution applies the correct precedence: CLI `--api-key` flag overrides env var, which overrides credential store, which overrides interactive prompt
   4. `src/auth/` module exports types, token store, and `resolveAuth()` as importable units with no circular dependencies
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 21-01: Auth types, token store, and `resolveAuth()` entry point
-- [ ] 21-02: Config schema `authMethod` field and precedence wiring
+- [ ] 21-01-PLAN.md — Auth types (AuthError, AuthResult, StoredCredential) and TokenStore with TDD
+- [ ] 21-02-PLAN.md — Config schema authMethod field, resolveAuth() precedence chain, and barrel export
 
 ### Phase 22: Gemini Provider
 **Goal**: Users can select Google Gemini as an LLM provider using a Google AI Studio API key
