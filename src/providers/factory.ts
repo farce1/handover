@@ -1,4 +1,5 @@
 import type { HandoverConfig } from '../config/schema.js';
+import type { AuthResult } from '../auth/index.js';
 import type { LLMProvider } from './base.js';
 import { AnthropicProvider } from './anthropic.js';
 import { OpenAICompatibleProvider } from './openai-compat.js';
@@ -51,14 +52,6 @@ export function validateProviderConfig(config: HandoverConfig): void {
       );
     }
 
-    // Cloud providers need an API key
-    if (!preset.isLocal) {
-      const envVarName = config.apiKeyEnv ?? preset.apiKeyEnv;
-      if (envVarName && !process.env[envVarName]) {
-        throw ProviderError.missingApiKey(config.provider);
-      }
-    }
-
     // Warn on unknown model (non-blocking)
     if (
       config.model &&
@@ -88,7 +81,7 @@ export function validateProviderConfig(config: HandoverConfig): void {
  * PROV-05: Switching providers requires only a config change.
  * Runs fail-fast validation, then creates the appropriate provider.
  */
-export function createProvider(config: HandoverConfig): LLMProvider {
+export function createProvider(config: HandoverConfig, authResult: AuthResult): LLMProvider {
   validateProviderConfig(config);
 
   const preset = PROVIDER_PRESETS[config.provider];
@@ -96,7 +89,7 @@ export function createProvider(config: HandoverConfig): LLMProvider {
   // Custom provider -- build a minimal preset
   if (config.provider === 'custom') {
     const customApiKeyEnv = config.apiKeyEnv ?? 'LLM_API_KEY';
-    const apiKey = process.env[customApiKeyEnv] ?? '';
+    const apiKey = authResult.apiKey;
     const model = config.model ?? 'gpt-4o';
     const concurrency = config.analysis.concurrency ?? DEFAULT_CONCURRENCY.custom;
 
@@ -119,10 +112,7 @@ export function createProvider(config: HandoverConfig): LLMProvider {
   }
 
   // Resolve configuration with preset fallbacks
-  const apiKeyEnv = config.apiKeyEnv ?? preset.apiKeyEnv;
-  const apiKey = preset.isLocal
-    ? 'ollama' // Required by SDK but ignored by Ollama
-    : (process.env[apiKeyEnv] ?? '');
+  const apiKey = preset.isLocal ? 'ollama' : authResult.apiKey;
   const model = config.model ?? preset.defaultModel;
   const concurrency = config.analysis.concurrency ?? preset.defaultConcurrency;
 

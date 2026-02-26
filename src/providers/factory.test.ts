@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { validateProviderConfig } from './factory.js';
 import { ProviderError } from '../utils/errors.js';
 import type { HandoverConfig } from '../config/schema.js';
@@ -9,6 +9,7 @@ import type { HandoverConfig } from '../config/schema.js';
 function baseConfig(overrides: Partial<HandoverConfig> = {}): HandoverConfig {
   return {
     provider: 'anthropic',
+    authMethod: 'api-key',
     output: './handover',
     audience: 'human',
     include: ['**/*'],
@@ -16,6 +17,14 @@ function baseConfig(overrides: Partial<HandoverConfig> = {}): HandoverConfig {
     analysis: { concurrency: 4, staticOnly: false },
     project: {},
     contextWindow: { pin: [], boost: [] },
+    serve: {
+      transport: 'stdio',
+      http: {
+        port: 3000,
+        host: '127.0.0.1',
+        path: '/mcp',
+      },
+    },
     ...overrides,
   };
 }
@@ -23,10 +32,6 @@ function baseConfig(overrides: Partial<HandoverConfig> = {}): HandoverConfig {
 // ─── validateProviderConfig() tests ──────────────────────────────────────────
 
 describe('validateProviderConfig', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   test('throws PROVIDER_UNKNOWN for unrecognized provider', () => {
     const config = { ...baseConfig(), provider: 'not-real' as HandoverConfig['provider'] };
     try {
@@ -50,7 +55,6 @@ describe('validateProviderConfig', () => {
   });
 
   test('throws PROVIDER_AZURE_NO_BASE_URL when azure-openai has no baseUrl', () => {
-    vi.stubEnv('AZURE_OPENAI_API_KEY', 'test-key');
     const config = baseConfig({ provider: 'azure-openai' });
     try {
       validateProviderConfig(config);
@@ -58,18 +62,6 @@ describe('validateProviderConfig', () => {
     } catch (e) {
       expect(e).toBeInstanceOf(ProviderError);
       expect((e as ProviderError).code).toBe('PROVIDER_AZURE_NO_BASE_URL');
-    }
-  });
-
-  test('throws PROVIDER_NO_API_KEY when anthropic API key env var is missing', () => {
-    vi.stubEnv('ANTHROPIC_API_KEY', undefined);
-    const config = baseConfig({ provider: 'anthropic' });
-    try {
-      validateProviderConfig(config);
-      expect.unreachable('should have thrown');
-    } catch (e) {
-      expect(e).toBeInstanceOf(ProviderError);
-      expect((e as ProviderError).code).toBe('PROVIDER_NO_API_KEY');
     }
   });
 
@@ -84,8 +76,7 @@ describe('validateProviderConfig', () => {
     }
   });
 
-  test('does not throw for valid anthropic config with API key set', () => {
-    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test-key');
+  test('does not throw for valid anthropic config', () => {
     const config = baseConfig({ provider: 'anthropic' });
     expect(() => validateProviderConfig(config)).not.toThrow();
   });
@@ -95,8 +86,7 @@ describe('validateProviderConfig', () => {
     expect(() => validateProviderConfig(config)).not.toThrow();
   });
 
-  test('does not throw for valid openai config with API key set', () => {
-    vi.stubEnv('OPENAI_API_KEY', 'sk-test');
+  test('does not throw for valid openai config', () => {
     const config = baseConfig({ provider: 'openai' });
     expect(() => validateProviderConfig(config)).not.toThrow();
   });
