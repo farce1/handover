@@ -8,17 +8,16 @@ An open source TypeScript CLI that generates comprehensive, AI-powered codebase 
 
 Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
 
-## Current State
+## Current Milestone: v6.0 Subscription Auth & Validation
 
-- v5.0 Remote & Advanced MCP is shipped and archived.
-- MCP now supports streaming QA lifecycle control, remote regeneration job control, local embedding routing, Streamable HTTP transport, and HTTP security guardrails.
-- Milestone audit result is `tech_debt`: shipped requirements are satisfied, with deferred human runtime validation follow-ups.
+**Goal:** Let users authenticate with their existing subscription plans (Claude Max, OpenAI Plus/Pro, Codex) instead of API keys, and close deferred runtime validation gaps from v4.0/v5.0.
 
-## Next Milestone Goals
-
-- Define v6.0 scope, requirements, and roadmap from fresh planning inputs.
-- Convert deferred v5.0 runtime validation items into explicit executable requirements.
-- Continue preserving stdio-first compatibility while expanding hosted and remote operability.
+**Target features:**
+- Subscription-based auth for Claude Max (use claude.ai plan credits instead of Anthropic API key)
+- Subscription-based auth for OpenAI Plus/Pro (use ChatGPT plan credits instead of OpenAI API key)
+- Subscription-based auth for Codex (use Codex plan subscription instead of OpenAI API key)
+- Per-provider auth method selection in config (API key OR subscription auth)
+- Deferred runtime validation: provider-backed generate→reindex, semantic relevance checks, MCP client interop matrix, streaming QA timing, local embedding fallback, remote regen lifecycle
 
 ## Requirements
 
@@ -74,23 +73,16 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ### Active
 
-- [ ] Define v6.0 milestone scope and success criteria (`/gsd-new-milestone`)
-- [ ] Create fresh v6.0 requirements and roadmap artifacts (new `.planning/REQUIREMENTS.md` and updated `.planning/ROADMAP.md`)
-- [ ] Schedule deferred v5.0 human runtime validation work as explicit v6.0 requirements
-
-<details>
-<summary>Archived v5.0 planning notes (pre-ship)</summary>
-
-Goal: Add remote-capable MCP execution paths and stronger UX for remote users, while preserving local CLI and MCP stability.
-
-Planned feature set:
-
-- Streaming MCP responses for long-form QA interactions (RMT-04)
-- MCP tool to trigger documentation regeneration remotely (RMT-01)
-- Optional HTTP MCP transport for hosted/remote deployment scenarios (RMT-02)
-- Local embedding provider path (for example Ollama) for offline workflows (RMT-03)
-
-</details>
+- [ ] Subscription auth for Claude Max (claude.ai plan credits)
+- [ ] Subscription auth for OpenAI Plus/Pro (ChatGPT plan credits)
+- [ ] Subscription auth for Codex (Codex plan subscription)
+- [ ] Per-provider auth method config (API key OR subscription)
+- [ ] Provider-backed generate→reindex runtime validation
+- [ ] Semantic relevance quality checks on real indexes
+- [ ] MCP client interoperability matrix (Claude Desktop/Cursor/VS Code)
+- [ ] Streaming QA timing and reconnect/resume behavior validation
+- [ ] Local embedding runtime fallback verification
+- [ ] End-to-end remote regeneration lifecycle validation
 
 ### Out of Scope
 
@@ -111,6 +103,7 @@ Planned feature set:
 - v4.0 MCP Server & Semantic Search: shipped 2026-02-22 (4 phases, 11 plans)
 - v5.0 Remote & Advanced MCP: shipped 2026-02-26 (5 phases, 12 plans, 28 tasks)
 - v5.0 audit status: tech_debt (17/17 requirements satisfied; deferred human runtime validation follow-ups)
+- v6.0 Subscription Auth & Validation: in progress
 - Architecture: DAG orchestrator, 8 static analyzers, 6 AI rounds, 14 document renderers, Zod-first domain model
 - CI runs on every PR; release-please automates versioning; OIDC publishes to npm with provenance
 - Codebase: ~31.7K LOC TypeScript across 151 source/test files, 254 tests, 92%+ coverage
@@ -167,4 +160,4 @@ Planned feature set:
 
 ---
 
-_Last updated: 2026-02-26 after v5.0 milestone completion_
+_Last updated: 2026-02-26 after v6.0 milestone start_

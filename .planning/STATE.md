@@ -5,17 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** Planning next milestone after v5.0 archival
+**Current focus:** v6.0 Subscription Auth & Validation
 
 ## Current Position
 
-Milestone: v5.0 Remote & Advanced MCP (shipped)
-Phase: 16-20 complete
-Plan: 12/12 complete in milestone (48/48 overall)
-Status: Archived
-Last activity: 2026-02-26 - archived v5.0 roadmap/requirements and prepared v6.0 planning handoff
-
-Progress: [█████████████████████████] 100% (48/48 plans completed)
+Milestone: v6.0 Subscription Auth & Validation
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-26 — Milestone v6.0 started
 
 ## Performance Metrics
 
@@ -154,5 +152,5 @@ v5.0 deferred runtime validation:
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed v5.0 milestone archival and release tagging prep
-Resume file: Start `/gsd-new-milestone` for fresh v6.0 requirements and roadmap planning
+Stopped at: v6.0 milestone initialized, defining requirements
+Resume file: Continue requirements definition and roadmap creation
