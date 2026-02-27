@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { runInit } from './init.js';
 import { runGenerate } from './generate.js';
+import { createAuthCommand } from './auth/index.js';
 
 const program = new Command();
 
@@ -122,6 +123,8 @@ program
     const { runServe } = await import('./serve.js');
     await runServe(opts);
   });
+
+program.addCommand(createAuthCommand());
 
 // Default action: run generate when no command specified
 program
