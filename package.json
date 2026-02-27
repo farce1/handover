@@ -29,7 +29,7 @@
     "prepare": "husky",
     "release": "npm run release:precheck && npm run release:publish",
     "release:precheck": "npm run lint && npm run typecheck && npm test && npm run build",
-    "release:publish": "npm publish --access public"
+    "release:publish": "npm publish --provenance --access public"
   },
   "keywords": [
     "documentation",
@@ -54,6 +54,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "0.78.0",
     "@clack/prompts": "^1.0.1",
+    "@google/genai": "^1.43.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "better-sqlite3": "^12.6.2",
     "commander": "^14.0.3",
