@@ -28,7 +28,8 @@ export function renderBanner(state: DisplayState): string[] {
   const sep = pc.dim(' \u00B7 '); // middle dot separator
   const arrow = pc.cyan(SYMBOLS.arrow);
   const name = pc.bold('handover');
-  const providerModel = `${state.provider}/${state.model}`;
+  const authLabel = state.authMethod ? ` (${state.authMethod})` : '';
+  const providerModel = `${state.provider}/${state.model}${authLabel}`;
   const files = `${state.fileCount} files`;
   const lang = state.language;
   const localBadge = state.isLocal ? `${sep}${pc.green(pc.bold('LOCAL'))}` : '';
@@ -180,6 +181,7 @@ export function renderRoundBlock(
   spinnerFrame?: number,
   isLocal?: boolean,
   streamVisible?: boolean,
+  isSubscription?: boolean,
 ): string[] {
   const lines: string[] = [];
   const sep = pc.dim(' \u00B7 ');
@@ -207,12 +209,13 @@ export function renderRoundBlock(
         const durationStr = formatDuration(rd.elapsedMs);
         const parts = [`${pc.green(SYMBOLS.done)} ${roundLabel}`, tokenStr, durationStr];
         // Show cost for cloud providers
-        if (!isLocal && rd.cost !== undefined) {
+        if (!isLocal && !isSubscription && rd.cost !== undefined) {
           parts.push(pc.yellow(formatCost(rd.cost)));
         }
         lines.push(`  ${parts.filter(Boolean).join(sep)}`);
         // Per-round savings line (per locked decision: show when savings exist)
         if (
+          !isSubscription &&
           rd.cacheSavingsTokens &&
           rd.cacheSavingsTokens > 0 &&
           rd.cacheSavingsPercent !== undefined &&
@@ -278,12 +281,12 @@ export function renderRoundBlock(
   }
 
   // Running total line -- omit for local providers (no $0.00 shown)
-  if (!isLocal && totalCost > 0) {
+  if (!isLocal && !isSubscription && totalCost > 0) {
     lines.push(`  ${pc.yellow(formatCost(totalCost))} total`);
   }
 
   // Cost warning -- only for cloud providers
-  if (!isLocal && totalCost > costWarningThreshold && costWarningThreshold > 0) {
+  if (!isLocal && !isSubscription && totalCost > costWarningThreshold && costWarningThreshold > 0) {
     lines.push(`  ${renderCostWarning(totalCost, costWarningThreshold)}`);
   }
 
@@ -343,8 +346,10 @@ export function renderCompletionSummary(state: DisplayState): string[] {
     formatTokens(state.totalTokens),
   ];
   // Only show cost for cloud providers (no $0.00 for local)
-  if (!state.isLocal) {
+  if (!state.isLocal && !state.isSubscription) {
     parts.push(pc.yellow(formatCost(state.totalCost)));
+  } else if (state.isSubscription) {
+    parts.push(pc.dim('subscription credits'));
   }
   parts.push(formatDuration(state.elapsedMs));
   const completionLine = parts.join(sep);
@@ -358,13 +363,13 @@ export function renderCompletionSummary(state: DisplayState): string[] {
         `  Round ${rs.round}`,
         formatTokens(rs.inputTokens + rs.outputTokens),
       ];
-      if (!state.isLocal) {
+      if (!state.isLocal && !state.isSubscription) {
         roundParts.push(pc.yellow(formatCost(rs.cost)));
       }
       lines.push(pc.dim(roundParts.join(sep)));
 
       // Savings line for this round (per locked decision: tokens, percentage, dollars)
-      if (rs.savings && rs.savings.tokens > 0) {
+      if (rs.savings && rs.savings.tokens > 0 && !state.isSubscription) {
         lines.push(renderRoundSavings(rs.savings.tokens, rs.savings.percent, rs.savings.dollars));
       }
     }

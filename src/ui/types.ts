@@ -77,6 +77,10 @@ export interface DisplayState {
   fileCoverage?: { analyzing: number; ignored: number; total: number };
   /** Whether streaming token output indicator is visible (opt-in via --stream flag). */
   streamVisible?: boolean;
+  /** Auth method in use for this run. */
+  authMethod?: 'api-key' | 'subscription';
+  /** Whether this run uses subscription auth (suppresses dollar cost rendering). */
+  isSubscription?: boolean;
   /** Whether this is an incremental run (some files changed, some unchanged). */
   isIncremental?: boolean;
   /** Number of files that changed since last run (only set on incremental runs). */
