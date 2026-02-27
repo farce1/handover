@@ -1,5 +1,6 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { isCI, isTTY } from '@clack/prompts';
 import { hashContent, AnalysisCache } from '../analyzers/cache.js';
 import { resolveAuth } from '../auth/index.js';
 import { loadConfig } from '../config/loader.js';
@@ -35,6 +36,7 @@ import {
 import type { RenderContext, DocumentStatus } from '../renderers/types.js';
 import { renderIndex } from '../renderers/render-00-index.js';
 import { determineDocStatus } from '../renderers/utils.js';
+import { isFirstRun, runOnboarding } from './onboarding.js';
 import type { RoundExecutionResult } from '../ai-rounds/types.js';
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 import type { PackedContext } from '../context/types.js';
@@ -104,6 +106,13 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       logger.setVerbose(true);
     }
 
+    // First-run onboarding: run before loading config so newly created
+    // .handover.yml is picked up in the same generate invocation.
+    if (!isCI() && isTTY(process.stdout) && isFirstRun()) {
+      const shouldContinue = await runOnboarding();
+      if (!shouldContinue) return;
+    }
+
     // Load config with CLI overrides
     const cliOverrides: Record<string, unknown> = {};
     if (options.provider) cliOverrides.provider = options.provider;
@@ -146,6 +155,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       completionDocs: 0,
       errors: [],
       streamVisible: options.stream === true,
+      authMethod: config.authMethod as 'api-key' | 'subscription',
+      isSubscription: config.authMethod === 'subscription',
     };
 
     // Suppress logger during renderer-managed output
