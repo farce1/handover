@@ -18,6 +18,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
   readonly name: string;
   private client: OpenAI;
   private preset: ProviderPreset;
+  private isSubscription: boolean;
 
   constructor(
     preset: ProviderPreset,
@@ -25,10 +26,12 @@ export class OpenAICompatibleProvider extends BaseProvider {
     model: string,
     concurrency: number,
     baseUrl?: string,
+    isSubscription?: boolean,
   ) {
     super(model, concurrency);
     this.preset = preset;
     this.name = preset.name;
+    this.isSubscription = isSubscription ?? false;
 
     // Azure OpenAI uses a dedicated client class
     if (preset.name === 'azure-openai') {

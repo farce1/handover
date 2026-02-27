@@ -143,6 +143,15 @@ export async function resolveAuth(
     }
   }
 
+  if (config.authMethod === 'subscription') {
+    throw new AuthError(
+      `Not authenticated with ${config.provider} (subscription)`,
+      `No stored subscription token found for provider "${config.provider}"`,
+      `Run ${pc.cyan(`handover auth login ${config.provider}`)} to authenticate`,
+      'AUTH_SUBSCRIPTION_NOT_LOGGED_IN',
+    );
+  }
+
   if (!isTTY(process.stdout) || isCI()) {
     throw AuthError.noCredential(config.provider, envVarName);
   }

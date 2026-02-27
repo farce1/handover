@@ -116,7 +116,14 @@ export function createProvider(config: HandoverConfig, authResult: AuthResult): 
       timeoutMs: config.timeout ?? 120_000,
     };
 
-    return new OpenAICompatibleProvider(customPreset, apiKey, model, concurrency, config.baseUrl);
+    return new OpenAICompatibleProvider(
+      customPreset,
+      apiKey,
+      model,
+      concurrency,
+      config.baseUrl,
+      isSubscription,
+    );
   }
 
   // Resolve configuration with preset fallbacks
@@ -134,7 +141,14 @@ export function createProvider(config: HandoverConfig, authResult: AuthResult): 
       return new GeminiProvider(apiKey, model, concurrency);
 
     case 'openai-compat':
-      return new OpenAICompatibleProvider(preset, apiKey, model, concurrency, config.baseUrl);
+      return new OpenAICompatibleProvider(
+        preset,
+        apiKey,
+        model,
+        concurrency,
+        config.baseUrl,
+        isSubscription,
+      );
 
     default:
       throw new ProviderError(
