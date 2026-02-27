@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v6.0 Codex Auth & Validation — Phase 23: Codex Auth Commands
+**Current focus:** v6.0 Codex Auth & Validation — Phase 24: Generate Integration & Onboarding
 
 ## Current Position
 
 Milestone: v6.0 Codex Auth & Validation
-Phase: 22 of 26 (Gemini Provider)
+Phase: 23 of 26 (Codex Auth Commands)
 Plan: 02 of 02
 Status: Complete
-Last activity: 2026-02-27 - completed 22-02 Gemini wiring across config/auth/factory/embedder/init
+Last activity: 2026-02-27 - completed phase 23 verification after PKCE auth + auth CLI delivery
 
 Progress: [██████████] 100%
 
@@ -27,9 +27,9 @@ Progress: [██████████] 100%
 - Timeline: 3 days (2026-02-23 to 2026-02-25)
 
 **v6.0 Velocity:**
-- Total plans completed: 5
-- Average duration: ~2.2 min/plan
-- Total execution time: ~11 min
+- Total plans completed: 7
+- Average duration: ~2.6 min/plan
+- Total execution time: ~18 min
 
 ## Accumulated Context
 
@@ -54,6 +54,9 @@ Key decisions from research locked for v6.0:
 - [Phase 22]: Gemini provider uses `@google/genai` native SDK with `responseSchema` + `responseMimeType: application/json` for structured round outputs.
 - [Phase 22]: Gemini auth supports env fallback order `GEMINI_API_KEY` then `GOOGLE_API_KEY` while preserving global precedence order.
 - [Phase 22]: Gemini embedding path is fixed at 1536 dimensions (`gemini-embedding-001` + `outputDimensionality`) to maintain existing index compatibility.
+- [Phase 23]: PKCE login now runs browser OAuth with localhost callback + headless URL fallback and persists access/refresh/expiry tokens.
+- [Phase 23]: Subscription credential refresh is proactive (5-minute buffer) and fail-soft on refresh errors.
+- [Phase 23]: `handover auth` command group is wired into CLI with `login <provider>` and `status [--json]`.
 
 ### Pending Todos
 
@@ -62,7 +65,6 @@ None.
 ### Blockers/Concerns
 
 Research flags for planning:
-- Phase 23: `@openai/codex-sdk` exact API surface needs a 30-minute spike before implementation (method signatures for OAuth login not confirmed)
 - Phase 24: `refreshCallback` design for mid-generation 401 during streaming needs validation (stream-abandon-and-retry vs mid-stream token swap)
 - Phase 24: Single-use refresh token rotation risk in concurrent CLI processes — verify scope against Codex CLI open-source repo before Phase 24
 
@@ -75,5 +77,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed phase 22 verification and closed Gemini provider work
+Stopped at: Completed phase 23 execution and verification (plans 23-01, 23-02)
 Resume file: .planning/ROADMAP.md

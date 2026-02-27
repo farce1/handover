@@ -67,8 +67,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 23-01-PLAN.md — PKCE OAuth flow, StoredCredential extension, proactive token refresh, and subscription concurrency=1 guard
-- [ ] 23-02-PLAN.md — `handover auth` CLI command group (login, status, --json) and main CLI wiring
+- [x] 23-01-PLAN.md — PKCE OAuth flow, StoredCredential extension, proactive token refresh, and subscription concurrency=1 guard
+- [x] 23-02-PLAN.md — `handover auth` CLI command group (login, status, --json) and main CLI wiring
 
 ### Phase 24: Generate Integration & Onboarding
 **Goal**: Users can run `handover generate` with Codex subscription auth and are guided through provider setup on first run
@@ -127,7 +127,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25 → 26
 |-------|-----------|----------------|--------|-----------|
 | 21. Auth Infrastructure | 3/3 | Complete    | 2026-02-26 | - |
 | 22. Gemini Provider | 2/2 | Complete    | 2026-02-27 | - |
-| 23. Codex Auth Commands | 2/2 | Complete   | 2026-02-27 | - |
+| 23. Codex Auth Commands | 2/2 | Complete    | 2026-02-27 | - |
 | 24. Generate Integration & Onboarding | v6.0 | 0/3 | Not started | - |
 | 25. Security Hardening | v6.0 | 0/1 | Not started | - |
 | 26. Runtime Validation | v6.0 | 0/2 | Not started | - |

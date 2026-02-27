@@ -22,11 +22,11 @@ Requirements for the Codex Auth & Validation milestone. Each maps to roadmap pha
 
 ### Codex Subscription Auth
 
-- [ ] **CDX-01**: User can authenticate with OpenAI Codex subscription via PKCE browser OAuth flow
-- [ ] **CDX-02**: User can run `handover auth login openai` to initiate subscription auth independently of onboarding
-- [ ] **CDX-03**: User can run `handover auth status` to see current auth method, provider, and token validity per configured provider
-- [ ] **CDX-04**: Subscription tokens are refreshed proactively before each LLM round to prevent mid-run expiry
-- [ ] **CDX-05**: Subscription mode enforces concurrency=1 to respect subscription rate limits
+- [x] **CDX-01**: User can authenticate with OpenAI Codex subscription via PKCE browser OAuth flow
+- [x] **CDX-02**: User can run `handover auth login openai` to initiate subscription auth independently of onboarding
+- [x] **CDX-03**: User can run `handover auth status` to see current auth method, provider, and token validity per configured provider
+- [x] **CDX-04**: Subscription tokens are refreshed proactively before each LLM round to prevent mid-run expiry
+- [x] **CDX-05**: Subscription mode enforces concurrency=1 to respect subscription rate limits
 
 ### Gemini Provider
 
@@ -100,11 +100,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GEM-02 | Phase 22 | Complete |
 | GEM-03 | Phase 22 | Complete |
 | GEM-04 | Phase 22 | Complete |
-| CDX-01 | Phase 23 | Pending |
-| CDX-02 | Phase 23 | Pending |
-| CDX-03 | Phase 23 | Pending |
-| CDX-04 | Phase 23 | Pending |
-| CDX-05 | Phase 23 | Pending |
+| CDX-01 | Phase 23 | Complete |
+| CDX-02 | Phase 23 | Complete |
+| CDX-03 | Phase 23 | Complete |
+| CDX-04 | Phase 23 | Complete |
+| CDX-05 | Phase 23 | Complete |
 | GEN-01 | Phase 24 | Pending |
 | GEN-02 | Phase 24 | Pending |
 | GEN-03 | Phase 24 | Pending |
@@ -130,4 +130,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-27 after phase 22 completion*
+*Last updated: 2026-02-27 after phase 23 completion*
