@@ -81,12 +81,12 @@ Plans:
   4. Running `handover generate` with `authMethod: subscription` but no stored token prints: "Run `handover auth login openai` to authenticate"
   5. A 429 from subscription mode shows the remaining rate-limit window time, distinct from API key 429 retry messaging
   6. A first-time user with no provider configured is guided through interactive provider and auth selection before generation begins
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 24-01: Factory async wiring, `resolveAuth()` integration, and subscription 429 handling
-- [ ] 24-02: Startup auth method banner, cost display suppression, and missing-auth error message
-- [ ] 24-03: First-run onboarding flow (interactive provider selection, env var detection)
+- [ ] 24-01-PLAN.md — Subscription missing-auth error, factory isSubscription plumbing, subscription 429/401 handling
+- [ ] 24-02-PLAN.md — DisplayState auth fields, banner auth label, cost display suppression (terminal + CI)
+- [ ] 24-03-PLAN.md — First-run onboarding wizard and generate.ts DisplayState wiring
 
 ### Phase 25: Security Hardening
 **Goal**: No credential data can leak via npm publish, debug logs, or documentation gaps
