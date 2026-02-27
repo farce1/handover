@@ -64,7 +64,7 @@ Plans:
   2. `handover auth status` shows the current auth method, provider, and token validity (including expiry time) for each configured provider
   3. Subscription tokens are refreshed proactively (5-minute buffer) before each LLM round so mid-run expiry does not corrupt output
   4. When `authMethod: subscription` is configured, the provider factory enforces `concurrency = 1` automatically
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 23-01-PLAN.md — PKCE OAuth flow, StoredCredential extension, proactive token refresh, and subscription concurrency=1 guard
@@ -127,7 +127,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25 → 26
 |-------|-----------|----------------|--------|-----------|
 | 21. Auth Infrastructure | 3/3 | Complete    | 2026-02-26 | - |
 | 22. Gemini Provider | 2/2 | Complete    | 2026-02-27 | - |
-| 23. Codex Auth Commands | v6.0 | 0/2 | Not started | - |
+| 23. Codex Auth Commands | 1/2 | In Progress|  | - |
 | 24. Generate Integration & Onboarding | v6.0 | 0/3 | Not started | - |
 | 25. Security Hardening | v6.0 | 0/1 | Not started | - |
 | 26. Runtime Validation | v6.0 | 0/2 | Not started | - |
