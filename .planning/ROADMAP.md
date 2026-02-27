@@ -64,11 +64,11 @@ Plans:
   2. `handover auth status` shows the current auth method, provider, and token validity (including expiry time) for each configured provider
   3. Subscription tokens are refreshed proactively (5-minute buffer) before each LLM round so mid-run expiry does not corrupt output
   4. When `authMethod: subscription` is configured, the provider factory enforces `concurrency = 1` automatically
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 23-01: PKCE OAuth flow implementation and token persistence
-- [ ] 23-02: `handover auth` CLI command group (login, status) and token refresh lifecycle
+- [ ] 23-01-PLAN.md — PKCE OAuth flow, StoredCredential extension, proactive token refresh, and subscription concurrency guard
+- [ ] 23-02-PLAN.md — `handover auth` CLI command group (login, status) and main CLI wiring
 
 ### Phase 24: Generate Integration & Onboarding
 **Goal**: Users can run `handover generate` with Codex subscription auth and are guided through provider setup on first run
