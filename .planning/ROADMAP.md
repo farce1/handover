@@ -52,8 +52,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 22-01-PLAN.md — GeminiProvider (chat completion) + GeminiEmbeddingProvider (embedding) + @google/genai SDK
-- [ ] 22-02-PLAN.md — Config schema, defaults, presets, factory, auth, embedding factory, and init flow wiring
+- [x] 22-01-PLAN.md — GeminiProvider (chat completion) + GeminiEmbeddingProvider (embedding) + @google/genai SDK
+- [x] 22-02-PLAN.md — Config schema, defaults, presets, factory, auth, embedding factory, and init flow wiring
 
 ### Phase 23: Codex Auth Commands
 **Goal**: Users can authenticate with OpenAI Codex subscription via browser OAuth and manage credentials through the `handover auth` CLI
@@ -126,7 +126,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25 → 26
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 21. Auth Infrastructure | 3/3 | Complete    | 2026-02-26 | - |
-| 22. Gemini Provider | 2/2 | Complete   | 2026-02-27 | - |
+| 22. Gemini Provider | 2/2 | Complete    | 2026-02-27 | - |
 | 23. Codex Auth Commands | v6.0 | 0/2 | Not started | - |
 | 24. Generate Integration & Onboarding | v6.0 | 0/3 | Not started | - |
 | 25. Security Hardening | v6.0 | 0/1 | Not started | - |

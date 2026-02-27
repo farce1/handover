@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v6.0 Codex Auth & Validation — Phase 21: Auth Infrastructure
+**Current focus:** v6.0 Codex Auth & Validation — Phase 23: Codex Auth Commands
 
 ## Current Position
 
 Milestone: v6.0 Codex Auth & Validation
-Phase: 21 of 26 (Auth Infrastructure)
-Plan: 03 of 03
+Phase: 22 of 26 (Gemini Provider)
+Plan: 02 of 02
 Status: Complete
-Last activity: 2026-02-26 - completed 21-03 auth wiring into factory and runtime call sites
+Last activity: 2026-02-27 - completed 22-02 Gemini wiring across config/auth/factory/embedder/init
 
 Progress: [██████████] 100%
 
@@ -27,9 +27,9 @@ Progress: [██████████] 100%
 - Timeline: 3 days (2026-02-23 to 2026-02-25)
 
 **v6.0 Velocity:**
-- Total plans completed: 3
-- Average duration: ~2.3 min/plan
-- Total execution time: ~7 min
+- Total plans completed: 5
+- Average duration: ~2.2 min/plan
+- Total execution time: ~11 min
 
 ## Accumulated Context
 
@@ -51,6 +51,9 @@ Key decisions from research locked for v6.0:
 - [Phase 21]: HandoverConfigSchema now defaults authMethod to api-key and rejects anthropic+subscription during validation.
 - [Phase 21]: validateProviderConfig now performs structural checks only; resolveAuth callers own credential validation.
 - [Phase 21]: Auth-dependent runtime paths import resolveAuth from src/auth/index.ts and pass AuthResult into createProvider.
+- [Phase 22]: Gemini provider uses `@google/genai` native SDK with `responseSchema` + `responseMimeType: application/json` for structured round outputs.
+- [Phase 22]: Gemini auth supports env fallback order `GEMINI_API_KEY` then `GOOGLE_API_KEY` while preserving global precedence order.
+- [Phase 22]: Gemini embedding path is fixed at 1536 dimensions (`gemini-embedding-001` + `outputDimensionality`) to maintain existing index compatibility.
 
 ### Pending Todos
 
@@ -71,6 +74,6 @@ External setup still required (unchanged from v5.0):
 
 ## Session Continuity
 
-Last session: 2026-02-26
-Stopped at: Phase 22 context gathered
-Resume file: .planning/phases/22-gemini-provider/22-CONTEXT.md
+Last session: 2026-02-27
+Stopped at: Completed phase 22 verification and closed Gemini provider work
+Resume file: .planning/ROADMAP.md

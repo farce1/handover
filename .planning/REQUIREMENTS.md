@@ -30,10 +30,10 @@ Requirements for the Codex Auth & Validation milestone. Each maps to roadmap pha
 
 ### Gemini Provider
 
-- [ ] **GEM-01**: User can select Google Gemini as an LLM provider in config
-- [ ] **GEM-02**: User can use Gemini via Google AI Studio API key (free tier available)
-- [ ] **GEM-03**: Gemini provider supports chat completion for all 6 analysis rounds
-- [ ] **GEM-04**: Gemini provider supports embedding generation for reindex/search
+- [x] **GEM-01**: User can select Google Gemini as an LLM provider in config
+- [x] **GEM-02**: User can use Gemini via Google AI Studio API key (free tier available)
+- [x] **GEM-03**: Gemini provider supports chat completion for all 6 analysis rounds
+- [x] **GEM-04**: Gemini provider supports embedding generation for reindex/search
 
 ### Generate Integration
 
@@ -96,10 +96,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-02 | Phase 21 | Pending |
 | AUTH-03 | Phase 21 | Pending |
 | AUTH-04 | Phase 21 | Pending |
-| GEM-01 | Phase 22 | Pending |
-| GEM-02 | Phase 22 | Pending |
-| GEM-03 | Phase 22 | Pending |
-| GEM-04 | Phase 22 | Pending |
+| GEM-01 | Phase 22 | Complete |
+| GEM-02 | Phase 22 | Complete |
+| GEM-03 | Phase 22 | Complete |
+| GEM-04 | Phase 22 | Complete |
 | CDX-01 | Phase 23 | Pending |
 | CDX-02 | Phase 23 | Pending |
 | CDX-03 | Phase 23 | Pending |
@@ -130,4 +130,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after roadmap creation (phases 21-26 assigned)*
+*Last updated: 2026-02-27 after phase 22 completion*
