@@ -121,4 +121,33 @@ describe('TokenStore', () => {
       expiresAt: '2026-03-01T00:00:00Z',
     });
   });
+
+  it('preserves refreshToken when provided', async () => {
+    const store = new TokenStore();
+    await store.write({
+      provider: 'openai',
+      token: 'tok_123',
+      refreshToken: 'ref_123',
+    });
+
+    await expect(store.read()).resolves.toEqual({
+      provider: 'openai',
+      token: 'tok_123',
+      refreshToken: 'ref_123',
+    });
+  });
+
+  it('read deletes invalid credential file with empty refreshToken', async () => {
+    const store = new TokenStore();
+    vol.fromJSON({
+      [credentialsPath]: JSON.stringify({
+        provider: 'openai',
+        token: 'tok_123',
+        refreshToken: '',
+      }),
+    });
+
+    await expect(store.read()).resolves.toBeNull();
+    expect(existsSync(credentialsPath)).toBe(false);
+  });
 });

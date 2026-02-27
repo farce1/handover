@@ -69,15 +69,17 @@ describe('auth types', () => {
     expectTypeOf(result.source).toEqualTypeOf<AuthSource>();
   });
 
-  it('StoredCredential includes provider, token, and optional expiresAt', () => {
+  it('StoredCredential includes provider, token, and optional OAuth fields', () => {
     const credential: StoredCredential = {
       provider: 'openai',
       token: 'tok_123',
       expiresAt: '2026-03-01T00:00:00Z',
+      refreshToken: 'ref_123',
     };
 
     expectTypeOf(credential.provider).toEqualTypeOf<string>();
     expectTypeOf(credential.token).toEqualTypeOf<string>();
     expectTypeOf(credential.expiresAt).toEqualTypeOf<string | undefined>();
+    expectTypeOf(credential.refreshToken).toEqualTypeOf<string | undefined>();
   });
 });

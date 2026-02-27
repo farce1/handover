@@ -28,6 +28,13 @@ function isValidCredential(value: unknown): value is StoredCredential {
     return false;
   }
 
+  if (
+    candidate.refreshToken !== undefined &&
+    (typeof candidate.refreshToken !== 'string' || candidate.refreshToken.trim().length === 0)
+  ) {
+    return false;
+  }
+
   return true;
 }
 

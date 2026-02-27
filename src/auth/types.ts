@@ -12,6 +12,7 @@ export interface StoredCredential {
   provider: string;
   token: string;
   expiresAt?: string;
+  refreshToken?: string;
 }
 
 export class AuthError extends HandoverError {
