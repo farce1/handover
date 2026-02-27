@@ -49,7 +49,7 @@ Plans:
   2. User can authenticate Gemini via a Google AI Studio API key (free tier key accepted)
   3. All 6 analysis rounds complete successfully using the Gemini provider
   4. `handover reindex` and `handover search` work when Gemini is configured as the embedding provider
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 22-01-PLAN.md — GeminiProvider (chat completion) + GeminiEmbeddingProvider (embedding) + @google/genai SDK
@@ -126,7 +126,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25 → 26
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 21. Auth Infrastructure | 3/3 | Complete    | 2026-02-26 | - |
-| 22. Gemini Provider | v6.0 | 0/2 | Not started | - |
+| 22. Gemini Provider | 1/2 | In Progress|  | - |
 | 23. Codex Auth Commands | v6.0 | 0/2 | Not started | - |
 | 24. Generate Integration & Onboarding | v6.0 | 0/3 | Not started | - |
 | 25. Security Hardening | v6.0 | 0/1 | Not started | - |
