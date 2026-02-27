@@ -4,10 +4,58 @@ import { countTokens } from 'gpt-tokenizer';
 import { countTokens as countTokensCl100k } from 'gpt-tokenizer/encoding/cl100k_base';
 import type { z } from 'zod';
 import type { ProviderPreset } from './presets.js';
+import { AuthError } from '../auth/types.js';
 import type { CompletionRequest, CompletionResult } from '../domain/types.js';
 import { BaseProvider } from './base-provider.js';
 import { zodToToolSchema } from './schema-utils.js';
 import { ProviderError } from '../utils/errors.js';
+
+function parseRetryAfterSeconds(err: InstanceType<typeof OpenAI.RateLimitError>): number | null {
+  const rawMs = err.headers?.get('retry-after-ms');
+  if (rawMs) {
+    const ms = Number.parseFloat(rawMs);
+    if (Number.isFinite(ms) && ms > 0) {
+      return ms / 1000;
+    }
+  }
+
+  const rawSeconds = err.headers?.get('retry-after');
+  if (!rawSeconds) {
+    return null;
+  }
+
+  const seconds = Number.parseFloat(rawSeconds);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return seconds;
+  }
+
+  const parsedDate = Date.parse(rawSeconds);
+  if (Number.isFinite(parsedDate)) {
+    return Math.max(0, (parsedDate - Date.now()) / 1000);
+  }
+
+  return null;
+}
+
+function formatRateLimitDuration(totalSeconds: number): string {
+  if (totalSeconds <= 0) {
+    return 'a moment';
+  }
+
+  const normalizedSeconds = Math.ceil(totalSeconds);
+  const minutes = Math.floor(normalizedSeconds / 60);
+  const seconds = normalizedSeconds % 60;
+
+  if (minutes === 0) {
+    return `${seconds}s`;
+  }
+
+  if (seconds === 0) {
+    return `${minutes}m`;
+  }
+
+  return `${minutes}m ${seconds}s`;
+}
 
 /**
  * OpenAI-compatible LLM provider.
@@ -69,107 +117,126 @@ export class OpenAICompatibleProvider extends BaseProvider {
     schema: z.ZodType<T>,
     onToken?: (tokenCount: number) => void,
   ): Promise<CompletionResult & { data: T }> {
-    const start = Date.now();
+    try {
+      const start = Date.now();
 
-    const parameters = zodToToolSchema(schema);
+      const parameters = zodToToolSchema(schema);
 
-    const params = {
-      model: this.model,
-      messages: [
-        { role: 'system' as const, content: request.systemPrompt },
-        { role: 'user' as const, content: request.userPrompt },
-      ],
-      tools: [
-        {
-          type: 'function' as const,
-          function: {
-            name: 'structured_response',
-            description: 'Return the analysis result as structured data',
-            parameters: parameters as Record<string, unknown>,
+      const params = {
+        model: this.model,
+        messages: [
+          { role: 'system' as const, content: request.systemPrompt },
+          { role: 'user' as const, content: request.userPrompt },
+        ],
+        tools: [
+          {
+            type: 'function' as const,
+            function: {
+              name: 'structured_response',
+              description: 'Return the analysis result as structured data',
+              parameters: parameters as Record<string, unknown>,
+            },
           },
+        ],
+        tool_choice: {
+          type: 'function' as const,
+          function: { name: 'structured_response' },
         },
-      ],
-      tool_choice: {
-        type: 'function' as const,
-        function: { name: 'structured_response' },
-      },
-      temperature: request.temperature ?? 0.3,
-      max_tokens: request.maxTokens ?? 4096,
-    };
+        temperature: request.temperature ?? 0.3,
+        max_tokens: request.maxTokens ?? 4096,
+      };
 
-    if (onToken) {
-      // Streaming path: use chat.completions.stream() for live token count updates
-      const runner = this.client.chat.completions.stream(params);
+      if (onToken) {
+        // Streaming path: use chat.completions.stream() for live token count updates
+        const runner = this.client.chat.completions.stream(params);
 
-      let charCount = 0;
-      runner.on('chunk', (chunk) => {
-        const delta = chunk.choices[0]?.delta?.tool_calls?.[0]?.function?.arguments ?? '';
-        charCount += delta.length;
-        onToken(Math.ceil(charCount / 4));
-      });
+        let charCount = 0;
+        runner.on('chunk', (chunk) => {
+          const delta = chunk.choices[0]?.delta?.tool_calls?.[0]?.function?.arguments ?? '';
+          charCount += delta.length;
+          onToken(Math.ceil(charCount / 4));
+        });
 
-      const completion = await runner.finalChatCompletion();
+        const completion = await runner.finalChatCompletion();
 
-      // Extract tool call from response
-      const toolCall = completion.choices[0]?.message.tool_calls?.[0];
+        // Extract tool call from response
+        const toolCall = completion.choices[0]?.message.tool_calls?.[0];
 
-      if (!toolCall || toolCall.type !== 'function') {
+        if (!toolCall || toolCall.type !== 'function') {
+          throw new ProviderError(
+            'No structured response from model',
+            'The model did not return a function tool call in its response',
+            'This may be a model issue -- try again or use a different model',
+            'PROVIDER_NO_TOOL_USE',
+          );
+        }
+
+        // OpenAI returns arguments as a JSON string; parse full accumulated response
+        const data = schema.parse(JSON.parse(toolCall.function.arguments));
+
+        // Snap to authoritative token count
+        const completionTokens = completion.usage?.completion_tokens ?? Math.ceil(charCount / 4);
+        onToken(completionTokens);
+
+        const duration = Date.now() - start;
+
+        return {
+          data,
+          usage: {
+            inputTokens: completion.usage?.prompt_tokens ?? 0,
+            outputTokens: completionTokens,
+          },
+          model: completion.model ?? this.model,
+          duration,
+        };
+      } else {
+        // Non-streaming path (original code, unchanged)
+        const completion = await this.client.chat.completions.create(params);
+
+        // Extract tool call from response
+        const toolCall = completion.choices[0]?.message.tool_calls?.[0];
+
+        if (!toolCall || toolCall.type !== 'function') {
+          throw new ProviderError(
+            'No structured response from model',
+            'The model did not return a function tool call in its response',
+            'This may be a model issue -- try again or use a different model',
+            'PROVIDER_NO_TOOL_USE',
+          );
+        }
+
+        // OpenAI returns arguments as a JSON string
+        const data = schema.parse(JSON.parse(toolCall.function.arguments));
+
+        const duration = Date.now() - start;
+
+        return {
+          data,
+          usage: {
+            inputTokens: completion.usage?.prompt_tokens ?? 0,
+            outputTokens: completion.usage?.completion_tokens ?? 0,
+          },
+          model: completion.model ?? this.model,
+          duration,
+        };
+      }
+    } catch (err) {
+      if (this.isSubscription && err instanceof OpenAI.RateLimitError) {
+        const retrySeconds = parseRetryAfterSeconds(err);
+        const duration = retrySeconds !== null ? formatRateLimitDuration(retrySeconds) : 'a moment';
         throw new ProviderError(
-          'No structured response from model',
-          'The model did not return a function tool call in its response',
-          'This may be a model issue -- try again or use a different model',
-          'PROVIDER_NO_TOOL_USE',
+          'Rate limited',
+          'Subscription rate limit reached',
+          `Try again in ${duration}`,
+          'PROVIDER_SUBSCRIPTION_RATE_LIMITED',
         );
       }
 
-      // OpenAI returns arguments as a JSON string; parse full accumulated response
-      const data = schema.parse(JSON.parse(toolCall.function.arguments));
-
-      // Snap to authoritative token count
-      const completionTokens = completion.usage?.completion_tokens ?? Math.ceil(charCount / 4);
-      onToken(completionTokens);
-
-      const duration = Date.now() - start;
-
-      return {
-        data,
-        usage: {
-          inputTokens: completion.usage?.prompt_tokens ?? 0,
-          outputTokens: completionTokens,
-        },
-        model: completion.model ?? this.model,
-        duration,
-      };
-    } else {
-      // Non-streaming path (original code, unchanged)
-      const completion = await this.client.chat.completions.create(params);
-
-      // Extract tool call from response
-      const toolCall = completion.choices[0]?.message.tool_calls?.[0];
-
-      if (!toolCall || toolCall.type !== 'function') {
-        throw new ProviderError(
-          'No structured response from model',
-          'The model did not return a function tool call in its response',
-          'This may be a model issue -- try again or use a different model',
-          'PROVIDER_NO_TOOL_USE',
-        );
+      if (this.isSubscription && err instanceof OpenAI.AuthenticationError) {
+        throw AuthError.sessionExpired(this.preset.name);
       }
 
-      // OpenAI returns arguments as a JSON string
-      const data = schema.parse(JSON.parse(toolCall.function.arguments));
-
-      const duration = Date.now() - start;
-
-      return {
-        data,
-        usage: {
-          inputTokens: completion.usage?.prompt_tokens ?? 0,
-          outputTokens: completion.usage?.completion_tokens ?? 0,
-        },
-        model: completion.model ?? this.model,
-        duration,
-      };
+      throw err;
     }
   }
 

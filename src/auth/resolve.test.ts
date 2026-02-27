@@ -188,16 +188,28 @@ describe('resolveAuth', () => {
     expect(result).toEqual({ apiKey: 'prompted-key', source: 'interactive-prompt' });
   });
 
-  test('skips credential store when provider mismatches', async () => {
+  test('throws AUTH_SUBSCRIPTION_NOT_LOGGED_IN when subscription credential provider mismatches', async () => {
     const store = createMockStore({ provider: 'anthropic', token: 'wrong-provider-token' });
 
-    const result = await resolveAuth(
+    await expect(
+      resolveAuth(
+        makeConfig({ provider: 'openai', authMethod: 'subscription' }),
+        undefined,
+        store as unknown as TokenStore,
+      ),
+    ).rejects.toMatchObject({
+      code: 'AUTH_SUBSCRIPTION_NOT_LOGGED_IN',
+    });
+
+    await resolveAuth(
       makeConfig({ provider: 'openai', authMethod: 'subscription' }),
       undefined,
       store as unknown as TokenStore,
-    );
-
-    expect(result).toEqual({ apiKey: 'prompted-key', source: 'interactive-prompt' });
+    ).catch((error: unknown) => {
+      expect(error).toBeInstanceOf(AuthError);
+      if (!(error instanceof AuthError)) return;
+      expect(error.fix).toContain('handover auth login openai');
+    });
   });
 
   test('uses interactive prompt as final precedence step', async () => {
@@ -209,7 +221,7 @@ describe('resolveAuth', () => {
     expect(mockClack.password).toHaveBeenCalledWith({ message: 'Enter your openai API key:' });
   });
 
-  test('throws AUTH_NO_CREDENTIAL when no TTY is available', async () => {
+  test('throws AUTH_SUBSCRIPTION_NOT_LOGGED_IN when subscription has no stored credential', async () => {
     mockClack.isTTY.mockReturnValue(false);
     const store = createMockStore(null);
 
@@ -220,7 +232,7 @@ describe('resolveAuth', () => {
         store as unknown as TokenStore,
       ),
     ).rejects.toMatchObject({
-      code: 'AUTH_NO_CREDENTIAL',
+      code: 'AUTH_SUBSCRIPTION_NOT_LOGGED_IN',
     });
 
     await expect(
@@ -238,10 +250,10 @@ describe('resolveAuth', () => {
     ).catch((error: unknown) => {
       expect(error).toBeInstanceOf(AuthError);
       if (!(error instanceof AuthError)) return;
-      expect(error.fix).toContain('OPENAI_API_KEY');
       expect(error.fix).toContain('handover auth login openai');
-      expect(error.fix).toContain('handover init');
     });
+
+    expect(mockClack.password).not.toHaveBeenCalled();
   });
 
   test('throws AUTH_NO_CREDENTIAL in CI mode', async () => {
