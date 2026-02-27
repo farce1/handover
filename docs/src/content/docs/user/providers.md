@@ -41,6 +41,8 @@ provider: anthropic
 model: claude-sonnet-4-5
 ```
 
+**Authentication:** Anthropic requires API key authentication. OAuth/subscription auth is not supported.
+
 **OpenAI:**
 
 ```bash
