@@ -16,9 +16,9 @@ Requirements for the Codex Auth & Validation milestone. Each maps to roadmap pha
 
 ### Onboarding
 
-- [ ] **ONB-01**: User running `handover generate` for the first time with no provider configured is guided through interactive provider selection and auth setup
-- [ ] **ONB-02**: User can select from available providers (OpenAI, Anthropic, Gemini, Codex subscription, etc.) during first-run onboarding
-- [ ] **ONB-03**: Onboarding flow detects existing env vars (e.g. `OPENAI_API_KEY`) and skips setup for already-configured providers
+- [x] **ONB-01**: User running `handover generate` for the first time with no provider configured is guided through interactive provider selection and auth setup
+- [x] **ONB-02**: User can select from available providers (OpenAI, Anthropic, Gemini, Codex subscription, etc.) during first-run onboarding
+- [x] **ONB-03**: Onboarding flow detects existing env vars (e.g. `OPENAI_API_KEY`) and skips setup for already-configured providers
 
 ### Codex Subscription Auth
 
@@ -37,11 +37,11 @@ Requirements for the Codex Auth & Validation milestone. Each maps to roadmap pha
 
 ### Generate Integration
 
-- [ ] **GEN-01**: `handover generate` works end-to-end with Codex subscription auth (no API key required)
-- [ ] **GEN-02**: Startup banner shows active auth method (api-key vs subscription) alongside provider/model
-- [ ] **GEN-03**: Cost display shows "subscription credits" instead of dollar amount when using subscription auth
-- [ ] **GEN-04**: Missing subscription auth produces clear error: "Run `handover auth login openai` to authenticate"
-- [ ] **GEN-05**: Subscription 429 errors show remaining rate limit window time, distinct from API key 429 retry logic
+- [x] **GEN-01**: `handover generate` works end-to-end with Codex subscription auth (no API key required)
+- [x] **GEN-02**: Startup banner shows active auth method (api-key vs subscription) alongside provider/model
+- [x] **GEN-03**: Cost display shows "subscription credits" instead of dollar amount when using subscription auth
+- [x] **GEN-04**: Missing subscription auth produces clear error: "Run `handover auth login openai` to authenticate"
+- [x] **GEN-05**: Subscription 429 errors show remaining rate limit window time, distinct from API key 429 retry logic
 
 ### Security
 
@@ -105,14 +105,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CDX-03 | Phase 23 | Complete |
 | CDX-04 | Phase 23 | Complete |
 | CDX-05 | Phase 23 | Complete |
-| GEN-01 | Phase 24 | Pending |
-| GEN-02 | Phase 24 | Pending |
-| GEN-03 | Phase 24 | Pending |
-| GEN-04 | Phase 24 | Pending |
-| GEN-05 | Phase 24 | Pending |
-| ONB-01 | Phase 24 | Pending |
-| ONB-02 | Phase 24 | Pending |
-| ONB-03 | Phase 24 | Pending |
+| GEN-01 | Phase 24 | Complete |
+| GEN-02 | Phase 24 | Complete |
+| GEN-03 | Phase 24 | Complete |
+| GEN-04 | Phase 24 | Complete |
+| GEN-05 | Phase 24 | Complete |
+| ONB-01 | Phase 24 | Complete |
+| ONB-02 | Phase 24 | Complete |
+| ONB-03 | Phase 24 | Complete |
 | SEC-01 | Phase 25 | Pending |
 | SEC-02 | Phase 25 | Pending |
 | SEC-03 | Phase 25 | Pending |

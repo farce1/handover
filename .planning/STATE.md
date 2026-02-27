@@ -1,3 +1,16 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: Codex Auth & Validation
+status: unknown
+last_updated: "2026-02-27T17:54:28.424Z"
+progress:
+  total_phases: 13
+  completed_phases: 13
+  total_plans: 33
+  completed_plans: 33
+---
+
 # Project State
 
 ## Project Reference
@@ -5,15 +18,15 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v6.0 Codex Auth & Validation — Phase 24: Generate Integration & Onboarding
+**Current focus:** v6.0 Codex Auth & Validation — Phase 25: Security Hardening
 
 ## Current Position
 
 Milestone: v6.0 Codex Auth & Validation
-Phase: 23 of 26 (Codex Auth Commands)
-Plan: 02 of 02
+Phase: 24 of 26 (Generate Integration & Onboarding)
+Plan: 03 of 03
 Status: Complete
-Last activity: 2026-02-27 - completed phase 23 verification after PKCE auth + auth CLI delivery
+Last activity: 2026-02-27 - completed phase 24 verification after generate integration and onboarding delivery
 
 Progress: [██████████] 100%
 
@@ -27,9 +40,9 @@ Progress: [██████████] 100%
 - Timeline: 3 days (2026-02-23 to 2026-02-25)
 
 **v6.0 Velocity:**
-- Total plans completed: 7
-- Average duration: ~2.6 min/plan
-- Total execution time: ~18 min
+- Total plans completed: 10
+- Average duration: ~2.2 min/plan
+- Total execution time: ~22 min
 
 ## Accumulated Context
 
@@ -57,6 +70,12 @@ Key decisions from research locked for v6.0:
 - [Phase 23]: PKCE login now runs browser OAuth with localhost callback + headless URL fallback and persists access/refresh/expiry tokens.
 - [Phase 23]: Subscription credential refresh is proactive (5-minute buffer) and fail-soft on refresh errors.
 - [Phase 23]: `handover auth` command group is wired into CLI with `login <provider>` and `status [--json]`.
+- [Phase 24]: Subscription mode now throws AUTH_SUBSCRIPTION_NOT_LOGGED_IN before generic no-credential fallback. — Ensures users get direct handover auth login remediation instead of api-key guidance in subscription mode.
+- [Phase 24]: Subscription 429 and 401 responses are mapped to fail-fast ProviderError/AuthError handling in OpenAICompatibleProvider. — Avoids generic retry loops for subscription rate-limits and gives explicit session-expired re-auth guidance.
+- [Phase 24]: DisplayState now carries authMethod and isSubscription so renderers can present auth-mode-aware output. — Keeps auth display/cost behavior centralized and backward-compatible via optional fields.
+- [Phase 24]: Subscription runs suppress dollar cost lines and show subscription credits across TTY and CI renderers. — Avoids misleading dollar amounts when billing is subscription-based while preserving token/performance visibility.
+- [Phase 24]: Onboarding now runs before loadConfig only for interactive first-run sessions (TTY + non-CI + no config/env). — Allows generate to consume newly written .handover.yml immediately while preserving non-interactive automation behavior.
+- [Phase 24]: Onboarding provider flow differentiates continuation behavior: subscription/ollama continue immediately, API-key flows stop after export guidance. — Prevents confusing auth failures and keeps UX aligned with each provider's credential mechanism.
 
 ### Pending Todos
 
@@ -64,9 +83,7 @@ None.
 
 ### Blockers/Concerns
 
-Research flags for planning:
-- Phase 24: `refreshCallback` design for mid-generation 401 during streaming needs validation (stream-abandon-and-retry vs mid-stream token swap)
-- Phase 24: Single-use refresh token rotation risk in concurrent CLI processes — verify scope against Codex CLI open-source repo before Phase 24
+None.
 
 External setup still required (unchanged from v5.0):
 - GitHub Sponsors enrollment
@@ -77,5 +94,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Phase 24 context gathered
-Resume file: .planning/phases/24-generate-integration-onboarding/24-CONTEXT.md
+Stopped at: Completed 24-03-PLAN.md and phase 24 verification
+Resume file: None
