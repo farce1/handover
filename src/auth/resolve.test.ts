@@ -310,4 +310,62 @@ describe('resolveAuth', () => {
     expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('credential-store'));
     expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('interactive-prompt'));
   });
+
+  test('log output never includes env var API key values', async () => {
+    const sensitiveKey = 'sk-ant-api03-supersecret-test-value';
+    process.env.OPENAI_API_KEY = sensitiveKey;
+    const store = createMockStore();
+
+    await resolveAuth(makeConfig(), undefined, store as unknown as TokenStore);
+
+    const allCalls = [
+      ...mockLogger.info.mock.calls,
+      ...mockLogger.debug.mock.calls,
+      ...mockLogger.warn.mock.calls,
+    ];
+    for (const [msg] of allCalls) {
+      expect(String(msg)).not.toContain(sensitiveKey);
+    }
+  });
+
+  test('log output never includes CLI api-key flag values', async () => {
+    const sensitiveKey = 'cli-key-supersecret-test-value';
+    const store = createMockStore();
+
+    await resolveAuth(makeConfig(), sensitiveKey, store as unknown as TokenStore);
+
+    const allCalls = [
+      ...mockLogger.info.mock.calls,
+      ...mockLogger.debug.mock.calls,
+      ...mockLogger.warn.mock.calls,
+    ];
+    for (const [msg] of allCalls) {
+      expect(String(msg)).not.toContain(sensitiveKey);
+    }
+  });
+
+  test('log output never includes subscription token values', async () => {
+    const sensitiveToken = 'eyJ-subscription-token-supersecret';
+    const store = createMockStore({
+      provider: 'openai',
+      token: sensitiveToken,
+      refreshToken: 'refresh-test',
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+
+    await resolveAuth(
+      makeConfig({ provider: 'openai', authMethod: 'subscription' }),
+      undefined,
+      store as unknown as TokenStore,
+    );
+
+    const allCalls = [
+      ...mockLogger.info.mock.calls,
+      ...mockLogger.debug.mock.calls,
+      ...mockLogger.warn.mock.calls,
+    ];
+    for (const [msg] of allCalls) {
+      expect(String(msg)).not.toContain(sensitiveToken);
+    }
+  });
 });
