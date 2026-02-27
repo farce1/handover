@@ -96,10 +96,10 @@ Plans:
   1. `npm pack --dry-run` in CI confirms `~/.handover/credentials.json` and all auth token paths are absent from the published package
   2. Debug and info log output never contains token values — only auth method names appear in logs
   3. Provider setup docs explicitly state that Anthropic providers require API key auth and that subscription OAuth is not available or compliant
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 25-01: npm publish safeguard, log redaction audit, and Anthropic restriction documentation
+- [ ] 25-01-PLAN.md — npm publish-safety CI job, log redaction regression tests, and Anthropic auth restriction documentation
 
 ### Phase 26: Runtime Validation
 **Goal**: All deferred v4.0 and v5.0 runtime behaviors are verified against real providers and live MCP clients
