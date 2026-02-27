@@ -165,6 +165,7 @@ export class TerminalRenderer implements Renderer {
       this.spinnerFrame,
       state.isLocal,
       state.streamVisible,
+      state.isSubscription,
     );
   }
 

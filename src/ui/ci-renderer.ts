@@ -31,8 +31,9 @@ export class CIRenderer implements Renderer {
   }
 
   onBanner(state: DisplayState): void {
+    const authLabel = state.authMethod ? ` (${state.authMethod})` : '';
     console.log(
-      `${this.timestamp()} handover \u00B7 ${state.provider}/${state.model} \u00B7 ${state.fileCount} files \u00B7 ${state.language}`,
+      `${this.timestamp()} handover \u00B7 ${state.provider}/${state.model}${authLabel} \u00B7 ${state.fileCount} files \u00B7 ${state.language}`,
     );
   }
 
@@ -89,7 +90,10 @@ export class CIRenderer implements Renderer {
         console.log(`${this.timestamp()} [round-${rd.roundNumber}] ${rd.name} cached`);
       } else if (rd.status === 'done') {
         const tokenStr = rd.tokens !== undefined ? formatTokens(rd.tokens) : '';
-        const costStr = !state.isLocal && rd.cost !== undefined ? formatCost(rd.cost) : '';
+        const costStr =
+          !state.isLocal && !state.isSubscription && rd.cost !== undefined
+            ? formatCost(rd.cost)
+            : '';
         const savingsStr =
           rd.cacheSavingsTokens && rd.cacheSavingsTokens > 0 && rd.cacheSavingsPercent !== undefined
             ? `${formatTokens(rd.cacheSavingsTokens)} saved (${Math.round(rd.cacheSavingsPercent * 100)}%)`
@@ -125,8 +129,10 @@ export class CIRenderer implements Renderer {
   onComplete(state: DisplayState): void {
     const duration = `${(state.elapsedMs / 1000).toFixed(0)}s`;
     const parts = [`${state.completionDocs} documents`, formatTokens(state.totalTokens)];
-    if (!state.isLocal) {
+    if (!state.isLocal && !state.isSubscription) {
       parts.push(formatCost(state.totalCost));
+    } else if (state.isSubscription) {
+      parts.push('subscription credits');
     }
     parts.push(duration);
     console.log(`${this.timestamp()} [done] ${parts.join(', ')}`);
