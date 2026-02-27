@@ -47,3 +47,24 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
           fail_ci_if_error: false
+
+  publish-safety:
+    name: Publish Safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Verify no credential paths in published package
+        run: |
+          PACK_OUTPUT=$(npm pack --dry-run 2>&1)
+          echo "$PACK_OUTPUT"
+          if echo "$PACK_OUTPUT" | grep -qE "credentials\.json|\.handover/"; then
+            echo "::error::Credential paths detected in npm package contents"
+            exit 1
+          fi
+          echo "PASS: No credential paths found in package"
