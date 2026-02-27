@@ -2,6 +2,7 @@ import type { HandoverConfig } from '../config/schema.js';
 import type { AuthResult } from '../auth/index.js';
 import type { LLMProvider } from './base.js';
 import { AnthropicProvider } from './anthropic.js';
+import { GeminiProvider } from './gemini.js';
 import { OpenAICompatibleProvider } from './openai-compat.js';
 import { PROVIDER_PRESETS, type ProviderPreset } from './presets.js';
 import { DEFAULT_CONCURRENCY } from '../config/defaults.js';
@@ -119,6 +120,9 @@ export function createProvider(config: HandoverConfig, authResult: AuthResult): 
   switch (preset.sdkType) {
     case 'anthropic':
       return new AnthropicProvider(apiKey, model, concurrency);
+
+    case 'gemini':
+      return new GeminiProvider(apiKey, model, concurrency);
 
     case 'openai-compat':
       return new OpenAICompatibleProvider(preset, apiKey, model, concurrency, config.baseUrl);

@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js';
 import { HandoverError } from '../utils/errors.js';
 import { EMBEDDING_MODELS } from './types.js';
 import type { HandoverConfig } from '../config/schema.js';
+import { GeminiEmbeddingProvider } from './gemini-embedder.js';
 
 export interface EmbeddingBatchResult {
   embeddings: number[][];
@@ -183,9 +184,10 @@ export class EmbeddingProvider implements EmbeddingClient {
  * @returns Configured embedding provider
  * @throws HandoverError if OpenAI API key not found
  */
-export function createEmbeddingProvider(config: HandoverConfig): EmbeddingProvider {
+export function createEmbeddingProvider(config: HandoverConfig): EmbeddingClient {
   let apiKey: string | undefined;
   let model: string;
+  const embeddingBatchSize = config.embedding?.batchSize;
 
   // Case 1: Explicit embedding config
   if (config.embedding) {
@@ -219,6 +221,23 @@ export function createEmbeddingProvider(config: HandoverConfig): EmbeddingProvid
       );
     }
   }
+  // Case 2.5: Reuse Gemini config from main provider
+  else if (config.provider === 'gemini') {
+    model = 'gemini-embedding-001';
+    const apiKeyEnv = config.apiKeyEnv ?? 'GEMINI_API_KEY';
+    apiKey = process.env[apiKeyEnv] ?? process.env['GOOGLE_API_KEY'];
+
+    if (!apiKey) {
+      throw new HandoverError(
+        'Embedding requires a Gemini API key',
+        'Neither GEMINI_API_KEY nor GOOGLE_API_KEY is set',
+        'Set the API key: export GEMINI_API_KEY=your-api-key-here',
+        'EMBEDDING_NO_API_KEY',
+      );
+    }
+
+    return new GeminiEmbeddingProvider(apiKey, model, embeddingBatchSize);
+  }
   // Case 3: No OpenAI config found
   else {
     apiKey = process.env.OPENAI_API_KEY;
@@ -241,6 +260,6 @@ export function createEmbeddingProvider(config: HandoverConfig): EmbeddingProvid
   return new EmbeddingProvider({
     model,
     apiKey,
-    batchSize: config.embedding?.batchSize,
+    batchSize: embeddingBatchSize,
   });
 }

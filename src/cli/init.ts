@@ -48,6 +48,11 @@ export async function runInit(): Promise<void> {
               label: 'Ollama',
               hint: 'Local models — zero external data transfer',
             },
+            {
+              value: 'gemini' as const,
+              label: 'Google Gemini',
+              hint: 'Gemini 2.5 Flash — generous free tier',
+            },
           ],
         }),
       apiKeyEnv: ({ results }) => {
