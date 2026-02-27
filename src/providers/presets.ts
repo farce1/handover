@@ -25,7 +25,7 @@ export interface ProviderPreset {
   /** True for Ollama only (controls LOCAL badge, cost omission) */
   isLocal: boolean;
   /** Which SDK to use */
-  sdkType: 'anthropic' | 'openai-compat';
+  sdkType: 'anthropic' | 'openai-compat' | 'gemini';
   /** Model pricing lookup: per-million input/output tokens */
   pricing: Record<string, { inputPerMillion: number; outputPerMillion: number }>;
   /** Known models for validation (non-exhaustive, warn on unknown) */
@@ -36,7 +36,7 @@ export interface ProviderPreset {
 
 /**
  * Registry of all named provider presets.
- * 7 entries: anthropic, openai, ollama, groq, together, deepseek, azure-openai.
+ * 8 entries: anthropic, openai, ollama, groq, together, deepseek, azure-openai, gemini.
  */
 export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
   anthropic: {
@@ -166,6 +166,25 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
       'gpt-4o-mini': { inputPerMillion: 0.15, outputPerMillion: 0.6 },
     },
     supportedModels: ['gpt-4o', 'gpt-4o-mini'],
+    timeoutMs: 120_000,
+  },
+
+  gemini: {
+    name: 'gemini',
+    displayName: 'Google Gemini',
+    baseUrl: '',
+    apiKeyEnv: 'GEMINI_API_KEY',
+    defaultModel: 'gemini-2.5-flash',
+    contextWindow: 1_000_000,
+    defaultConcurrency: 4,
+    isLocal: false,
+    sdkType: 'gemini',
+    pricing: {
+      'gemini-2.5-flash': { inputPerMillion: 0.3, outputPerMillion: 2.5 },
+      'gemini-2.5-pro': { inputPerMillion: 1.25, outputPerMillion: 10 },
+      'gemini-embedding-001': { inputPerMillion: 0.15, outputPerMillion: 0 },
+    },
+    supportedModels: [],
     timeoutMs: 120_000,
   },
 };

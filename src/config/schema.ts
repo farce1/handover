@@ -66,6 +66,7 @@ export const HandoverConfigSchema = z
         'deepseek',
         'azure-openai',
         'custom',
+        'gemini',
       ])
       .default('anthropic'),
     authMethod: z.enum(['api-key', 'subscription']).default('api-key'),

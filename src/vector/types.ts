@@ -164,4 +164,5 @@ export const EMBEDDING_MODELS: Record<string, number> = {
   'text-embedding-3-small': 1536,
   'text-embedding-3-large': 3072,
   'text-embedding-ada-002': 1536,
+  'gemini-embedding-001': 1536,
 };

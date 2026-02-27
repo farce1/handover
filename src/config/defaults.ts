@@ -10,6 +10,7 @@ export const DEFAULT_API_KEY_ENV: Record<string, string> = {
   together: 'TOGETHER_API_KEY',
   deepseek: 'DEEPSEEK_API_KEY',
   'azure-openai': 'AZURE_OPENAI_API_KEY',
+  gemini: 'GEMINI_API_KEY',
   custom: 'LLM_API_KEY',
 };
 
@@ -25,6 +26,7 @@ export const DEFAULT_MODEL: Record<string, string> = {
   together: 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo',
   deepseek: 'deepseek-chat',
   'azure-openai': 'gpt-4o',
+  gemini: 'gemini-2.5-flash',
   custom: 'gpt-4o',
 };
 
@@ -40,5 +42,6 @@ export const DEFAULT_CONCURRENCY: Record<string, number> = {
   together: 4,
   deepseek: 4,
   'azure-openai': 4,
+  gemini: 4,
   custom: 4,
 };
