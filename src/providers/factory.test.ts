@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { validateProviderConfig } from './factory.js';
+import { createProvider, validateProviderConfig } from './factory.js';
 import { ProviderError } from '../utils/errors.js';
 import type { HandoverConfig } from '../config/schema.js';
 
@@ -27,6 +27,11 @@ function baseConfig(overrides: Partial<HandoverConfig> = {}): HandoverConfig {
     },
     ...overrides,
   };
+}
+
+function getProviderConcurrency(provider: unknown): number {
+  const limiter = (provider as { rateLimiter?: { maxConcurrent?: number } }).rateLimiter;
+  return limiter?.maxConcurrent ?? -1;
 }
 
 // ─── validateProviderConfig() tests ──────────────────────────────────────────
@@ -89,5 +94,47 @@ describe('validateProviderConfig', () => {
   test('does not throw for valid openai config', () => {
     const config = baseConfig({ provider: 'openai' });
     expect(() => validateProviderConfig(config)).not.toThrow();
+  });
+});
+
+describe('createProvider', () => {
+  test('enforces concurrency=1 for subscription auth on preset providers', () => {
+    const provider = createProvider(
+      baseConfig({
+        provider: 'openai',
+        authMethod: 'subscription',
+        analysis: { concurrency: 8, staticOnly: false },
+      }),
+      { apiKey: 'sub-token', source: 'credential-store' },
+    );
+
+    expect(getProviderConcurrency(provider)).toBe(1);
+  });
+
+  test('uses configured concurrency for api-key auth', () => {
+    const provider = createProvider(
+      baseConfig({
+        provider: 'openai',
+        authMethod: 'api-key',
+        analysis: { concurrency: 6, staticOnly: false },
+      }),
+      { apiKey: 'api-key', source: 'env-var' },
+    );
+
+    expect(getProviderConcurrency(provider)).toBe(6);
+  });
+
+  test('enforces concurrency=1 for subscription auth on custom provider', () => {
+    const provider = createProvider(
+      baseConfig({
+        provider: 'custom',
+        authMethod: 'subscription',
+        baseUrl: 'https://example.com/v1',
+        analysis: { concurrency: 7, staticOnly: false },
+      }),
+      { apiKey: 'sub-token', source: 'credential-store' },
+    );
+
+    expect(getProviderConcurrency(provider)).toBe(1);
   });
 });

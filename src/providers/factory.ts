@@ -84,6 +84,11 @@ export function validateProviderConfig(config: HandoverConfig): void {
  */
 export function createProvider(config: HandoverConfig, authResult: AuthResult): LLMProvider {
   validateProviderConfig(config);
+  const isSubscription = config.authMethod === 'subscription';
+
+  if (isSubscription) {
+    logger.info('[factory] Subscription auth: enforcing concurrency=1');
+  }
 
   const preset = PROVIDER_PRESETS[config.provider];
 
@@ -92,7 +97,9 @@ export function createProvider(config: HandoverConfig, authResult: AuthResult): 
     const customApiKeyEnv = config.apiKeyEnv ?? 'LLM_API_KEY';
     const apiKey = authResult.apiKey;
     const model = config.model ?? 'gpt-4o';
-    const concurrency = config.analysis.concurrency ?? DEFAULT_CONCURRENCY.custom;
+    const concurrency = isSubscription
+      ? 1
+      : (config.analysis.concurrency ?? DEFAULT_CONCURRENCY.custom);
 
     const customPreset: ProviderPreset = {
       name: 'custom',
@@ -115,7 +122,9 @@ export function createProvider(config: HandoverConfig, authResult: AuthResult): 
   // Resolve configuration with preset fallbacks
   const apiKey = preset.isLocal ? 'ollama' : authResult.apiKey;
   const model = config.model ?? preset.defaultModel;
-  const concurrency = config.analysis.concurrency ?? preset.defaultConcurrency;
+  const concurrency = isSubscription
+    ? 1
+    : (config.analysis.concurrency ?? preset.defaultConcurrency);
 
   switch (preset.sdkType) {
     case 'anthropic':

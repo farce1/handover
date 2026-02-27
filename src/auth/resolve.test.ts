@@ -11,6 +11,17 @@ const mockLogger = vi.hoisted(() => ({
   debug: vi.fn(),
 }));
 
+const mockOpenIdClient = vi.hoisted(() => ({
+  Configuration: class {
+    constructor() {
+      // no-op test stub
+    }
+  },
+  None: vi.fn(() => Symbol('none')),
+  discovery: vi.fn(),
+  refreshTokenGrant: vi.fn(),
+}));
+
 const CANCELLED = Symbol('clack:cancel');
 
 const mockClack = vi.hoisted(() => ({
@@ -22,6 +33,7 @@ const mockClack = vi.hoisted(() => ({
 
 vi.mock('../utils/logger.js', () => ({ logger: mockLogger }));
 vi.mock('@clack/prompts', () => mockClack);
+vi.mock('openid-client', () => mockOpenIdClient);
 
 type MockStore = {
   read: ReturnType<typeof vi.fn>;
@@ -53,6 +65,12 @@ describe('resolveAuth', () => {
     mockClack.isCI.mockReturnValue(false);
     mockClack.password.mockResolvedValue('prompted-key');
     mockClack.isCancel.mockImplementation((value: unknown) => value === CANCELLED);
+    mockOpenIdClient.discovery.mockResolvedValue({ discovered: true });
+    mockOpenIdClient.refreshTokenGrant.mockResolvedValue({
+      access_token: 'refreshed-key',
+      refresh_token: 'rotated-refresh',
+      expires_in: 3600,
+    });
   });
 
   afterEach(() => {
@@ -111,6 +129,50 @@ describe('resolveAuth', () => {
 
     expect(result).toEqual({ apiKey: 'sub-token', source: 'credential-store' });
     expect(store.read).toHaveBeenCalledTimes(1);
+  });
+
+  test('refreshes subscription token when credential expires within five minutes', async () => {
+    const store = createMockStore({
+      provider: 'openai',
+      token: 'stale-token',
+      refreshToken: 'refresh-token',
+      expiresAt: new Date(Date.now() + 4 * 60 * 1000).toISOString(),
+    });
+
+    const result = await resolveAuth(
+      makeConfig({ provider: 'openai', authMethod: 'subscription' }),
+      undefined,
+      store as unknown as TokenStore,
+    );
+
+    expect(mockOpenIdClient.refreshTokenGrant).toHaveBeenCalledTimes(1);
+    expect(store.write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+        token: 'refreshed-key',
+        refreshToken: 'rotated-refresh',
+      }),
+    );
+    expect(result).toEqual({ apiKey: 'refreshed-key', source: 'credential-store' });
+  });
+
+  test('does not refresh subscription token when expiry is more than five minutes away', async () => {
+    const store = createMockStore({
+      provider: 'openai',
+      token: 'current-token',
+      refreshToken: 'refresh-token',
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+
+    const result = await resolveAuth(
+      makeConfig({ provider: 'openai', authMethod: 'subscription' }),
+      undefined,
+      store as unknown as TokenStore,
+    );
+
+    expect(mockOpenIdClient.refreshTokenGrant).not.toHaveBeenCalled();
+    expect(store.write).not.toHaveBeenCalled();
+    expect(result).toEqual({ apiKey: 'current-token', source: 'credential-store' });
   });
 
   test('does not check credential store when authMethod is api-key', async () => {
