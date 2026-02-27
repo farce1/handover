@@ -77,5 +77,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed phase 23 execution and verification (plans 23-01, 23-02)
-Resume file: .planning/ROADMAP.md
+Stopped at: Phase 24 context gathered
+Resume file: .planning/phases/24-generate-integration-onboarding/24-CONTEXT.md
