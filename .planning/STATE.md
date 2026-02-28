@@ -18,7 +18,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v6.0 Codex Auth & Validation — Phase 26: Runtime Validation
+**Current focus:** v6.0 Codex Auth & Validation — Phase 26: Runtime Validation (context gathered)
 
 ## Current Position
 
@@ -97,5 +97,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 25-01-PLAN.md and phase 25 verification
-Resume file: None
+Stopped at: Phase 26 context gathered
+Resume file: .planning/phases/26-runtime-validation/26-CONTEXT.md
