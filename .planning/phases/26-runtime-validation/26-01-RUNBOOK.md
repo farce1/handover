@@ -8,16 +8,16 @@ Target repo: `handover` (this repository)
 
 | Scenario | Requirement | Risk | PASS | FAIL | SKIP | Notes |
 |---|---|---|---|---|---|---|
-| S-01: End-to-end generate then reindex | VAL-01 | HIGH | [ ] | [ ] | [ ] | |
-| S-02: Incremental reindex skip | VAL-01 | MEDIUM | [ ] | [ ] | [ ] | |
-| S-03: Incremental reindex on modified doc | VAL-01 | MEDIUM | [ ] | [ ] | [ ] | |
-| S-04: Index integrity check | VAL-01 | MEDIUM | [ ] | [ ] | [ ] | |
-| S-05: Keyword semantic search | VAL-02 | HIGH | [ ] | [ ] | [ ] | |
-| S-06: QA mode search | VAL-02 | HIGH | [ ] | [ ] | [ ] | |
-| S-07: TTY vs non-TTY output | VAL-02 | LOW | [ ] | [ ] | [ ] | |
-| S-08: Local-only embedding route | VAL-05 | MEDIUM | [ ] | [ ] | [ ] | |
-| S-09: Remote-only embedding route | VAL-05 | MEDIUM | [ ] | [ ] | [ ] | |
-| S-10: Local-preferred with local unavailable | VAL-05 | HIGH | [ ] | [ ] | [ ] | |
+| S-01: End-to-end generate then reindex | VAL-01 | HIGH | [x] | [ ] | [ ] | |
+| S-02: Incremental reindex skip | VAL-01 | MEDIUM | [x] | [ ] | [ ] | |
+| S-03: Incremental reindex on modified doc | VAL-01 | MEDIUM | [x] | [ ] | [ ] | |
+| S-04: Index integrity check | VAL-01 | MEDIUM | [x] | [ ] | [ ] | |
+| S-05: Keyword semantic search | VAL-02 | HIGH | [x] | [ ] | [ ] | |
+| S-06: QA mode search | VAL-02 | HIGH | [x] | [ ] | [ ] | |
+| S-07: TTY vs non-TTY output | VAL-02 | LOW | [x] | [ ] | [ ] | |
+| S-08: Local-only embedding route | VAL-05 | MEDIUM | [x] | [ ] | [ ] | |
+| S-09: Remote-only embedding route | VAL-05 | MEDIUM | [x] | [ ] | [ ] | |
+| S-10: Local-preferred with local unavailable | VAL-05 | HIGH | [x] | [ ] | [ ] | |
 
 ## Prerequisites
 
@@ -86,7 +86,7 @@ sqlite3 .handover/search.db "SELECT COUNT(*) FROM chunks;"
 
 **Pass gate:** Both commands succeed, document count is `14`, and chunk count is `> 50`.  
 **Fail gate:** Any command exits non-zero, docs are missing, or chunk count is `0`/unexpectedly low.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-02: Incremental reindex skip
 
@@ -117,7 +117,7 @@ grep -E "Summary: processed 0, skipped [1-9][0-9]*" /tmp/phase26-s02-reindex.log
 
 **Pass gate:** Skip evidence appears and summary confirms no re-embed work was needed.  
 **Fail gate:** Reindex reprocesses many docs without any content changes.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-03: Incremental reindex on modified doc
 
@@ -153,7 +153,7 @@ grep -E "Summary: processed 1, skipped [1-9][0-9]*" /tmp/phase26-s03-reindex.log
 
 **Pass gate:** Reindex shows the edited file as changed and summary reports `processed 1`.  
 **Fail gate:** Multiple files are unexpectedly reprocessed or changed file is not detected.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-04: Index integrity check
 
@@ -175,7 +175,7 @@ sqlite3 .handover/search.db "SELECT COUNT(*) AS chunks FROM chunks; SELECT COUNT
 
 **Pass gate:** Both query values are non-zero and consistent with a populated index.  
 **Fail gate:** Missing DB, query errors, zero chunks, or implausible source counts.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-05: Keyword semantic search
 
@@ -200,7 +200,7 @@ handover search "error handling patterns" --top-k 5
 
 **Pass gate:** Top result is clearly relevant for at least `2` out of `3` queries.  
 **Fail gate:** Most top results are off-topic or empty despite populated index.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-06: QA mode search
 
@@ -223,7 +223,7 @@ handover search "How does the DAG orchestrator work?" --mode qa --top-k 10
 
 **Pass gate:** Answer references DAG/orchestration behavior and includes citation(s).  
 **Fail gate:** QA mode fails due to provider/config issues or returns uncited/non-answer output.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-07: TTY vs non-TTY output
 
@@ -249,7 +249,7 @@ handover search "testing strategy" --top-k 3 | cat
 
 **Pass gate:** Both modes produce valid readable results without corruption.  
 **Fail gate:** Output corruption, missing fields, or unreadable piped output.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-08: Local-only embedding route
 
@@ -279,7 +279,7 @@ handover reindex --embedding-mode local-only --verbose
 
 **Pass gate:** Command exits `0` and route line confirms local provider.  
 **Fail gate:** Local provider availability errors or route reports remote provider.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-09: Remote-only embedding route
 
@@ -305,7 +305,7 @@ handover reindex --embedding-mode remote-only --verbose
 
 **Pass gate:** Command exits `0` and route line confirms remote provider.  
 **Fail gate:** Route does not match mode or command fails before indexing.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-10: Local-preferred with local unavailable
 
@@ -341,7 +341,7 @@ grep -F "EMBEDDING_CONFIRMATION_REQUIRED" /tmp/phase26-s10-local-preferred.log
 
 **Pass gate:** Non-zero exit with explicit confirmation-required error (no silent remote fallback).  
 **Fail gate:** Command silently falls back to remote without confirmation semantics.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ## Cleanup
 
