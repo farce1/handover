@@ -8,18 +8,18 @@ Target repo: `handover` (this repository)
 
 | Scenario | Requirement | Client | Risk | PASS | FAIL | SKIP | Notes |
 |---|---|---|---|---|---|---|---|
-| S-01: Tool/resource discovery (Claude Desktop) | VAL-03 | Claude Desktop | HIGH | [ ] | [ ] | [ ] | |
-| S-02: Semantic search via MCP (Claude Desktop) | VAL-03 | Claude Desktop | HIGH | [ ] | [ ] | [ ] | |
-| S-03: Tool/resource discovery (Cursor) | VAL-03 | Cursor | MEDIUM | [ ] | [ ] | [ ] | |
-| S-04: Semantic search via MCP (Cursor) | VAL-03 | Cursor | MEDIUM | [ ] | [ ] | [ ] | |
-| S-05: Tool/resource discovery (VS Code) | VAL-03 | VS Code | MEDIUM | [ ] | [ ] | [ ] | |
-| S-06: Semantic search via MCP (VS Code) | VAL-03 | VS Code | MEDIUM | [ ] | [ ] | [ ] | |
-| S-07: QA stream start with progress | VAL-04 | Any MCP client (Claude preferred) | HIGH | [ ] | [ ] | [ ] | |
-| S-08: QA stream status check | VAL-04 | Any MCP client | HIGH | [ ] | [ ] | [ ] | |
-| S-09: QA stream resume after disconnect | VAL-04 | Any MCP client | HIGH | [ ] | [ ] | [ ] | |
-| S-10: Regeneration trigger | VAL-06 | Any MCP client | HIGH | [ ] | [ ] | [ ] | |
-| S-11: Regeneration status polling | VAL-06 | Any MCP client | HIGH | [ ] | [ ] | [ ] | |
-| S-12: Regeneration dedupe on duplicate trigger | VAL-06 | Any MCP client | MEDIUM | [ ] | [ ] | [ ] | |
+| S-01: Tool/resource discovery (Claude Desktop) | VAL-03 | Claude Desktop | HIGH | [x] | [ ] | [ ] | |
+| S-02: Semantic search via MCP (Claude Desktop) | VAL-03 | Claude Desktop | HIGH | [x] | [ ] | [ ] | |
+| S-03: Tool/resource discovery (Cursor) | VAL-03 | Cursor | MEDIUM | [x] | [ ] | [ ] | |
+| S-04: Semantic search via MCP (Cursor) | VAL-03 | Cursor | MEDIUM | [x] | [ ] | [ ] | |
+| S-05: Tool/resource discovery (VS Code) | VAL-03 | VS Code | MEDIUM | [x] | [ ] | [ ] | |
+| S-06: Semantic search via MCP (VS Code) | VAL-03 | VS Code | MEDIUM | [x] | [ ] | [ ] | |
+| S-07: QA stream start with progress | VAL-04 | Any MCP client (Claude preferred) | HIGH | [x] | [ ] | [ ] | |
+| S-08: QA stream status check | VAL-04 | Any MCP client | HIGH | [x] | [ ] | [ ] | |
+| S-09: QA stream resume after disconnect | VAL-04 | Any MCP client | HIGH | [x] | [ ] | [ ] | |
+| S-10: Regeneration trigger | VAL-06 | Any MCP client | HIGH | [x] | [ ] | [ ] | |
+| S-11: Regeneration status polling | VAL-06 | Any MCP client | HIGH | [x] | [ ] | [ ] | |
+| S-12: Regeneration dedupe on duplicate trigger | VAL-06 | Any MCP client | MEDIUM | [x] | [ ] | [ ] | |
 
 ## Prerequisites
 
@@ -121,7 +121,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** Connected server + readable resource + visible `semantic_search` tool schema.  
 **Fail gate:** Cannot connect, resources empty/unreadable, or tool missing.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-02: Semantic search via MCP tool (Claude Desktop)
 
@@ -148,7 +148,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** `ok: true` with at least one result entry.  
 **Fail gate:** Tool error, malformed payload, or empty results on known populated index.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-03: Tool and resource discovery (Cursor)
 
@@ -170,7 +170,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** Connection + resource read + tool visibility all succeed.  
 **Fail gate:** Any of the three capability checks fails.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-04: Semantic search via MCP tool (Cursor)
 
@@ -194,7 +194,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** Successful result payload with non-empty `results`.  
 **Fail gate:** Tool call fails or returns invalid structure.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-05: Tool and resource discovery (VS Code)
 
@@ -216,7 +216,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** All three checks pass: connection, resources, tool availability.  
 **Fail gate:** Missing connection, missing resources, or missing tool.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-06: Semantic search via MCP tool (VS Code)
 
@@ -240,7 +240,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** Structured successful payload with at least one result.  
 **Fail gate:** Invocation fails or payload does not match expected fields.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-07: QA stream start with progress
 
@@ -269,7 +269,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** Valid `sessionId` plus completed answer payload. Progress notifications are a strong positive signal but not strictly required on very fast runs.  
 **Fail gate:** Missing `sessionId`, missing final answer, or tool-level error.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-08: QA stream status check
 
@@ -293,7 +293,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** `events` array is non-empty and reflects session lifecycle events.  
 **Fail gate:** Session lookup errors or empty event history for known completed session.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-09: QA stream resume after disconnect
 
@@ -328,7 +328,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** Resume returns events without protocol/session errors.  
 **Fail gate:** Resume fails despite valid session ID and cursor semantics.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-10: Regeneration trigger
 
@@ -357,7 +357,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** Valid job reference returned with expected fields and first-call dedupe state.  
 **Fail gate:** Trigger rejected or no pollable job metadata returned.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-11: Regeneration status polling to completion
 
@@ -383,7 +383,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** Terminal state reached with valid lifecycle metadata and no protocol errors.  
 **Fail gate:** Invalid transitions, missing status payloads, or polling dead-end.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ### S-12: Regeneration dedupe on rapid duplicate trigger
 
@@ -411,7 +411,7 @@ Reload VS Code after config changes.
 
 **Pass gate:** Duplicate call joins in-flight job and returns same `jobId`.  
 **Fail gate:** Duplicate call creates a separate concurrent job for same target while first is still running.  
-**Result:** [ ] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
+**Result:** [x] PASS  [ ] FAIL  [ ] SKIP  Notes: __________
 
 ## Cleanup
 
