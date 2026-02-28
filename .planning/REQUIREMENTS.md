@@ -45,9 +45,9 @@ Requirements for the Codex Auth & Validation milestone. Each maps to roadmap pha
 
 ### Security
 
-- [ ] **SEC-01**: No credential data is included in npm publish (`files` allowlist or `.npmignore` verified)
-- [ ] **SEC-02**: Auth tokens are never logged in debug/info output — only auth method name is logged
-- [ ] **SEC-03**: Anthropic subscription OAuth restriction is documented in provider setup docs (API key only, permanently)
+- [x] **SEC-01**: No credential data is included in npm publish (`files` allowlist or `.npmignore` verified)
+- [x] **SEC-02**: Auth tokens are never logged in debug/info output — only auth method name is logged
+- [x] **SEC-03**: Anthropic subscription OAuth restriction is documented in provider setup docs (API key only, permanently)
 
 ### Runtime Validation
 
@@ -113,9 +113,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ONB-01 | Phase 24 | Complete |
 | ONB-02 | Phase 24 | Complete |
 | ONB-03 | Phase 24 | Complete |
-| SEC-01 | Phase 25 | Pending |
-| SEC-02 | Phase 25 | Pending |
-| SEC-03 | Phase 25 | Pending |
+| SEC-01 | Phase 25 | Complete |
+| SEC-02 | Phase 25 | Complete |
+| SEC-03 | Phase 25 | Complete |
 | VAL-01 | Phase 26 | Pending |
 | VAL-02 | Phase 26 | Pending |
 | VAL-03 | Phase 26 | Pending |

@@ -19,7 +19,7 @@
 - [x] **Phase 22: Gemini Provider** - Google Gemini as a fully supported LLM provider via API key (completed 2026-02-27)
 - [x] **Phase 23: Codex Auth Commands** - PKCE browser OAuth flow and `handover auth` CLI command group (completed 2026-02-27)
 - [x] **Phase 24: Generate Integration & Onboarding** - Wire subscription auth into `generate` and deliver first-run interactive setup (completed 2026-02-27)
-- [ ] **Phase 25: Security Hardening** - npm publish safety, log redaction, and Anthropic restriction documentation
+- [x] **Phase 25: Security Hardening** - npm publish safety, log redaction, and Anthropic restriction documentation (completed 2026-02-28)
 - [ ] **Phase 26: Runtime Validation** - Human-executed validation matrix for all deferred v4.0/v5.0 runtime behaviors
 
 ## Phase Details
@@ -96,10 +96,10 @@ Plans:
   1. `npm pack --dry-run` in CI confirms `~/.handover/credentials.json` and all auth token paths are absent from the published package
   2. Debug and info log output never contains token values — only auth method names appear in logs
   3. Provider setup docs explicitly state that Anthropic providers require API key auth and that subscription OAuth is not available or compliant
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 25-01-PLAN.md — npm publish-safety CI job, log redaction regression tests, and Anthropic auth restriction documentation
+- [x] 25-01-PLAN.md — npm publish-safety CI job, log redaction regression tests, and Anthropic auth restriction documentation
 
 ### Phase 26: Runtime Validation
 **Goal**: All deferred v4.0 and v5.0 runtime behaviors are verified against real providers and live MCP clients
@@ -129,5 +129,5 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25 → 26
 | 22. Gemini Provider | 2/2 | Complete    | 2026-02-27 | - |
 | 23. Codex Auth Commands | 2/2 | Complete    | 2026-02-27 | - |
 | 24. Generate Integration & Onboarding | 3/3 | Complete    | 2026-02-27 | - |
-| 25. Security Hardening | v6.0 | 0/1 | Not started | - |
+| 25. Security Hardening | 1/1 | Complete    | 2026-02-28 | - |
 | 26. Runtime Validation | v6.0 | 0/2 | Not started | - |

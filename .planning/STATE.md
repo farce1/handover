@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Codex Auth & Validation
 status: unknown
-last_updated: "2026-02-27T17:54:28.424Z"
+last_updated: "2026-02-28T00:03:35.000Z"
 progress:
-  total_phases: 13
-  completed_phases: 13
-  total_plans: 33
-  completed_plans: 33
+  total_phases: 14
+  completed_phases: 14
+  total_plans: 34
+  completed_plans: 34
 ---
 
 # Project State
@@ -18,15 +18,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v6.0 Codex Auth & Validation — Phase 25: Security Hardening
+**Current focus:** v6.0 Codex Auth & Validation — Phase 26: Runtime Validation
 
 ## Current Position
 
 Milestone: v6.0 Codex Auth & Validation
-Phase: 24 of 26 (Generate Integration & Onboarding)
-Plan: 03 of 03
+Phase: 25 of 26 (Security Hardening)
+Plan: 01 of 01
 Status: Complete
-Last activity: 2026-02-27 - completed phase 24 verification after generate integration and onboarding delivery
+Last activity: 2026-02-28 - completed phase 25 verification after security hardening delivery
 
 Progress: [██████████] 100%
 
@@ -40,9 +40,9 @@ Progress: [██████████] 100%
 - Timeline: 3 days (2026-02-23 to 2026-02-25)
 
 **v6.0 Velocity:**
-- Total plans completed: 10
-- Average duration: ~2.2 min/plan
-- Total execution time: ~22 min
+- Total plans completed: 11
+- Average duration: ~2.3 min/plan
+- Total execution time: ~25 min
 
 ## Accumulated Context
 
@@ -76,6 +76,9 @@ Key decisions from research locked for v6.0:
 - [Phase 24]: Subscription runs suppress dollar cost lines and show subscription credits across TTY and CI renderers. — Avoids misleading dollar amounts when billing is subscription-based while preserving token/performance visibility.
 - [Phase 24]: Onboarding now runs before loadConfig only for interactive first-run sessions (TTY + non-CI + no config/env). — Allows generate to consume newly written .handover.yml immediately while preserving non-interactive automation behavior.
 - [Phase 24]: Onboarding provider flow differentiates continuation behavior: subscription/ollama continue immediately, API-key flows stop after export guidance. — Prevents confusing auth failures and keeps UX aligned with each provider's credential mechanism.
+- [Phase 25]: CI now enforces npm publish safety by failing on `credentials.json` or `.handover/` paths in `npm pack --dry-run` output.
+- [Phase 25]: Auth resolution regression tests assert sensitive env/CLI/subscription values never appear in logger output.
+- [Phase 25]: Provider setup docs now explicitly state Anthropic is API key only and does not support OAuth/subscription auth.
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ External setup still required (unchanged from v5.0):
 
 ## Session Continuity
 
-Last session: 2026-02-27
-Stopped at: Completed 24-03-PLAN.md and phase 24 verification
+Last session: 2026-02-28
+Stopped at: Completed 25-01-PLAN.md and phase 25 verification
 Resume file: None
