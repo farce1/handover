@@ -51,12 +51,12 @@ Requirements for the Codex Auth & Validation milestone. Each maps to roadmap pha
 
 ### Runtime Validation
 
-- [ ] **VAL-01**: Full provider-backed generate then reindex pipeline validated end-to-end
-- [ ] **VAL-02**: Semantic relevance quality checked on populated real indexes (not just synthetic test data)
-- [ ] **VAL-03**: MCP client interoperability verified against Claude Desktop, Cursor, and VS Code
-- [ ] **VAL-04**: Streaming QA timing and reconnect/resume behavior validated with real MCP clients
-- [ ] **VAL-05**: Local embedding runtime fallback and route-visibility verified in provider-backed environments
-- [ ] **VAL-06**: End-to-end remote regeneration trigger/status lifecycle validated against live MCP clients
+- [x] **VAL-01**: Full provider-backed generate then reindex pipeline validated end-to-end
+- [x] **VAL-02**: Semantic relevance quality checked on populated real indexes (not just synthetic test data)
+- [x] **VAL-03**: MCP client interoperability verified against Claude Desktop, Cursor, and VS Code
+- [x] **VAL-04**: Streaming QA timing and reconnect/resume behavior validated with real MCP clients
+- [x] **VAL-05**: Local embedding runtime fallback and route-visibility verified in provider-backed environments
+- [x] **VAL-06**: End-to-end remote regeneration trigger/status lifecycle validated against live MCP clients
 
 ## v7.0 Requirements
 
@@ -116,12 +116,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SEC-01 | Phase 25 | Complete |
 | SEC-02 | Phase 25 | Complete |
 | SEC-03 | Phase 25 | Complete |
-| VAL-01 | Phase 26 | Pending |
-| VAL-02 | Phase 26 | Pending |
-| VAL-03 | Phase 26 | Pending |
-| VAL-04 | Phase 26 | Pending |
-| VAL-05 | Phase 26 | Pending |
-| VAL-06 | Phase 26 | Pending |
+| VAL-01 | Phase 26 | Complete |
+| VAL-02 | Phase 26 | Complete |
+| VAL-03 | Phase 26 | Complete |
+| VAL-04 | Phase 26 | Complete |
+| VAL-05 | Phase 26 | Complete |
+| VAL-06 | Phase 26 | Complete |
 
 **Coverage:**
 - v6.0 requirements: 30 total
@@ -130,4 +130,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-27 after phase 23 completion*
+*Last updated: 2026-02-28 after phase 26 completion*

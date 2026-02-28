@@ -20,7 +20,7 @@
 - [x] **Phase 23: Codex Auth Commands** - PKCE browser OAuth flow and `handover auth` CLI command group (completed 2026-02-27)
 - [x] **Phase 24: Generate Integration & Onboarding** - Wire subscription auth into `generate` and deliver first-run interactive setup (completed 2026-02-27)
 - [x] **Phase 25: Security Hardening** - npm publish safety, log redaction, and Anthropic restriction documentation (completed 2026-02-28)
-- [ ] **Phase 26: Runtime Validation** - Human-executed validation matrix for all deferred v4.0/v5.0 runtime behaviors
+- [x] **Phase 26: Runtime Validation** - Human-executed validation matrix for all deferred v4.0/v5.0 runtime behaviors (completed 2026-02-28)
 
 ## Phase Details
 
@@ -112,11 +112,11 @@ Plans:
   4. Streaming QA sessions run to completion and resume correctly after disconnect with a real MCP client
   5. Local embedding fallback activates correctly when remote provider is unavailable, with route visibility confirmed in CLI output
   6. Remote regeneration trigger and status polling complete the full lifecycle against a live MCP client
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 26-01-PLAN.md — Provider-backed pipeline, semantic relevance, and embedding fallback runbook + execution
-- [ ] 26-02-PLAN.md — MCP client interop matrix, streaming QA, and remote regeneration lifecycle runbook + execution
+- [x] 26-01-PLAN.md — Provider-backed pipeline, semantic relevance, and embedding fallback runbook + execution
+- [x] 26-02-PLAN.md — MCP client interop matrix, streaming QA, and remote regeneration lifecycle runbook + execution
 
 ## Progress
 
@@ -130,4 +130,4 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25 → 26
 | 23. Codex Auth Commands | 2/2 | Complete    | 2026-02-27 | - |
 | 24. Generate Integration & Onboarding | 3/3 | Complete    | 2026-02-27 | - |
 | 25. Security Hardening | 1/1 | Complete    | 2026-02-28 | - |
-| 26. Runtime Validation | v6.0 | 0/2 | Not started | - |
+| 26. Runtime Validation | 2/2 | Complete    | 2026-02-28 | - |

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Codex Auth & Validation
 status: unknown
-last_updated: "2026-02-28T00:03:35.000Z"
+last_updated: "2026-02-28T14:34:33.104Z"
 progress:
-  total_phases: 14
-  completed_phases: 14
-  total_plans: 34
-  completed_plans: 34
+  total_phases: 15
+  completed_phases: 15
+  total_plans: 36
+  completed_plans: 36
 ---
 
 # Project State
@@ -18,15 +18,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v6.0 Codex Auth & Validation — Phase 26: Runtime Validation (context gathered)
+**Current focus:** v6.0 Codex Auth & Validation — Phase 26: Runtime Validation (completed and verified)
 
 ## Current Position
 
 Milestone: v6.0 Codex Auth & Validation
-Phase: 25 of 26 (Security Hardening)
-Plan: 01 of 01
+Phase: 26 of 26 (Runtime Validation)
+Plan: 02 of 02
 Status: Complete
-Last activity: 2026-02-28 - completed phase 25 verification after security hardening delivery
+Last activity: 2026-02-28 - completed phase 26 runtime validation and verification
 
 Progress: [██████████] 100%
 
@@ -40,9 +40,9 @@ Progress: [██████████] 100%
 - Timeline: 3 days (2026-02-23 to 2026-02-25)
 
 **v6.0 Velocity:**
-- Total plans completed: 11
-- Average duration: ~2.3 min/plan
-- Total execution time: ~25 min
+- Total plans completed: 13
+- Average duration: ~8.5 min/plan (includes human validation checkpoints)
+- Total execution time: ~110 min
 
 ## Accumulated Context
 
@@ -79,6 +79,9 @@ Key decisions from research locked for v6.0:
 - [Phase 25]: CI now enforces npm publish safety by failing on `credentials.json` or `.handover/` paths in `npm pack --dry-run` output.
 - [Phase 25]: Auth resolution regression tests assert sensitive env/CLI/subscription values never appear in logger output.
 - [Phase 25]: Provider setup docs now explicitly state Anthropic is API key only and does not support OAuth/subscription auth.
+- [Phase 26]: Runtime validation is executed through two requirement-mapped runbooks (CLI + MCP) with scenario-level PASS/FAIL/SKIP gates.
+- [Phase 26]: Manual checkpoint approval is captured by updating runbook scenario result markers and treated as phase verification evidence.
+- [Phase 26]: All deferred runtime requirements VAL-01 through VAL-06 are now marked complete in REQUIREMENTS.md traceability.
 
 ### Pending Todos
 
@@ -97,5 +100,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Phase 26 context gathered
-Resume file: .planning/phases/26-runtime-validation/26-CONTEXT.md
+Stopped at: Completed phase 26 execution and verification
+Resume file: None
