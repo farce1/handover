@@ -93,3 +93,26 @@
 - Phase 19 verification artifact gap (`19-VERIFICATION.md` missing) despite integration coverage and shipped behavior
 
 ---
+
+## v6.0 Codex Auth & Validation (Shipped: 2026-02-28)
+
+**Phases completed:** 6 phases, 13 plans, 27 tasks
+**Timeline:** 3 days (2026-02-26 -> 2026-02-28)
+**Git range:** feat(21-01) -> docs(phase-26)
+**Code delta:** 71 files changed, 9435 insertions(+), 340 deletions(-)
+
+**Key accomplishments:**
+
+- Added shared auth infrastructure (token store, auth resolution, provider integration), including strict precedence and fail-closed credential handling.
+- Added Gemini provider and embedding support with full config/factory/auth wiring and index-compatible embedding dimensions.
+- Added Codex OAuth auth commands (`handover auth login/status`) with PKCE flow and proactive subscription token refresh.
+- Integrated subscription auth UX into `generate` and onboarding, including auth-mode-aware display and first-run setup flow.
+- Added security hardening guardrails (publish-safety CI check, auth log redaction regression coverage, provider auth policy docs).
+- Completed runtime validation runbooks for CLI and MCP paths, marking all VAL-01..VAL-06 flows as passed.
+
+### Known Gaps (Accepted At Milestone Close)
+
+- `AUTH-01` through `AUTH-04` remain unchecked/pending in `REQUIREMENTS.md` traceability despite completed implementation in Phase 21 (requirements bookkeeping drift accepted for archive).
+- No standalone `v6.0-MILESTONE-AUDIT.md` file was present at completion time; milestone archived via proceed-anyway path.
+
+---

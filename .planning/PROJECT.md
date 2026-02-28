@@ -8,16 +8,35 @@ An open source TypeScript CLI that generates comprehensive, AI-powered codebase 
 
 Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
 
-## Current Milestone: v6.0 Subscription Auth & Validation
+## Current State
 
-**Goal:** Let users authenticate with their existing subscription plans (Claude Max, OpenAI Plus/Pro, Codex) instead of API keys, and close deferred runtime validation gaps from v4.0/v5.0.
+**Latest shipped milestone:** v6.0 Codex Auth & Validation (2026-02-28)
 
-**Target features:**
-- Subscription-based auth for Claude Max (use claude.ai plan credits instead of Anthropic API key)
-- Subscription-based auth for OpenAI Plus/Pro (use ChatGPT plan credits instead of OpenAI API key)
-- Subscription-based auth for Codex (use Codex plan subscription instead of OpenAI API key)
-- Per-provider auth method selection in config (API key OR subscription auth)
-- Deferred runtime validation: provider-backed generate→reindex, semantic relevance checks, MCP client interop matrix, streaming QA timing, local embedding fallback, remote regen lifecycle
+What shipped:
+- OpenAI Codex subscription auth support (PKCE login, token refresh, provider integration)
+- Gemini provider support across generation and embeddings
+- First-run onboarding and auth-mode-aware runtime UX for generate/search/reindex flows
+- Security hardening guardrails for publish artifacts and auth log redaction
+- Runtime validation matrix completion for deferred v4.0/v5.0 behaviors (`VAL-01` through `VAL-06`)
+
+### Next Milestone Goals (Draft)
+
+- Ship secure credential storage uplift via OS keychain integration (`AUTH-05`)
+- Add auth lifecycle commands for session management (`AUTH-07`, `AUTH-08`)
+- Add headless/device auth path for SSH/container environments (`AUTH-06`)
+- Continue advanced auth ergonomics and operational safety hardening
+
+<details>
+<summary>v6.0 Milestone Snapshot</summary>
+
+Goal: Add OpenAI Codex subscription-based auth as an alternative to API keys and close deferred runtime validation gaps from v4.0/v5.0.
+
+Primary outcomes:
+- Codex OAuth via PKCE browser flow
+- Auth infrastructure and generate/onboarding integration
+- Runtime validation runbooks for CLI and MCP paths
+
+</details>
 
 ## Requirements
 
@@ -70,19 +89,23 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - ✓ Remote regeneration MCP lifecycle (`regenerate_docs`, `regenerate_docs_status`) with single-flight dedupe — v5.0
 - ✓ Optional Streamable HTTP MCP transport with stdio parity and canonical endpoint routing — v5.0
 - ✓ HTTP origin/auth security middleware with non-loopback startup auth guardrails — v5.0
+- ✓ OpenAI Codex subscription OAuth via PKCE browser flow — v6.0
+- ✓ Auth CLI commands: login and status — v6.0
+- ✓ Secure credential storage with file-based fallback (`~/.handover/credentials.json`, 0600) — v6.0
+- ✓ Per-provider auth method config (API key OR subscription where available) — v6.0
+- ✓ Provider-backed generate→reindex runtime validation — v6.0
+- ✓ Semantic relevance quality checks on real indexes — v6.0
+- ✓ MCP client interoperability matrix (Claude Desktop/Cursor/VS Code) — v6.0
+- ✓ Streaming QA timing and reconnect/resume behavior validation — v6.0
+- ✓ Local embedding runtime fallback verification — v6.0
+- ✓ End-to-end remote regeneration lifecycle validation — v6.0
 
 ### Active
 
-- [ ] Subscription auth for Claude Max (claude.ai plan credits)
-- [ ] Subscription auth for OpenAI Plus/Pro (ChatGPT plan credits)
-- [ ] Subscription auth for Codex (Codex plan subscription)
-- [ ] Per-provider auth method config (API key OR subscription)
-- [ ] Provider-backed generate→reindex runtime validation
-- [ ] Semantic relevance quality checks on real indexes
-- [ ] MCP client interoperability matrix (Claude Desktop/Cursor/VS Code)
-- [ ] Streaming QA timing and reconnect/resume behavior validation
-- [ ] Local embedding runtime fallback verification
-- [ ] End-to-end remote regeneration lifecycle validation
+- [ ] OS keychain-backed credential storage (`AUTH-05`)
+- [ ] Headless device-code auth flow (`AUTH-06`)
+- [ ] `handover auth token` support for CI/CD injection (`AUTH-07`)
+- [ ] `handover auth logout` command and full credential clearing (`AUTH-08`)
 
 ### Out of Scope
 
@@ -103,7 +126,7 @@ Every person (or LLM) who encounters this repo should understand what handover d
 - v4.0 MCP Server & Semantic Search: shipped 2026-02-22 (4 phases, 11 plans)
 - v5.0 Remote & Advanced MCP: shipped 2026-02-26 (5 phases, 12 plans, 28 tasks)
 - v5.0 audit status: tech_debt (17/17 requirements satisfied; deferred human runtime validation follow-ups)
-- v6.0 Subscription Auth & Validation: in progress
+- v6.0 Codex Auth & Validation: shipped 2026-02-28 (6 phases, 13 plans, 27 tasks)
 - Architecture: DAG orchestrator, 8 static analyzers, 6 AI rounds, 14 document renderers, Zod-first domain model
 - CI runs on every PR; release-please automates versioning; OIDC publishes to npm with provenance
 - Codebase: ~31.7K LOC TypeScript across 151 source/test files, 254 tests, 92%+ coverage
@@ -160,4 +183,4 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ---
 
-_Last updated: 2026-02-26 after v6.0 milestone start_
+_Last updated: 2026-02-28 after v6.0 milestone completion_

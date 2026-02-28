@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
+milestone: v6.0
 milestone_name: Codex Auth & Validation
-status: unknown
-last_updated: "2026-02-28T14:34:33.104Z"
+status: milestone_complete
+last_updated: "2026-02-28T18:05:10.046Z"
 progress:
   total_phases: 15
   completed_phases: 15
@@ -15,18 +15,18 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-26)
+See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v6.0 Codex Auth & Validation — Phase 26: Runtime Validation (completed and verified)
+**Current focus:** Planning next milestone (v7.0 draft goals captured in PROJECT.md)
 
 ## Current Position
 
 Milestone: v6.0 Codex Auth & Validation
-Phase: 26 of 26 (Runtime Validation)
-Plan: 02 of 02
-Status: Complete
-Last activity: 2026-02-28 - completed phase 26 runtime validation and verification
+Phase: None (milestone archived)
+Plan: None
+Status: Milestone complete
+Last activity: 2026-02-28 - archived v6.0 milestone artifacts and prepared next milestone handoff
 
 Progress: [██████████] 100%
 
@@ -82,6 +82,7 @@ Key decisions from research locked for v6.0:
 - [Phase 26]: Runtime validation is executed through two requirement-mapped runbooks (CLI + MCP) with scenario-level PASS/FAIL/SKIP gates.
 - [Phase 26]: Manual checkpoint approval is captured by updating runbook scenario result markers and treated as phase verification evidence.
 - [Phase 26]: All deferred runtime requirements VAL-01 through VAL-06 are now marked complete in REQUIREMENTS.md traceability.
+- [Milestone v6.0]: Closed via proceed-anyway path with known requirements bookkeeping drift (`AUTH-01` through `AUTH-04`) captured in MILESTONES.md.
 
 ### Pending Todos
 
@@ -100,5 +101,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed phase 26 execution and verification
-Resume file: None
+Stopped at: Completed v6.0 milestone archival and release tagging
+Resume file: $gsd-new-milestone
