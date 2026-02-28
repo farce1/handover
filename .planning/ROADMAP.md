@@ -112,11 +112,11 @@ Plans:
   4. Streaming QA sessions run to completion and resume correctly after disconnect with a real MCP client
   5. Local embedding fallback activates correctly when remote provider is unavailable, with route visibility confirmed in CLI output
   6. Remote regeneration trigger and status polling complete the full lifecycle against a live MCP client
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 26-01: Provider-backed pipeline, semantic relevance, and embedding fallback validation
-- [ ] 26-02: MCP client interop matrix, streaming QA, and remote regeneration lifecycle validation
+- [ ] 26-01-PLAN.md — Provider-backed pipeline, semantic relevance, and embedding fallback runbook + execution
+- [ ] 26-02-PLAN.md — MCP client interop matrix, streaming QA, and remote regeneration lifecycle runbook + execution
 
 ## Progress
 
