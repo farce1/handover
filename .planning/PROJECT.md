@@ -19,12 +19,16 @@ What shipped:
 - Security hardening guardrails for publish artifacts and auth log redaction
 - Runtime validation matrix completion for deferred v4.0/v5.0 behaviors (`VAL-01` through `VAL-06`)
 
-### Next Milestone Goals (Draft)
+## Current Milestone: v7.0 Quality, Performance & Polish
 
-- Ship secure credential storage uplift via OS keychain integration (`AUTH-05`)
-- Add auth lifecycle commands for session management (`AUTH-07`, `AUTH-08`)
-- Add headless/device auth path for SSH/container environments (`AUTH-06`)
-- Continue advanced auth ergonomics and operational safety hardening
+**Goal:** Raise test coverage to 90%+, add git-aware incremental regeneration, polish search/QA UX, and close documentation gaps with smarter onboarding.
+
+**Target features:**
+- 90%+ test coverage with integration tests for CLI, auth, vector/search modules
+- Git-aware incremental regeneration — only re-analyze changed files + affected rounds
+- Search & QA polish — index stats, result-to-source linking, confidence threshold filtering
+- User documentation — troubleshooting guide, search walkthrough, embedding mode docs, performance tuning
+- Smarter `handover init` — interactive wizard for audience, exclusions, cost settings, embedding locality
 
 <details>
 <summary>v6.0 Milestone Snapshot</summary>
@@ -102,6 +106,16 @@ Primary outcomes:
 
 ### Active
 
+- [ ] 90%+ test coverage with integration tests for CLI, auth, vector/search modules
+- [ ] Git-aware incremental regeneration (dirty-check, changed-file-only re-analysis)
+- [ ] Search index stats command, result-to-source linking, confidence threshold filtering
+- [ ] QA session UX polish (token consumption visibility, batch/export)
+- [ ] Troubleshooting guide, search/reindex walkthrough, embedding mode trade-off docs
+- [ ] Performance tuning guide (concurrency, caching, embedding locality recommendations)
+- [ ] Interactive `handover init` wizard (audience, exclusions, cost settings, embedding locality)
+
+### Deferred
+
 - [ ] OS keychain-backed credential storage (`AUTH-05`)
 - [ ] Headless device-code auth flow (`AUTH-06`)
 - [ ] `handover auth token` support for CI/CD injection (`AUTH-07`)
@@ -127,6 +141,7 @@ Primary outcomes:
 - v5.0 Remote & Advanced MCP: shipped 2026-02-26 (5 phases, 12 plans, 28 tasks)
 - v5.0 audit status: tech_debt (17/17 requirements satisfied; deferred human runtime validation follow-ups)
 - v6.0 Codex Auth & Validation: shipped 2026-02-28 (6 phases, 13 plans, 27 tasks)
+- v7.0 Quality, Performance & Polish: in progress — test coverage, incremental regen, search polish, docs
 - Architecture: DAG orchestrator, 8 static analyzers, 6 AI rounds, 14 document renderers, Zod-first domain model
 - CI runs on every PR; release-please automates versioning; OIDC publishes to npm with provenance
 - Codebase: ~31.7K LOC TypeScript across 151 source/test files, 254 tests, 92%+ coverage
@@ -183,4 +198,4 @@ Primary outcomes:
 
 ---
 
-_Last updated: 2026-02-28 after v6.0 milestone completion_
+_Last updated: 2026-03-01 after v7.0 milestone start_

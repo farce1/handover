@@ -1,34 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v6.0
-milestone_name: Codex Auth & Validation
-status: milestone_complete
-last_updated: "2026-02-28T18:05:10.046Z"
+milestone: v7.0
+milestone_name: Quality, Performance & Polish
+status: defining_requirements
+last_updated: "2026-03-01"
 progress:
-  total_phases: 15
-  completed_phases: 15
-  total_plans: 36
-  completed_plans: 36
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-28)
+See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** Planning next milestone (v7.0 draft goals captured in PROJECT.md)
+**Current focus:** v7.0 Quality, Performance & Polish — test coverage, incremental regen, search polish, docs
 
 ## Current Position
 
-Milestone: v6.0 Codex Auth & Validation
-Phase: None (milestone archived)
-Plan: None
-Status: Milestone complete
-Last activity: 2026-02-28 - archived v6.0 milestone artifacts and prepared next milestone handoff
+Milestone: v7.0 Quality, Performance & Polish
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-01 — Milestone v7.0 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -100,6 +100,6 @@ External setup still required (unchanged from v5.0):
 
 ## Session Continuity
 
-Last session: 2026-02-28
-Stopped at: Completed v6.0 milestone archival and release tagging
-Resume file: $gsd-new-milestone
+Last session: 2026-03-01
+Stopped at: Defining v7.0 requirements
+Resume file: none
