@@ -78,5 +78,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Roadmap created for v7.0 — 4 phases (27-30), 16 requirements mapped, ready to plan Phase 27
-Resume file: none
+Stopped at: Phase 27 context gathered
+Resume file: .planning/phases/27-test-coverage-infrastructure/27-CONTEXT.md
