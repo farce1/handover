@@ -503,6 +503,239 @@ describe('packFiles', () => {
     const secondResult = result.files.find((f) => f.path === 'second.ts');
     expect(secondResult?.tier).not.toBe('full');
   });
+
+  test('oversized file includes edge-case marker sections when TODO appears in non-exported function', async () => {
+    const fillerLines = Array.from({ length: 450 }, (_, i) => `const filler_${i} = ${i};`).join(
+      '\n',
+    );
+    const fileContent = [
+      'export function exportedFn() {',
+      "  return 'ok';",
+      '}',
+      '',
+      'function handleEdgeCase() {',
+      '  // TODO: add retry cap',
+      '  return false;',
+      '}',
+      '',
+      'export class EdgeCaseClassifier {',
+      '  public classify() {',
+      "    return 'edge';",
+      '  }',
+      '}',
+      '',
+      fillerLines,
+    ].join('\n');
+
+    const parsedFile = mkParsedFile({
+      path: 'big.ts',
+      lineCount: fileContent.split('\n').length,
+      functions: [
+        {
+          kind: 'function',
+          name: 'exportedFn',
+          parameters: [],
+          returnType: 'string',
+          typeParameters: [],
+          isAsync: false,
+          isGenerator: false,
+          visibility: 'public',
+          decorators: [],
+          line: 1,
+          endLine: 3,
+        },
+        {
+          kind: 'function',
+          name: 'handleEdgeCase',
+          parameters: [],
+          returnType: 'boolean',
+          typeParameters: [],
+          isAsync: false,
+          isGenerator: false,
+          visibility: 'public',
+          decorators: [],
+          line: 5,
+          endLine: 8,
+        },
+      ],
+      exports: [
+        { name: 'exportedFn', kind: 'function', isReExport: false, isTypeOnly: false, line: 1 },
+        {
+          name: 'EdgeCaseClassifier',
+          kind: 'class',
+          isReExport: false,
+          isTypeOnly: false,
+          line: 10,
+        },
+      ],
+      classes: [
+        {
+          kind: 'class',
+          name: 'EdgeCaseClassifier',
+          typeParameters: [],
+          extends: [],
+          implements: [],
+          mixins: [],
+          fields: [],
+          methods: [
+            {
+              kind: 'function',
+              name: 'classify',
+              parameters: [],
+              returnType: 'string',
+              typeParameters: [],
+              isAsync: false,
+              isGenerator: false,
+              visibility: 'public',
+              decorators: [],
+              line: 11,
+              endLine: 13,
+            },
+          ],
+          decorators: [],
+          visibility: 'public',
+          line: 10,
+          endLine: 14,
+        },
+      ],
+    });
+
+    const result = await packFiles(
+      [mkScored('big.ts', 75)],
+      mkASTResult([parsedFile]),
+      mkBudget(6000),
+      charTokens,
+      mkContentFn({ 'big.ts': fileContent }),
+    );
+
+    const packed = result.files.find((f) => f.path === 'big.ts');
+    expect(packed?.tier).toBe('full');
+    expect(packed?.content).toContain('// --- Export: exportedFn ---');
+    expect(packed?.content).toContain('// --- Export: EdgeCaseClassifier ---');
+    expect(packed?.content).toContain('// --- Edge case: handleEdgeCase ---');
+  });
+
+  test('oversized file greedy section subset keeps only sections that fit remaining budget', async () => {
+    const alphaBody = 'a'.repeat(2800);
+    const betaBody = 'b'.repeat(2800);
+    const gammaBody = 'c'.repeat(2800);
+    const fileContent = [
+      'export function alpha() {',
+      `  return '${alphaBody}';`,
+      '}',
+      '',
+      'export function beta() {',
+      `  return '${betaBody}';`,
+      '}',
+      '',
+      'export function gamma() {',
+      `  return '${gammaBody}';`,
+      '}',
+    ].join('\n');
+
+    const parsedFile = mkParsedFile({
+      path: 'oversized.ts',
+      lineCount: fileContent.split('\n').length,
+      functions: [
+        {
+          kind: 'function',
+          name: 'alpha',
+          parameters: [],
+          returnType: 'string',
+          typeParameters: [],
+          isAsync: false,
+          isGenerator: false,
+          visibility: 'public',
+          decorators: [],
+          line: 1,
+          endLine: 3,
+        },
+        {
+          kind: 'function',
+          name: 'beta',
+          parameters: [],
+          returnType: 'string',
+          typeParameters: [],
+          isAsync: false,
+          isGenerator: false,
+          visibility: 'public',
+          decorators: [],
+          line: 5,
+          endLine: 7,
+        },
+        {
+          kind: 'function',
+          name: 'gamma',
+          parameters: [],
+          returnType: 'string',
+          typeParameters: [],
+          isAsync: false,
+          isGenerator: false,
+          visibility: 'public',
+          decorators: [],
+          line: 9,
+          endLine: 11,
+        },
+      ],
+      exports: [
+        { name: 'alpha', kind: 'function', isReExport: false, isTypeOnly: false, line: 1 },
+        { name: 'beta', kind: 'function', isReExport: false, isTypeOnly: false, line: 5 },
+        { name: 'gamma', kind: 'function', isReExport: false, isTypeOnly: false, line: 9 },
+      ],
+    });
+
+    const result = await packFiles(
+      [mkScored('oversized.ts', 80)],
+      mkASTResult([parsedFile]),
+      mkBudget(6200),
+      charTokens,
+      mkContentFn({ 'oversized.ts': fileContent }),
+    );
+
+    const packed = result.files.find((f) => f.path === 'oversized.ts');
+    expect(packed?.tier).toBe('signatures');
+    expect(packed?.content).toContain('// --- Export: alpha ---');
+    expect(packed?.content).toContain('// --- Export: beta ---');
+    expect(packed?.content).not.toContain('// --- Export: gamma ---');
+  });
+
+  test('oversized file is skipped when signatures do not fit remaining budget', async () => {
+    const oversizedContent = 'x'.repeat(OVERSIZED_THRESHOLD_TOKENS + 50);
+    const parsedFile = mkParsedFile({
+      path: 'too-tight.ts',
+      lineCount: 20,
+      functions: [
+        {
+          kind: 'function',
+          name: 'expensive',
+          parameters: [],
+          returnType: 'string',
+          typeParameters: [],
+          isAsync: false,
+          isGenerator: false,
+          visibility: 'public',
+          decorators: [],
+          line: 1,
+          endLine: 3,
+        },
+      ],
+      exports: [
+        { name: 'expensive', kind: 'function', isReExport: false, isTypeOnly: false, line: 1 },
+      ],
+    });
+
+    const result = await packFiles(
+      [mkScored('too-tight.ts', 70)],
+      mkASTResult([parsedFile]),
+      mkBudget(20),
+      charTokens,
+      mkContentFn({ 'too-tight.ts': oversizedContent }),
+    );
+
+    const packed = result.files.find((f) => f.path === 'too-tight.ts');
+    expect(packed?.tier).toBe('skip');
+    expect(packed?.tokens).toBe(0);
+  });
 });
 
 // ─── generateSignatureSummary() tests ────────────────────────────────────────
@@ -809,5 +1042,41 @@ describe('generateSignatureSummary', () => {
     expect(result).toContain('export class MyClass');
     expect(result).toContain('export const MY_CONST: string');
     expect(result).toContain('// 1 imports from: ./dep');
+  });
+
+  test('file with no exported symbols returns only the header line', () => {
+    const parsed = mkParsedFile({
+      path: 'src/private-only.ts',
+      lineCount: 12,
+      functions: [
+        {
+          kind: 'function',
+          name: 'internalHelper',
+          parameters: [],
+          returnType: 'void',
+          typeParameters: [],
+          isAsync: false,
+          isGenerator: false,
+          visibility: 'public',
+          decorators: [],
+          line: 1,
+          endLine: 4,
+        },
+      ],
+      exports: [],
+      imports: [],
+      constants: [
+        {
+          kind: 'constant',
+          name: 'INTERNAL_ONLY',
+          type: 'string',
+          isExported: false,
+          line: 6,
+        },
+      ],
+    });
+
+    const result = generateSignatureSummary(parsed);
+    expect(result).toBe('// FILE: src/private-only.ts (12 lines)');
   });
 });

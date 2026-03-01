@@ -215,4 +215,53 @@ describe('HandoverConfigSchema', () => {
       expect(result.data.exclude).toEqual([]);
     });
   });
+
+  describe('embedding config validation', () => {
+    test('rejects local-only mode without local.model', () => {
+      const result = HandoverConfigSchema.safeParse({
+        embedding: { mode: 'local-only' },
+      });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+
+      const issue = result.error.issues.find(
+        (candidate) => candidate.path.join('.') === 'embedding.local.model',
+      );
+      expect(issue?.message).toContain('embedding.local.model is required');
+    });
+
+    test('rejects local-preferred mode without local.model', () => {
+      const result = HandoverConfigSchema.safeParse({
+        embedding: { mode: 'local-preferred' },
+      });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+
+      const issue = result.error.issues.find(
+        (candidate) => candidate.path.join('.') === 'embedding.local.model',
+      );
+      expect(issue?.message).toContain('embedding.local.model is required');
+    });
+
+    test('accepts remote-only mode without local.model', () => {
+      const result = HandoverConfigSchema.safeParse({
+        embedding: { mode: 'remote-only' },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    test('accepts local-only mode when local.model is provided', () => {
+      const result = HandoverConfigSchema.safeParse({
+        embedding: {
+          mode: 'local-only',
+          local: {
+            model: 'all-MiniLM-L6-v2',
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.embedding?.local?.model).toBe('all-MiniLM-L6-v2');
+    });
+  });
 });
