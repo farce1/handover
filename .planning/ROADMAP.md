@@ -43,10 +43,10 @@ See milestone archives in `.planning/milestones/`.
 **Verification:** gaps found (`.planning/phases/27-test-coverage-infrastructure/27-VERIFICATION.md`)
 
 Plans:
-- [ ] 27-01-PLAN.md — Freeze exclusion list with justifications, add 7 missing exclusions, narrow mcp glob, add json-summary reporter, fix 80% gate
-- [ ] 27-02-PLAN.md — Expand tests for renderers/utils, config/schema, context/packer (pure-function targets)
-- [ ] 27-03-PLAN.md — Expand tests for auth/resolve, auth/pkce-login; create mcp/tools.test.ts (mock-heavy targets)
-- [ ] 27-04-PLAN.md — Raise thresholds in batches (80→85→88→90 lines/funcs/stmts, 80→83→85 branches)
+- [x] 27-01-PLAN.md — Freeze exclusion list with justifications, add 7 missing exclusions, narrow mcp glob, add json-summary reporter, fix 80% gate
+- [x] 27-02-PLAN.md — Expand tests for renderers/utils, config/schema, context/packer (pure-function targets)
+- [x] 27-03-PLAN.md — Expand tests for auth/resolve, auth/pkce-login; create mcp/tools.test.ts (mock-heavy targets)
+- [x] 27-04-PLAN.md — Raise thresholds in batches (80→85→88→90 lines/funcs/stmts, 80→83→85 branches)
 
 ### Phase 28: Git-Aware Incremental Regeneration
 **Goal**: Users can skip re-analysis of unchanged files by pointing generate at a git ref, with safe fallback when git context is unavailable
