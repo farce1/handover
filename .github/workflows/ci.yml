@@ -26,6 +26,9 @@ jobs:
   quality:
     name: Quality Gate (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     strategy:
       matrix:
         node-version: [20, 22]
@@ -47,6 +50,12 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
           fail_ci_if_error: false
+      - name: Coverage report PR comment
+        if: matrix.node-version == 20 && github.event_name == 'pull_request'
+        uses: davelosert/vitest-coverage-report-action@2500dafcee7dd64f85ab689c0b83798a8359770e # v2.9.3
+        with:
+          json-summary-path: ./coverage/coverage-summary.json
+          json-final-path: ./coverage/coverage-final.json
 
   publish-safety:
     name: Publish Safety
