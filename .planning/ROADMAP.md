@@ -39,13 +39,13 @@ See milestone archives in `.planning/milestones/`.
   2. New test files exist for `renderers/utils`, `auth/resolve`, `auth/pkce-login`, `config/schema`, `context/packer`, and `mcp/tools` with output assertions (not only mock call assertions)
   3. The vitest coverage exclusion list is frozen with a written comment justifying each entry (including `gemini.ts` added immediately for its zero-API-key-testable surface)
   4. `json-summary` reporter is active and the GitHub Actions coverage comment reflects the new thresholds
-**Plans**: TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] 27-01: Freeze exclusion list, add gemini.ts exclusion, fix the currently-failing 80% gate
-- [ ] 27-02: New test suites for renderers/utils, config/schema, context/packer (pure-function targets)
-- [ ] 27-03: New test suites for auth/resolve, auth/pkce-login, mcp/tools (mock-heavy targets)
-- [ ] 27-04: Raise thresholds in batches (80→85→88→90) as each test suite confirms coverage
+- [ ] 27-01-PLAN.md — Freeze exclusion list with justifications, add 7 missing exclusions, narrow mcp glob, add json-summary reporter, fix 80% gate
+- [ ] 27-02-PLAN.md — Expand tests for renderers/utils, config/schema, context/packer (pure-function targets)
+- [ ] 27-03-PLAN.md — Expand tests for auth/resolve, auth/pkce-login; create mcp/tools.test.ts (mock-heavy targets)
+- [ ] 27-04-PLAN.md — Raise thresholds in batches (80→85→88→90 lines/funcs/stmts, 80→83→85 branches)
 
 ### Phase 28: Git-Aware Incremental Regeneration
 **Goal**: Users can skip re-analysis of unchanged files by pointing generate at a git ref, with safe fallback when git context is unavailable
