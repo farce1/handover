@@ -9,7 +9,7 @@ Requirements for milestone v7.0 Quality, Performance & Polish. Each maps to road
 
 ### Testing & Coverage
 
-- [ ] **TEST-01**: Coverage gate raised to 90%+ lines/functions/statements, 85%+ branches
+- [x] **TEST-01**: Coverage gate raised to 90%+ lines/functions/statements, 85%+ branches
 - [x] **TEST-02**: New test suites for highest-gap modules (renderers/utils, auth/resolve, auth/pkce-login, config/schema, context/packer, mcp/tools)
 - [x] **TEST-03**: Coverage exclusion list frozen with written justification for each existing exclusion
 
@@ -70,7 +70,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 | Phase 27 | Pending |
+| TEST-01 | Phase 27 | Complete |
 | TEST-02 | Phase 27 | Complete |
 | TEST-03 | Phase 27 | Complete |
 | REGEN-01 | Phase 28 | Pending |
@@ -94,4 +94,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-01*
-*Last updated: 2026-03-01 after roadmap creation*
+*Last updated: 2026-03-01 after phase 27 completion*

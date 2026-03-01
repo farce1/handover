@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Quality, Performance & Polish
 status: unknown
-last_updated: "2026-03-01T20:16:00.000Z"
+last_updated: "2026-03-01T21:44:00.000Z"
 progress:
   total_phases: 16
-  completed_phases: 15
-  total_plans: 40
-  completed_plans: 40
+  completed_phases: 16
+  total_plans: 42
+  completed_plans: 42
 ---
 
 # Project State
@@ -18,17 +18,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v7.0 Phase 27 gap closure — Branch coverage shortfall (TEST-01)
+**Current focus:** v7.0 Phase 28 planning — Git-aware incremental regeneration (`--since`) with safe non-git fallback
 
 ## Current Position
 
 Milestone: v7.0 Quality, Performance & Polish
-Phase: 27 of 30 (Test Coverage & Infrastructure)
-Plan: 04 of 04 completed (verification gaps found)
-Status: In progress (phase goal not met)
-Last activity: 2026-03-01 — Completed execution plans 27-01..27-04, generated 27-VERIFICATION.md with TEST-01 gap
+Phase: 28 of 30 (Git-Aware Incremental Regeneration)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-03-01 — Completed plans 27-05 and 27-06, updated thresholds to 90/90/90/85, and passed 27-VERIFICATION.md
 
-Progress: [████████░░] 80%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -38,9 +38,9 @@ Progress: [████████░░] 80%
 - Total execution time: ~110 min
 
 **v7.0 Velocity:**
-- Total plans completed: 4
-- Average duration: ~9.5 min/plan
-- Total execution time: ~38 min
+- Total plans completed: 6
+- Average duration: ~8.5 min/plan
+- Total execution time: ~51 min
 
 ## Accumulated Context
 
@@ -63,6 +63,8 @@ Key decisions locked for v7.0 planning:
 - [Phase 27]: Expanded tests for renderers/config/packer/auth/mcp handlers with output assertions to raise line/function/statement coverage above 85%. — Prioritized branch-rich, low-risk unit targets before threshold adjustments.
 - [Phase 27]: resolveAuth now honors config.apiKeyEnv before provider defaults. — Align auth behavior with config schema and avoid ignoring explicit env-var overrides.
 - [Phase 27]: Locked thresholds at 85/85/85/75 as highest passing gate after branch target failed at 80. — Maintain enforced quality gate while explicitly surfacing remaining branch-coverage gap for follow-up.
+- [Phase 27]: Expanded MCP tool tests (`registerMcpTools` handlers + `createMcpStructuredError`) to close the largest branch coverage deficit. — Lifted `mcp/tools.ts` branch coverage to 70.58% and `mcp/errors.ts` to 100%.
+- [Phase 27]: Added branch-focused tests across auth/validator/orchestrator/registry/rate-limiter/chunker and raised thresholds to `90/90/90/85`. — Achieved full-suite coverage totals `96.47/97.03/96.34/86.14` and closed TEST-01.
 
 ### Pending Todos
 
@@ -70,8 +72,6 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 27]: TEST-01 remains open — target thresholds `90/90/90/85` not met; current passing gate is `85/85/85/75` (branch coverage 75.16%)
-- [Phase 27]: Low-coverage branch hotspots are `src/mcp/tools.ts`, `src/mcp/errors.ts`, and `src/auth/pkce-login.ts`; requires gap-closure plan before phase completion
 - [Phase 28]: `src/regeneration/` has no CLI integration; define shared runner interface before implementing `--since`
 - [Phase 28]: Verify `.github/workflows/ci.yml` checkout depth before Phase 28 ships (shallow clone breaks `--since`)
 
@@ -84,5 +84,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Phase 27 verification completed with gaps_found
-Resume file: .planning/phases/27-test-coverage-infrastructure/27-VERIFICATION.md
+Stopped at: Phase 27 complete and verified passed
+Resume file: .planning/ROADMAP.md

@@ -23,7 +23,7 @@ See milestone archives in `.planning/milestones/`.
 
 **Milestone Goal:** Raise test coverage to 90%+, add git-aware incremental regeneration, polish search/QA UX, and close documentation gaps with smarter onboarding.
 
-- [x] **Phase 27: Test Coverage & Infrastructure** - Raise the CI coverage gate from the currently-failing 80% to a verified 90%+ (execution complete; gap closure pending from 27-VERIFICATION.md) (completed 2026-03-01)
+- [x] **Phase 27: Test Coverage & Infrastructure** - Raise the CI coverage gate from the currently-failing 80% to a verified 90%+ (completed 2026-03-01)
 - [ ] **Phase 28: Git-Aware Incremental Regeneration** - Users can re-analyze only files changed since a git ref, with graceful fallback in non-git environments
 - [ ] **Phase 29: Search & QA UX Polish** - Search output surfaces result quality signals, clickable links, zero-results guidance, and enriched MCP responses
 - [ ] **Phase 30: Documentation & Onboarding** - User and contributor docs reflect final behavior, `handover init` gains TTY guard, broken-link CI check added
@@ -40,15 +40,15 @@ See milestone archives in `.planning/milestones/`.
   3. The vitest coverage exclusion list is frozen with a written comment justifying each entry (including `gemini.ts` added immediately for its zero-API-key-testable surface)
   4. `json-summary` reporter is active and the GitHub Actions coverage comment reflects the new thresholds
 **Plans:** 6/6 plans complete
-**Verification:** gaps found (`.planning/phases/27-test-coverage-infrastructure/27-VERIFICATION.md`)
+**Verification:** passed (`.planning/phases/27-test-coverage-infrastructure/27-VERIFICATION.md`)
 
 Plans:
 - [x] 27-01-PLAN.md — Freeze exclusion list with justifications, add 7 missing exclusions, narrow mcp glob, add json-summary reporter, fix 80% gate
 - [x] 27-02-PLAN.md — Expand tests for renderers/utils, config/schema, context/packer (pure-function targets)
 - [x] 27-03-PLAN.md — Expand tests for auth/resolve, auth/pkce-login; create mcp/tools.test.ts (mock-heavy targets)
 - [x] 27-04-PLAN.md — Raise thresholds in batches (80→85→88→90 lines/funcs/stmts, 80→83→85 branches)
-- [ ] 27-05-PLAN.md — [gap closure] Deep MCP coverage: expand mcp/tools.test.ts for all tool handlers, create mcp/errors.test.ts
-- [ ] 27-06-PLAN.md — [gap closure] Secondary module branch coverage + raise thresholds to 90/90/90/85
+- [x] 27-05-PLAN.md — [gap closure] Deep MCP coverage: expand mcp/tools.test.ts for all tool handlers, create mcp/errors.test.ts
+- [x] 27-06-PLAN.md — [gap closure] Secondary module branch coverage + raise thresholds to 90/90/90/85
 
 ### Phase 28: Git-Aware Incremental Regeneration
 **Goal**: Users can skip re-analysis of unchanged files by pointing generate at a git ref, with safe fallback when git context is unavailable
@@ -107,7 +107,7 @@ Phase 27 → Phase 28 (parallel with 29, after 27) → Phase 29 (parallel with 2
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 27. Test Coverage & Infrastructure | 6/6 | Complete   | 2026-03-01 | - |
+| 27. Test Coverage & Infrastructure | v7.0 | 6/6 | Complete | 2026-03-01 |
 | 28. Git-Aware Incremental Regeneration | v7.0 | 0/2 | Not started | - |
 | 29. Search & QA UX Polish | v7.0 | 0/3 | Not started | - |
 | 30. Documentation & Onboarding | v7.0 | 0/3 | Not started | - |

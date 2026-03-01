@@ -1,15 +1,15 @@
 ---
 phase: 27-test-coverage-infrastructure
-verified: 2026-03-01T20:15:20Z
-status: gaps_found
-score: 3/4 must-haves verified
+verified: 2026-03-01T21:43:00Z
+status: passed
+score: 4/4 must-haves verified
 ---
 
 # Phase 27: Test Coverage & Infrastructure Verification Report
 
-**Phase Goal:** The CI coverage gate passes at 90%+ and every coverage exclusion is documented with written justification.
-**Verified:** 2026-03-01T20:15:20Z
-**Status:** gaps_found
+**Phase Goal:** The CI coverage gate passes at 90%+ and every coverage exclusion is documented with written justification.  
+**Verified:** 2026-03-01T21:43:00Z  
+**Status:** passed
 
 ## Goal Achievement
 
@@ -17,12 +17,12 @@ score: 3/4 must-haves verified
 
 | # | Truth | Status | Evidence |
 | --- | --- | --- | --- |
-| 1 | `npm test` passes with thresholds at `90/90/90/85` | ✗ FAILED | Highest passing enforced threshold is `85/85/85/75`; full-suite measured coverage is `85.19/85.16/85.51/75.16` |
-| 2 | New tests exist for `renderers/utils`, `auth/resolve`, `auth/pkce-login`, `config/schema`, `context/packer`, and `mcp/tools` | ✓ VERIFIED | Updated test files plus new `src/mcp/tools.test.ts` committed in plans `27-02` and `27-03` |
-| 3 | Coverage exclusion list is frozen with written justifications per entry | ✓ VERIFIED | `vitest.config.ts` has frozen header and inline justification comments for all entries |
-| 4 | `json-summary` reporter is active and CI posts PR coverage comments | ✓ VERIFIED | `vitest.config.ts` includes `json-summary`; `.github/workflows/ci.yml` includes coverage PR comment step with required permissions |
+| 1 | `npm test` passes with thresholds at `90/90/90/85` | ✓ VERIFIED | `npm test -- --coverage` passed with totals `lines 96.47`, `functions 97.03`, `statements 96.34`, `branches 86.14` and enforced thresholds `90/90/90/85` |
+| 2 | New tests exist for `renderers/utils`, `auth/resolve`, `auth/pkce-login`, `config/schema`, `context/packer`, and `mcp/tools` | ✓ VERIFIED | Existing phase artifacts plus gap-closure test expansions in plans `27-05` and `27-06` |
+| 3 | Coverage exclusion list is frozen with written justifications per entry | ✓ VERIFIED | `vitest.config.ts` retains frozen exclusion header and per-entry justification comments |
+| 4 | `json-summary` reporter is active and CI posts PR coverage comments | ✓ VERIFIED | `vitest.config.ts` includes `json-summary`; CI workflow coverage comment step remains configured |
 
-**Score:** 3/4 truths verified
+**Score:** 4/4 truths verified
 
 ### Required Artifacts
 
@@ -31,16 +31,18 @@ score: 3/4 must-haves verified
 | `.planning/phases/27-test-coverage-infrastructure/27-01-SUMMARY.md` | Plan 01 completion summary | ✓ VERIFIED | Exists with task commits and self-check |
 | `.planning/phases/27-test-coverage-infrastructure/27-02-SUMMARY.md` | Plan 02 completion summary | ✓ VERIFIED | Exists with task commits and self-check |
 | `.planning/phases/27-test-coverage-infrastructure/27-03-SUMMARY.md` | Plan 03 completion summary | ✓ VERIFIED | Exists with task commits and self-check |
-| `.planning/phases/27-test-coverage-infrastructure/27-04-SUMMARY.md` | Plan 04 completion summary | ✓ VERIFIED | Exists with threshold fallback evidence and self-check |
-| `coverage/coverage-summary.json` | Machine-readable coverage output | ✓ VERIFIED | Generated on full coverage run |
+| `.planning/phases/27-test-coverage-infrastructure/27-04-SUMMARY.md` | Plan 04 completion summary | ✓ VERIFIED | Exists with threshold fallback evidence |
+| `.planning/phases/27-test-coverage-infrastructure/27-05-SUMMARY.md` | Plan 05 gap-closure summary | ✓ VERIFIED | Exists with MCP coverage closure evidence |
+| `.planning/phases/27-test-coverage-infrastructure/27-06-SUMMARY.md` | Plan 06 gap-closure summary | ✓ VERIFIED | Exists with final threshold raise evidence |
+| `coverage/coverage-summary.json` | Machine-readable coverage output | ✓ VERIFIED | Generated from passing full-suite coverage run |
 
 ### Requirements Coverage
 
 | Requirement | Description | Status | Evidence |
 | --- | --- | --- | --- |
-| TEST-01 | Coverage gate raised to 90%+ lines/functions/statements, 85%+ branches | ✗ GAP | Current enforced gate is `85/85/85/75`; branch gap remains in MCP/auth-heavy modules |
-| TEST-02 | New test suites for highest-gap modules | ✓ SATISFIED | Tests expanded for all required modules including new `src/mcp/tools.test.ts` |
-| TEST-03 | Coverage exclusion list frozen with written justification for each exclusion | ✓ SATISFIED | Frozen list and per-entry justifications in `vitest.config.ts` |
+| TEST-01 | Coverage gate raised to 90%+ lines/functions/statements, 85%+ branches | ✓ SATISFIED | Thresholds set to `90/90/90/85`; full suite passes with `96.47/97.03/96.34/86.14` |
+| TEST-02 | New test suites for highest-gap modules | ✓ SATISFIED | Targeted tests expanded for MCP handlers and secondary branch hotspots |
+| TEST-03 | Coverage exclusion list frozen with written justification for each exclusion | ✓ SATISFIED | Frozen list preserved with comments and no new exclusions added |
 
 ### Human Verification Required
 
@@ -48,13 +50,9 @@ None.
 
 ### Gaps Summary
 
-1. **TEST-01 gap (coverage target not reached):**
-- **Expected:** `90/90/90/85`
-- **Actual measured:** `85.19/85.16/85.51/75.16`
-- **Blocking modules:** `src/mcp/tools.ts`, `src/mcp/errors.ts`, and branch-heavy auth paths in `src/auth/pkce-login.ts`
-- **Impact:** Phase 27 cannot be considered complete against roadmap success criterion #1.
+None.
 
 ---
 
-_Verified: 2026-03-01T20:15:20Z_  
+_Verified: 2026-03-01T21:43:00Z_  
 _Verifier: Codex (full-suite coverage evidence + artifact and requirement cross-check)_
