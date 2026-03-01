@@ -70,28 +70,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| REGEN-01 | — | Pending |
-| REGEN-02 | — | Pending |
-| SRCH-01 | — | Pending |
-| SRCH-02 | — | Pending |
-| SRCH-03 | — | Pending |
-| SRCH-04 | — | Pending |
-| SRCH-05 | — | Pending |
-| SRCH-06 | — | Pending |
-| DOCS-01 | — | Pending |
-| DOCS-02 | — | Pending |
-| DOCS-03 | — | Pending |
-| DOCS-04 | — | Pending |
-| DOCS-05 | — | Pending |
+| TEST-01 | Phase 27 | Pending |
+| TEST-02 | Phase 27 | Pending |
+| TEST-03 | Phase 27 | Pending |
+| REGEN-01 | Phase 28 | Pending |
+| REGEN-02 | Phase 28 | Pending |
+| SRCH-01 | Phase 29 | Pending |
+| SRCH-02 | Phase 29 | Pending |
+| SRCH-03 | Phase 29 | Pending |
+| SRCH-04 | Phase 29 | Pending |
+| SRCH-05 | Phase 29 | Pending |
+| SRCH-06 | Phase 29 | Pending |
+| DOCS-01 | Phase 30 | Pending |
+| DOCS-02 | Phase 30 | Pending |
+| DOCS-03 | Phase 30 | Pending |
+| DOCS-04 | Phase 30 | Pending |
+| DOCS-05 | Phase 30 | Pending |
 
 **Coverage:**
 - v7.0 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16
+- Mapped to phases: 16
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-01*
-*Last updated: 2026-03-01 after initial definition*
+*Last updated: 2026-03-01 after roadmap creation*
