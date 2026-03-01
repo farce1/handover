@@ -5,8 +5,10 @@ import {
   sectionIntro,
   crossRef,
   buildFrontMatter,
+  buildSummaryLine,
   determineDocStatus,
 } from './utils.js';
+import type { RenderContext } from './types.js';
 
 // ─── buildTable ──────────────────────────────────────────────────────────────
 
@@ -146,6 +148,164 @@ describe('buildFrontMatter()', () => {
     expect(result).toContain('title: Test');
     expect(result.startsWith('---\n')).toBe(true);
     expect(result.endsWith('\n---\n')).toBe(true);
+  });
+});
+
+// ─── buildSummaryLine ───────────────────────────────────────────────────────
+
+function mkRenderContext(overrides: Partial<RenderContext> = {}): RenderContext {
+  const base = {
+    projectName: 'handover',
+    generatedAt: '2026-03-01T00:00:00Z',
+    audience: 'human',
+    config: {},
+    rounds: {},
+    staticAnalysis: {
+      fileTree: {
+        filesByExtension: {
+          '.ts': 50,
+          '.js': 10,
+        },
+      },
+      dependencies: {
+        manifests: [],
+      },
+      tests: {
+        frameworks: [],
+        summary: {
+          totalTestFiles: 0,
+          totalTests: 0,
+        },
+      },
+      metadata: {
+        fileCount: 60,
+        analyzedAt: '2026-03-01T00:00:00Z',
+      },
+    },
+  };
+
+  return {
+    ...(base as object),
+    ...(overrides as object),
+    rounds: {
+      ...(base.rounds as object),
+      ...(overrides.rounds as object),
+    },
+    staticAnalysis: {
+      ...(base.staticAnalysis as object),
+      ...(overrides.staticAnalysis as object),
+    },
+  } as RenderContext;
+}
+
+describe('buildSummaryLine()', () => {
+  it('returns architecture summary with top patterns and modules', () => {
+    const ctx = mkRenderContext({
+      rounds: {
+        r4: {
+          data: {
+            patterns: [{ name: 'Layered' }, { name: 'Pipeline' }, { name: 'Factory' }],
+          },
+        } as RenderContext['rounds']['r4'],
+        r2: {
+          data: {
+            modules: [{ name: 'cli' }, { name: 'providers' }, { name: 'renderers' }],
+          },
+        } as RenderContext['rounds']['r2'],
+      },
+    });
+
+    const result = buildSummaryLine(ctx, 'architecture');
+
+    expect(result).toContain('handover uses Layered, Pipeline, Factory architecture');
+    expect(result).toContain('Key modules include cli, providers, renderers');
+  });
+
+  it('returns overview summary with dominant extension, file count, and analyzed date', () => {
+    const ctx = mkRenderContext({
+      staticAnalysis: {
+        ...mkRenderContext().staticAnalysis,
+        fileTree: {
+          filesByExtension: {
+            '.ts': 50,
+            '.js': 10,
+          },
+        },
+        metadata: {
+          fileCount: 60,
+          analyzedAt: '2026-03-01T12:34:56Z',
+        },
+      } as RenderContext['staticAnalysis'],
+    });
+
+    const result = buildSummaryLine(ctx, 'overview');
+
+    expect(result).toContain('handover is a .ts project with 60 files');
+    expect(result).toContain('It was analyzed on 2026-03-01T12:34:56Z');
+  });
+
+  it('returns dependencies summary with dependency and manifest counts', () => {
+    const ctx = mkRenderContext({
+      staticAnalysis: {
+        ...mkRenderContext().staticAnalysis,
+        dependencies: {
+          manifests: [
+            {
+              file: 'package.json',
+              packageManager: 'npm',
+              dependencies: [
+                { name: 'a', version: '1.0.0', type: 'production' },
+                { name: 'b', version: '1.0.0', type: 'production' },
+                { name: 'c', version: '1.0.0', type: 'production' },
+                { name: 'd', version: '1.0.0', type: 'production' },
+                { name: 'e', version: '1.0.0', type: 'production' },
+              ],
+            },
+          ],
+        },
+      } as RenderContext['staticAnalysis'],
+    });
+
+    const result = buildSummaryLine(ctx, 'dependencies');
+
+    expect(result).toContain('handover has 5 dependencies across 1 manifest(s)');
+  });
+
+  it('returns testing summary with test counts and framework list', () => {
+    const ctx = mkRenderContext({
+      staticAnalysis: {
+        ...mkRenderContext().staticAnalysis,
+        tests: {
+          frameworks: ['vitest'],
+          summary: {
+            totalTestFiles: 10,
+            totalTests: 50,
+          },
+        },
+      } as RenderContext['staticAnalysis'],
+    });
+
+    const result = buildSummaryLine(ctx, 'testing');
+
+    expect(result).toContain('handover has 10 test files containing 50 tests');
+    expect(result).toContain('Frameworks: vitest');
+  });
+
+  it('falls back to generic summary for unknown topics', () => {
+    const ctx = mkRenderContext({
+      staticAnalysis: {
+        ...mkRenderContext().staticAnalysis,
+        metadata: {
+          fileCount: 99,
+          analyzedAt: '2026-03-01T00:00:00Z',
+        },
+      } as RenderContext['staticAnalysis'],
+    });
+
+    const result = buildSummaryLine(ctx, 'unknown-topic');
+
+    expect(result).toContain('handover contains 99 files analyzed at 2026-03-01T00:00:00Z');
+    expect(result).toContain('See sections below for details');
   });
 });
 
