@@ -18,7 +18,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v7.0 Phase 28 planning — Git-aware incremental regeneration (`--since`) with safe non-git fallback
+**Current focus:** v7.0 Phase 28 — Git-aware incremental regeneration, context gathered, ready to plan
 
 ## Current Position
 
@@ -84,5 +84,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Phase 27 complete and verified passed
-Resume file: .planning/ROADMAP.md
+Stopped at: Phase 28 context gathered
+Resume file: .planning/phases/28-git-aware-incremental-regeneration/28-CONTEXT.md
