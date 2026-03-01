@@ -1,4 +1,4 @@
-# handover
+<img width="1024" height="1024" src="https://github.com/user-attachments/assets/92ab1cb5-ba66-4ddc-8dcf-c4035a8370e8" />
 
 <p align="center">
   <strong>Generate a complete knowledge base from any codebase with a single command.</strong>
