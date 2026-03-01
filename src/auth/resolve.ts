@@ -116,7 +116,9 @@ export async function resolveAuth(
   }
 
   const envVarName =
-    DEFAULT_API_KEY_ENV[config.provider] ?? `${config.provider.toUpperCase()}_API_KEY`;
+    config.apiKeyEnv ??
+    DEFAULT_API_KEY_ENV[config.provider] ??
+    `${config.provider.toUpperCase()}_API_KEY`;
   const envValue = process.env[envVarName];
 
   // Gemini-specific: fall back to GOOGLE_API_KEY if GEMINI_API_KEY is not set.

@@ -203,4 +203,103 @@ describe('pkceLogin', () => {
       }),
     );
   });
+
+  test('throws AUTH_CANCELLED when user cancels re-authentication prompt', async () => {
+    const existingCredential: StoredCredential = {
+      provider: 'openai',
+      token: 'existing-token',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    const store = createStore(existingCredential);
+    mockClack.confirm.mockResolvedValue(CANCELLED);
+
+    await expect(pkceLogin('openai', store as unknown as TokenStore)).rejects.toMatchObject({
+      code: 'AUTH_CANCELLED',
+    });
+    expect(store.write).not.toHaveBeenCalled();
+  });
+
+  test('accepts string expires_in values and persists expiresAt', async () => {
+    mockOpenIdClient.authorizationCodeGrant.mockResolvedValue({
+      access_token: 'access-token',
+      refresh_token: 'refresh-token',
+      expires_in: '3600',
+    });
+    const store = createStore();
+
+    const result = await pkceLogin('openai', store as unknown as TokenStore);
+
+    expect(store.write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+        token: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: expect.any(String),
+      }),
+    );
+    expect(result.expiresAt).toEqual(expect.any(String));
+  });
+
+  test('writes credential without expiresAt when expires_in is missing', async () => {
+    mockOpenIdClient.authorizationCodeGrant.mockResolvedValue({
+      access_token: 'token-no-expiry',
+      refresh_token: 'refresh-token',
+    });
+    const store = createStore();
+
+    const result = await pkceLogin('openai', store as unknown as TokenStore);
+
+    expect(store.write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+        token: 'token-no-expiry',
+        refreshToken: 'refresh-token',
+        expiresAt: undefined,
+      }),
+    );
+    expect(result.expiresAt).toBeUndefined();
+  });
+
+  test('writes credential without refreshToken when token response omits it', async () => {
+    mockOpenIdClient.authorizationCodeGrant.mockResolvedValue({
+      access_token: 'token-no-refresh',
+      expires_in: 3600,
+    });
+    const store = createStore();
+
+    const result = await pkceLogin('openai', store as unknown as TokenStore);
+
+    expect(store.write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+        token: 'token-no-refresh',
+        refreshToken: undefined,
+      }),
+    );
+    expect(result.refreshToken).toBeUndefined();
+  });
+
+  test('headless mode with existing valid credential skips confirm and re-authenticates', async () => {
+    setStdoutTTY(false);
+    const existingCredential: StoredCredential = {
+      provider: 'openai',
+      token: 'existing-token',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    const store = createStore(existingCredential);
+
+    const loginPromise = pkceLogin('openai', store as unknown as TokenStore);
+    await vi.waitFor(() => {
+      expect(mockClack.log.info).toHaveBeenCalled();
+    });
+
+    const infoMessage = String(mockClack.log.info.mock.calls[0][0] ?? '');
+    const urlMatch = infoMessage.match(/https?:\/\/\S+/);
+    expect(urlMatch).toBeTruthy();
+    await triggerCallbackFromAuthorizationUrl(urlMatch![0]);
+
+    const result = await loginPromise;
+    expect(mockClack.confirm).not.toHaveBeenCalled();
+    expect(result.token).toBe('access-token');
+  });
 });

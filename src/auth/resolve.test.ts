@@ -61,6 +61,9 @@ describe('resolveAuth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.MY_CUSTOM_KEY;
     mockClack.isTTY.mockReturnValue(true);
     mockClack.isCI.mockReturnValue(false);
     mockClack.password.mockResolvedValue('prompted-key');
@@ -75,6 +78,9 @@ describe('resolveAuth', () => {
 
   afterEach(() => {
     delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.MY_CUSTOM_KEY;
   });
 
   test('uses CLI --api-key flag as highest precedence', async () => {
@@ -284,6 +290,144 @@ describe('resolveAuth', () => {
     await expect(resolveAuth(makeConfig())).rejects.toMatchObject({
       code: 'AUTH_CANCELLED',
     });
+  });
+
+  test('uses GOOGLE_API_KEY fallback when provider is gemini and GEMINI_API_KEY is absent', async () => {
+    process.env.GOOGLE_API_KEY = 'google-key';
+
+    const result = await resolveAuth(makeConfig({ provider: 'gemini' }));
+
+    expect(result).toEqual({ apiKey: 'google-key', source: 'env-var' });
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.stringContaining('using GOOGLE_API_KEY (fallback)'),
+    );
+  });
+
+  test('uses custom apiKeyEnv from config when provided', async () => {
+    process.env.MY_CUSTOM_KEY = 'custom-key';
+
+    const result = await resolveAuth(makeConfig({ apiKeyEnv: 'MY_CUSTOM_KEY' }));
+
+    expect(result).toEqual({ apiKey: 'custom-key', source: 'env-var' });
+    expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('MY_CUSTOM_KEY'));
+  });
+
+  test('uses fallback refresh config when OpenID discovery fails', async () => {
+    mockOpenIdClient.discovery.mockRejectedValue(new Error('discovery unavailable'));
+    mockOpenIdClient.refreshTokenGrant.mockResolvedValue({
+      access_token: 'fallback-refresh-token',
+      refresh_token: 'fallback-refresh',
+      expires_in: 3600,
+    });
+
+    const store = createMockStore({
+      provider: 'openai',
+      token: 'stale-token',
+      refreshToken: 'refresh-token',
+      expiresAt: new Date(Date.now() + 4 * 60 * 1000).toISOString(),
+    });
+
+    const result = await resolveAuth(
+      makeConfig({ provider: 'openai', authMethod: 'subscription' }),
+      undefined,
+      store as unknown as TokenStore,
+    );
+
+    expect(mockOpenIdClient.discovery).toHaveBeenCalledTimes(1);
+    expect(mockOpenIdClient.refreshTokenGrant).toHaveBeenCalledTimes(1);
+    expect(store.write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: 'fallback-refresh-token',
+        refreshToken: 'fallback-refresh',
+      }),
+    );
+    expect(result).toEqual({ apiKey: 'fallback-refresh-token', source: 'credential-store' });
+  });
+
+  test('parses string expires_in and keeps previous refreshToken when new value is blank', async () => {
+    mockOpenIdClient.refreshTokenGrant.mockResolvedValue({
+      access_token: 'new-token',
+      refresh_token: '   ',
+      expires_in: '3600',
+    });
+
+    const existing = {
+      provider: 'openai' as const,
+      token: 'old-token',
+      refreshToken: 'existing-refresh-token',
+      expiresAt: new Date(Date.now() + 4 * 60 * 1000).toISOString(),
+    };
+    const store = createMockStore(existing);
+
+    const result = await resolveAuth(
+      makeConfig({ provider: 'openai', authMethod: 'subscription' }),
+      undefined,
+      store as unknown as TokenStore,
+    );
+
+    expect(store.write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: 'new-token',
+        refreshToken: 'existing-refresh-token',
+      }),
+    );
+    expect(result).toEqual({ apiKey: 'new-token', source: 'credential-store' });
+  });
+
+  test('handles invalid access_token from refresh response by keeping existing token', async () => {
+    mockOpenIdClient.refreshTokenGrant.mockResolvedValue({
+      access_token: '   ',
+      refresh_token: 'new-refresh',
+      expires_in: 'invalid',
+    });
+
+    const existing = {
+      provider: 'openai' as const,
+      token: 'existing-token',
+      refreshToken: 'existing-refresh',
+      expiresAt: new Date(Date.now() + 4 * 60 * 1000).toISOString(),
+    };
+    const store = createMockStore(existing);
+
+    const result = await resolveAuth(
+      makeConfig({ provider: 'openai', authMethod: 'subscription' }),
+      undefined,
+      store as unknown as TokenStore,
+    );
+
+    expect(store.write).not.toHaveBeenCalled();
+    expect(result).toEqual({ apiKey: 'existing-token', source: 'credential-store' });
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      '[auth] Token refresh failed, trying current token',
+    );
+  });
+
+  test('propagates credential store read errors for subscription auth', async () => {
+    const store = {
+      read: vi.fn(async () => {
+        throw new Error('disk read failed');
+      }),
+      write: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+    };
+
+    await expect(
+      resolveAuth(
+        makeConfig({ provider: 'openai', authMethod: 'subscription' }),
+        undefined,
+        store as unknown as TokenStore,
+      ),
+    ).rejects.toThrow('disk read failed');
+  });
+
+  test('throws AUTH_NO_CREDENTIAL when stdout is non-TTY even outside CI', async () => {
+    mockClack.isTTY.mockReturnValue(false);
+    mockClack.isCI.mockReturnValue(false);
+
+    await expect(resolveAuth(makeConfig({ authMethod: 'api-key' }))).rejects.toMatchObject({
+      code: 'AUTH_NO_CREDENTIAL',
+    });
+    expect(mockClack.password).not.toHaveBeenCalled();
   });
 
   test('logs the provider and source for every successful path', async () => {
