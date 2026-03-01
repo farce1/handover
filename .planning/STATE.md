@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v7.0
+milestone: v1.0
 milestone_name: Quality, Performance & Polish
-status: roadmap_created
-last_updated: "2026-03-01"
+status: unknown
+last_updated: "2026-03-01T19:04:55.113Z"
 progress:
-  total_phases: 4
-  completed_phases: 0
-  total_plans: 12
-  completed_plans: 0
+  total_phases: 16
+  completed_phases: 15
+  total_plans: 40
+  completed_plans: 38
 ---
 
 # Project State
@@ -24,11 +24,11 @@ See: .planning/PROJECT.md (updated 2026-03-01)
 
 Milestone: v7.0 Quality, Performance & Polish
 Phase: 27 of 30 (Test Coverage & Infrastructure)
-Plan: — (not started)
-Status: Ready to plan
-Last activity: 2026-03-01 — Roadmap created for v7.0 (4 phases, 16 requirements mapped)
+Plan: 01 of 04 (Coverage exclusions + CI coverage comments)
+Status: In progress
+Last activity: 2026-03-01 — Completed Plan 27-01 (frozen exclusions, json-summary reporter, CI PR coverage comment)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 25%
 
 ## Performance Metrics
 
@@ -38,9 +38,9 @@ Progress: [░░░░░░░░░░] 0%
 - Total execution time: ~110 min
 
 **v7.0 Velocity:**
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: —
+- Total plans completed: 1
+- Average duration: ~8 min/plan
+- Total execution time: ~8 min
 
 ## Accumulated Context
 
@@ -58,6 +58,8 @@ Key decisions locked for v7.0 planning:
 - [Research]: OSC8 links are TTY-gated; plain path fallback for piped/CI output
 - [Research]: MCP `semantic_search` content limited to top 3 results to avoid 25KB+ payloads
 - [Research]: Add `starlight-links-validator` to CI before writing any new doc pages
+- [Phase 27]: Replaced broad src/mcp/** exclusion with explicit MCP runtime file exclusions while keeping mcp/tools.ts/mcp/errors.ts testable. — Expose testable MCP surfaces so branch coverage can be raised with focused unit tests in plans 27-02/27-03.
+- [Phase 27]: Added json-summary coverage reporter and SHA-pinned PR coverage comment action in CI. — Provide machine-readable coverage output and deterministic PR feedback in pull requests.
 
 ### Pending Todos
 
@@ -65,7 +67,7 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 27]: 80% coverage gate is currently failing on all four metrics — first plan must fix this before threshold can be raised
+- [Phase 27]: Coverage is still below threshold because `mcp/tools.ts` and `mcp/errors.ts` are now testable but untested; close in plans 27-02/27-03 before threshold-raise plan 27-04
 - [Phase 28]: `src/regeneration/` has no CLI integration; define shared runner interface before implementing `--since`
 - [Phase 28]: Verify `.github/workflows/ci.yml` checkout depth before Phase 28 ships (shallow clone breaks `--since`)
 
@@ -78,5 +80,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Phase 27 context gathered
-Resume file: .planning/phases/27-test-coverage-infrastructure/27-CONTEXT.md
+Stopped at: Completed 27-01-PLAN.md
+Resume file: .planning/phases/27-test-coverage-infrastructure/27-02-PLAN.md
