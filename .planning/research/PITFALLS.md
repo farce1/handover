@@ -1,340 +1,369 @@
 # Pitfalls Research
 
-**Domain:** Subscription-based provider auth (Claude Max, OpenAI Plus/Pro, Codex) added to existing TypeScript CLI with API key auth
-**Researched:** 2026-02-26
-**Confidence:** HIGH — Critical TOS findings from official Anthropic policy and The Register reporting; token security from Google, Auth0, and RFC 9700; rate limit details from official provider docs
+**Domain:** Test coverage uplift, git-aware incremental regeneration, search UX polish, and documentation/onboarding on an existing TypeScript CLI tool
+**Researched:** 2026-03-01
+**Confidence:** HIGH — Coverage pitfalls from Vitest official docs and community post-mortems; git edge cases from git-scm official docs and simple-git changelog; vector search pitfalls from sqlite-vec issue tracker and the authoritative sqlite-vec hybrid search post; CLI UX from clig.dev (the reference standard); onboarding pitfalls from community CLI project issues
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Using Claude Subscription OAuth Tokens in Any Third-Party Tool is a TOS Violation
+### Pitfall 1: Coverage Exclusion Creep Produces a Fake Number
 
 **What goes wrong:**
-Developers implement OAuth flows to exchange Claude Free/Pro/Max subscription credentials for access tokens and use them to make programmatic API calls. The integration works initially, then Anthropic server-side blocks it without notice. Accounts face potential suspension.
+The project already excludes 30+ source paths from coverage (CLI entry points, CLI commands, all analyzers, all cache code, all vector code, all MCP code, all regeneration code, all rendering code, all provider SDKs, the logger, and domain entities). The threshold sits at 80% for files that remain. Each new phase that adds exclusions to `vitest.config.ts` in order to keep CI green raises the percentage on a shrinking denominator. The number reaches 90% without the codebase being meaningfully more tested.
 
 **Why it happens:**
-Claude Code itself is an open-source CLI that authenticates via OAuth to Anthropic's backend. Developers observe this mechanism, extract the pattern, and replicate it in other tools. The integration looks legitimate — it uses the same OAuth flow, same endpoints, same tokens.
-
-**The hard constraint:**
-Anthropic's Consumer Terms of Service explicitly state: "Using OAuth tokens obtained through Claude Free, Pro, or Max accounts in any other product, tool, or service — including the Agent SDK — is not permitted and constitutes a violation of the Consumer Terms of Service."
-
-Anthropic enforced this with a silent server-side block on January 9, 2026 — no advance notice — and formally documented the ban on February 17-18, 2026. Tools including OpenCode, OpenClaw, and Cline lost Claude subscription access immediately. This is a real risk, not hypothetical.
+"Integration-only" is a legitimate reason to exclude code from unit-coverage — but it becomes a habit. When a file is hard to test, the path of least resistance is adding it to the exclusion list rather than refactoring or writing a focused integration test. The 90% threshold then measures coverage over a cherry-picked subset that excludes all the risky code.
 
 **How to avoid:**
-- Do NOT implement Claude subscription OAuth flows in Handover.
-- The only permitted programmatic access to Claude from a third-party tool is via API keys (`ANTHROPIC_API_KEY`) through the official REST API.
-- If users ask about using their Max subscription instead of paying for API tokens, explain the policy explicitly and link to the official Anthropic guidance.
-- API keys remain fully supported with no restrictions.
+- Freeze the exclusion list before starting the coverage uplift phase. Any new exclusion requires explicit justification committed alongside the entry.
+- Distinguish between three categories when evaluating uncovered files: (a) truly not unit-testable without network/disk (legitimate exclusion), (b) testable with a modest amount of mocking (must add tests), (c) untested because of avoidance (must add tests).
+- Track the denominator: report "covered LOC out of total eligible LOC" in addition to the percentage. If the denominator shrinks as coverage rises, that is a warning sign.
+- Treat growing `vitest.config.ts` coverage.exclude arrays as a code smell requiring review in PR.
 
 **Warning signs:**
-- Any code that initiates `https://claude.ai/oauth` or `https://claude.ai/auth` flows.
-- Any code storing tokens to `~/.claude/oauth_token.json` or equivalent.
-- Any PR or feature request titled "support Claude Max/Pro subscription auth."
+- Coverage exclusion list grows during the coverage phase.
+- A PR adds a test file AND simultaneously adds new exclusions for other files.
+- Coverage percentage improves while the number of test files stays flat.
+- `src/qa/`, `src/cache/`, `src/vector/`, and `src/regeneration/` never appear in coverage reports despite being core business logic.
 
 **Phase to address:**
-Auth implementation phase — establish a clear decision: Claude support = API key only, no subscription OAuth.
+Test coverage uplift phase — establish exclusion freeze and denominator tracking before writing any new tests.
 
 ---
 
-### Pitfall 2: OpenAI ChatGPT Plus/Pro Subscription Access Does Not Include API Access — These Are Separate Products
+### Pitfall 2: Mock-Heavy Tests That Raise Coverage Without Testing Behavior
 
 **What goes wrong:**
-Developers assume that a user's ChatGPT Plus or Pro subscription grants programmatic API access. They build a "use your ChatGPT subscription" auth flow. Users configure it, and calls fail with authentication errors because subscription credentials don't work against the OpenAI API.
+To cover modules that depend on filesystem, SQLite, or LLM providers, developers wrap every dependency in a `vi.mock()` and assert that the mock was called. Coverage goes up. The tests pass when the real integration is broken. This is especially likely for `src/cache/round-cache.ts`, `src/vector/query-engine.ts`, and `src/orchestrator/` — all complex modules that are currently excluded from coverage.
 
 **Why it happens:**
-OpenAI pricing pages emphasize "access to GPT-4o" and "advanced models" for Plus subscribers. This is for the ChatGPT web/app product. The OpenAI API is entirely separate with its own billing. There is no token exchange, no OAuth bridge, and no way to route API calls through a ChatGPT subscription.
-
-**The hard constraint:**
-ChatGPT Plus ($20/month) and the OpenAI API have completely separate billing, separate authentication, and separate feature sets. OpenAI's Services Agreement also prohibits buying, selling, or transferring API keys to third parties, and prohibits circumventing rate limits or restrictions.
+Mock-heavy tests are fast to write and immediately raise line counts. The alternative — a real-filesystem integration test or a memfs-backed unit test — requires more design effort. The project already has `memfs` as a devDependency, which signals intent, but it is easy to reach for `vi.mock()` instead.
 
 **How to avoid:**
-- OpenAI support in Handover = API key auth only (`OPENAI_API_KEY`).
-- If implementing "OpenAI Plus" support, this is not feasible. The feature is simply not possible without violating TOS.
-- Document clearly for users: "You need an OpenAI API key, not a ChatGPT subscription."
+- Use `memfs` (already in devDependencies) for tests that exercise filesystem logic, rather than mocking the `fs` module at the method level.
+- Tests that mock the return value of a function being tested (not its dependencies) are testing nothing — identify these and replace them.
+- For each new test file, ask: "Would this test catch a regression where the real code path is broken?" If no, it is a mock test.
+- Prefer testing through public interfaces over testing internal state.
 
 **Warning signs:**
-- Feature requests to "use ChatGPT credentials instead of API key."
-- Any code attempting to authenticate against `https://chat.openai.com/` endpoints.
-- Confusion in issues where users provide ChatGPT credentials and report auth failures.
+- A test file contains more `vi.mock()` calls than `expect()` calls.
+- Test assertions are all `expect(mockFn).toHaveBeenCalledWith(...)` with no output verification.
+- The test file imports from `vitest-mock-extended` exclusively with no real implementation.
+- Deleting a production code path does not make a test fail.
 
 **Phase to address:**
-Provider configuration and documentation phase — state clearly which auth method is supported per provider.
+Test coverage uplift phase — establish a test quality policy (no pure-mock coverage gaming) before writing new tests.
 
 ---
 
-### Pitfall 3: OAuth Refresh Token Stored in Plaintext Config File
+### Pitfall 3: Git-Aware Incremental Detection Misses Untracked New Files
 
 **What goes wrong:**
-Subscription OAuth flows produce both a short-lived access token and a long-lived refresh token. Developers store both in a JSON config file (e.g., `~/.handover/credentials.json`). The refresh token persists indefinitely. If a user's machine is compromised, the attacker gains persistent access to the LLM provider account — not just a short window.
+`git diff --name-only HEAD` (or `simple-git`'s equivalent) returns only files that are tracked by git. A user creates new source files and runs `handover generate` without staging them first. The incremental check sees no changed tracked files, concludes nothing changed, and skips regeneration. The new files are never indexed.
 
 **Why it happens:**
-Saving to a JSON config file is the path of least resistance for CLI credential storage. API keys are already stored this way (and have the same problem), so developers apply the same pattern to OAuth tokens without recognizing that refresh tokens have different security characteristics: they are long-lived, revocable only via the provider, and represent full account access rather than limited API scope.
+`git diff` compares states within the git graph. Untracked files are not in the index or any commit, so they are invisible to `diff`. This is documented behavior — git-scm explicitly states diffs from the index to working tree cannot have Added entries for untracked files. It is a natural assumption gap: users expect "detect what changed" to include new files they just wrote.
 
 **How to avoid:**
-- For any OAuth tokens, use the OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service via `keytar` or `@keytar/node`) rather than plaintext files.
-- If OS keychain is unavailable (e.g., headless server), warn the user explicitly and fall back to a clearly-marked insecure storage path.
-- Apply the same best practice to API keys: they should not be in plaintext config files committed to git.
-- Ensure `.gitignore` excludes credential files.
-- Follow RFC 9700 (January 2025): access tokens should expire in 5-15 minutes; refresh tokens should expire within 7-30 days maximum.
+- Do not rely solely on `git diff` for change detection. Supplement with `git status --short` which does report untracked files (the `?` prefix).
+- The canonical approach with `simple-git`: call `git.status()` and inspect both `modified`, `created`, and `not_added` (untracked) fields.
+- Alternatively: when git-aware mode detects no changes via diff, fall back to the existing content-hash comparison for the full file set. Git awareness is an optimization (skip known-unchanged files), not a replacement for hash-based detection.
+- Document this behavior clearly: "Files must be staged (git add) or already tracked for incremental detection to include them."
 
 **Warning signs:**
-- `credentials.json` or `auth.json` containing token fields stored under the project directory.
-- No keytar/keychain dependency in `package.json` when OAuth is supported.
-- CI logs showing token values.
-- Missing `.gitignore` entries for credential files.
+- Incremental mode reports "no changes" after adding new source files without staging.
+- Test scenarios only cover modified tracked files, not new untracked files.
+- The `simple-git` integration only calls `git.diff()` without `git.status()`.
 
 **Phase to address:**
-Auth implementation phase — choose secure storage before writing any credential persistence code.
+Git-aware incremental regeneration phase — test the untracked-file scenario explicitly in the integration test suite.
 
 ---
 
-### Pitfall 4: Silent Mid-Run Auth Failures Corrupt 6-Round Analysis Output
+### Pitfall 4: Detached HEAD and Shallow Clone Break git-Aware Mode Silently
 
 **What goes wrong:**
-Handover runs 6 sequential LLM rounds. An OAuth access token expires mid-run (e.g., after round 3). The API returns 401. The CLI doesn't handle this gracefully — it either crashes with an unhelpful error, silently truncates output, or retries indefinitely. The partially-generated handover document is either not saved or saved in an incomplete state the user doesn't know is broken.
+A user runs `handover generate` inside a git repo that is in detached HEAD state (e.g., after `git checkout <commit>`, inside a CI job, or in a GitHub Actions checkout with `fetch-depth: 1`). `simple-git` operations that depend on a branch reference (`git diff origin/main...HEAD`, `git rev-parse --abbrev-ref HEAD`) fail or return empty results. The CLI swallows the error and either skips incremental detection entirely (regenerating everything, silently wasting time) or crashes with an unhelpful message.
 
 **Why it happens:**
-OAuth access tokens are short-lived (Anthropic's Claude Code tokens have been observed expiring in hours; RFC 9700 recommends 5-15 minutes for sensitive APIs). API key auth is stateless — it doesn't expire mid-run. Developers design error handling around API key patterns (401 = wrong key, don't retry) and don't account for token refresh mid-sequence.
+Developers test incremental mode on their working branch. CI pipelines and shallow clones are edge cases encountered later. The `simple-git` library does not automatically surface "you are in detached HEAD" as a structured error — it surfaces it as a string like `HEAD` for the branch name or as a spawned-process error.
 
 **How to avoid:**
-- Implement proactive token refresh: refresh the access token before each round (not just at startup) if token expiry is within a safe margin (e.g., 2 minutes).
-- Classify 401 errors: if using OAuth, attempt one token refresh and retry. If still 401, surface a clear re-auth message.
-- If mid-run refresh fails, save partial output with an explicit `[INCOMPLETE: auth failed at round N]` marker.
-- Test the token-expiry-during-run scenario explicitly.
+- Always check `git.status()` for `detached` before running branch-relative diffs. `StatusResult.detached === true` when in detached HEAD.
+- In detached HEAD or shallow clone (detectable via `git log --depth=1` returning quickly), fall back gracefully to full content-hash mode and log a warning: "Git-aware incremental mode unavailable (detached HEAD). Running full analysis."
+- In CI: document that `fetch-depth: 0` is required in the GitHub Actions checkout step when using incremental mode.
+- Test this edge case explicitly with a fixture repository.
 
 **Warning signs:**
-- Error handler for 401 that just throws without attempting refresh.
-- Token loaded once at startup, never rechecked during multi-round runs.
-- No partial output save on auth failure.
+- `simple-git` calls use branch names without checking `detached`.
+- No test for detached HEAD in the integration test suite.
+- Error logs from users running in CI with "ref not found" or empty diff output.
 
 **Phase to address:**
-Auth implementation phase, and validated during multi-round integration testing.
+Git-aware incremental regeneration phase — add explicit detached HEAD handling before shipping incremental mode.
 
 ---
 
-### Pitfall 5: Rate Limit Mismatch — Subscription Limits Are Message-Based, Not Token-Based
+### Pitfall 5: Integrating the Unused `src/regeneration/` Module Into the CLI Without a Contract
 
 **What goes wrong:**
-A developer implements subscription auth and assumes rate limits behave like API rate limits (tokens/minute, requests/minute). They implement the same retry-with-backoff logic. But subscription rate limits count weighted "messages" in 5-hour rolling windows, not raw requests. A single 6-round Handover analysis may consume 6-60+ message units depending on context length — and the user hits their weekly limit after only a few runs without warning.
-
-**How it differs:**
-
-| Auth Type | Rate Limit Unit | Window | Notes |
-|-----------|----------------|--------|-------|
-| API key (Tier 1) | 50 requests/min, 40K tokens/min | Per minute | Token-based, resets every minute |
-| Claude Pro subscription | ~45 Opus 4 messages | 5-hour rolling | Message = weighted token consumption |
-| Claude Max 5x ($100/mo) | ~225 Opus 4 messages | 5-hour rolling | 5x Pro capacity |
-| Claude Max 20x ($200/mo) | ~900 Opus 4 messages | 5-hour rolling | Professional tier |
-| OpenAI Codex Plus | 30-150 messages | 5-hour window | Platform-specific |
-| OpenAI Codex Pro | 300-1,500 messages | 5-hour window | |
-
-A 6-round Handover run on long codebase context could consume 60-90+ weighted message units (context grows each round). On Claude Pro that is ~1/3 to 2/3 of a 5-hour window per single run.
+`src/regeneration/` (job-manager, job-store, targets, schema) was written for the MCP server and is not wired into the CLI `generate` command. When the incremental regeneration feature connects this module to the CLI, it introduces an implicit contract: the job-store is in-memory only, the runner is injected, and the schema defines targets the CLI must honor. If this connection is made ad hoc (e.g., directly calling `job-manager` internals from the CLI command), the CLI and MCP server end up with diverging behavior for the same conceptual operation.
 
 **Why it happens:**
-Developers test with short prompts where subscription limits don't bite. Multi-round analysis with growing context is exactly the worst case for message-weighted rate limits.
+The module exists but lacks a clear CLI integration interface. The fastest path is to call `createRegenerationJobManager()` directly from `src/cli/generate.ts` with inline runner logic. This works but couples the CLI to job-store implementation details and makes the module harder to test.
 
 **How to avoid:**
-- Surface the auth method to users prominently, including its limit characteristics.
-- Add a pre-run estimate: "This analysis may consume approximately N context tokens across 6 rounds. Your current tier allows approximately M message units per 5 hours."
-- On 429 errors from subscription endpoints, return a user-friendly message explaining remaining window time, not just a generic "rate limited, retry in Xs."
-- Do NOT assume the same retry logic works for subscription 429s as for API key 429s — subscription 429s may require waiting hours, not seconds.
+- Define an explicit integration interface for how `src/regeneration/` is invoked from both CLI and MCP contexts before writing CLI integration code.
+- The runner function (injected into `createRegenerationJobManager`) should be the same runner used by MCP. Extract it to a shared module rather than implementing it twice.
+- Write tests for `src/regeneration/job-manager.ts` and `src/regeneration/targets.ts` — these are currently unexcluded from coverage but have no test files. Tests will surface interface assumptions early.
 
 **Warning signs:**
-- Same `retryWithBackoff` function used for both subscription and API key 429s.
-- No distinction between "rate limited for 30 seconds" (API) and "rate limited for 4.5 hours" (subscription window).
-- No token estimation before multi-round runs.
+- `src/cli/generate.ts` imports directly from `src/regeneration/job-store.ts` internals.
+- Runner logic is duplicated between CLI and MCP integration paths.
+- `src/regeneration/` files remain unexcluded from coverage but untested.
 
 **Phase to address:**
-Rate limit handling phase — implement provider-aware error handling, not generic retry logic.
+Git-aware incremental regeneration phase — define the regeneration integration interface before wiring CLI to the module.
 
 ---
 
-### Pitfall 6: Users Confused About Which Auth Method Is Active
+### Pitfall 6: sqlite-vec KNN Always Returns K Results Even When All Are Irrelevant
 
 **What goes wrong:**
-User configures both an API key and subscription auth "just in case." The tool silently picks one. The wrong one gets used — either the user pays API costs thinking they're using their subscription, or subscription limits get consumed thinking the API key is active. Support requests become impossible to diagnose because auth state is implicit.
+`sqlite-vec`'s vec0 KNN queries are "give me the K nearest vectors" with no distance threshold enforcement. The search command returns `--top-k` results even when the query has no semantically meaningful matches in the index. Users get confusing results (low-relevance snippets) with no indication that their query returned poor-quality matches. Adding stats or filters without addressing this makes the problem worse — high-confidence-looking stats for low-relevance results.
 
 **Why it happens:**
-Adding a second auth method to a tool that previously had one creates a precedence question the developer answers implicitly in code. Users don't see which method was selected. When something goes wrong, both user and developer are debugging without a shared understanding of which auth path ran.
+KNN is inherently threshold-free. The sqlite-vec issue tracker explicitly notes: "No room for pagination, custom distance thresholds or anything" in the current vec0 implementation (issue #165 is open for this). The current search CLI likely returns results without surfacing cosine/L2 distance to the user.
 
 **How to avoid:**
-- Always print which auth method is active at the start of a run: `[auth] Using API key for claude-3-5-sonnet-20241022` or `[auth] Using subscription (Claude Max) for claude-3-5-sonnet-20241022`.
-- Make precedence explicit and documented: e.g., "API key takes precedence over subscription auth if both are configured."
-- Add a `handover auth status` command that shows which credentials are configured, which will be used, and their current validity.
-- Never silently fall back from one auth method to another — if the configured method fails, surface the failure with the method name.
+- Surface the raw distance score alongside each result. Users can judge relevance; hiding the score removes their agency.
+- Implement a soft warning threshold: if the best result's distance exceeds a configurable value (e.g., cosine distance > 0.5), print a warning: "Low-confidence results — no closely matching content found for this query."
+- For the search stats feature, include the distance distribution (min, median, max distance across returned results) so users can assess result quality at a glance.
+- Do not implement minimum-distance filtering as hard cutoff (it silently returns zero results for legitimate queries with unique terminology) — use it only as a warning signal.
 
 **Warning signs:**
-- No logging of which auth path was taken.
-- Fallback logic with no user notification.
-- Users opening issues with "it's not using my API key" or "it's not using my subscription."
+- Search results displayed without distance scores.
+- `--top-k 5` always returns exactly 5 results even for nonsense queries.
+- No empty-state message when the index contains no documents.
+- Stats show result count but not result quality distribution.
 
 **Phase to address:**
-Auth implementation phase — design the auth selection UX before writing the provider logic.
+Search UX polish phase — add distance surfacing and relevance warnings before adding stats/filters.
 
 ---
 
-### Pitfall 7: Credential Files Inadvertently Published in npm Package
+### Pitfall 7: Search Filters That Reference Document Types Not Present in the Index
 
 **What goes wrong:**
-A Handover contributor adds credential or config files to the project root during development. The `.npmignore` or `files` field in `package.json` is not configured to exclude them. A release publishes `credentials.json`, `~/.handover/config.json` or test fixture files containing real API keys to npm. The keys are immediately scraped by automated bots that watch npm publish feeds.
+A `--type` filter is added to the search CLI. Users query `handover search "auth flow" --type architecture`. The index may contain no documents of type "architecture" — either because the document was never generated, the index is stale, or the type name does not match what was indexed. The result is silently zero results. The user cannot tell whether their query simply has no good matches or the filter is wrong.
 
 **Why it happens:**
-npm publishes everything in the package directory by default unless explicitly excluded. Development config files accumulate in the project root. The `files` field in `package.json` is often not set, relying on `.npmignore` which may not be complete. Security scanning tools targeting AI assistant CLIs (McpInject, credential harvesting npm packages) specifically target `.claude/`, `.env`, and config files.
+Filter implementations are written against an assumed schema without verifying that the filter values are present in the actual index. The disconnect between filter option values and indexed document metadata is an integration gap that only appears at runtime.
 
 **How to avoid:**
-- Use the `files` allowlist in `package.json` (explicit inclusion is safer than exclusion): only include `dist/`, `bin/`, `README.md`, `LICENSE`.
-- Add to `.npmignore`: `*.json` (all JSON at root except package.json), `.env*`, `credentials*`, `config*`, `.handover/`.
-- Run `npm pack --dry-run` in CI to audit what would be published before every release.
-- Never commit test fixtures containing real credentials.
-- Rotate any key that may have been exposed immediately — even briefly published secrets are scraped.
+- Before executing a filtered search, validate that at least one document of the requested type exists in the index. If none exist, surface: "No documents of type 'architecture' found in the index. Run `handover reindex` to rebuild, or search without --type to see all results."
+- The reindex command should report which document types were indexed and their counts as part of its output.
+- Test filter combinations against empty and stale indices explicitly.
 
 **Warning signs:**
-- No `files` field in `package.json`.
-- `.npmignore` does not exist or does not explicitly exclude config/credential patterns.
-- `npm pack --dry-run` not in the release checklist.
-- Credential files present in the project root.
+- `--type` filter returns zero results without a diagnostic message.
+- The list of valid filter values is hardcoded in the CLI rather than queried from the index.
+- No test for filtering against a stale or empty index.
 
 **Phase to address:**
-Pre-release security phase — add npm publish audit to CI before any release that includes new auth features.
+Search UX polish phase — implement filter validation and empty-state messaging alongside filter implementation.
+
+---
+
+### Pitfall 8: Interactive Onboarding (`init`) Breaks CI and Non-TTY Environments
+
+**What goes wrong:**
+An interactive `handover init` command is added using `@clack/prompts` (already a dependency). The prompts wait for user input via stdin. A user runs `handover init` in a CI script or pipes output to a file — stdin is not a TTY. The prompts hang indefinitely or crash with an unhelpful error. CI pipelines fail with timeouts.
+
+**Why it happens:**
+Interactive prompt libraries check for TTY context during prompts but the check is not always applied consistently, especially when prompts are composed or conditionally shown. `@clack/prompts` is designed for TTY contexts. Non-TTY behavior varies — some versions hang, some return empty strings, some throw.
+
+**How to avoid:**
+- Always guard interactive prompts with a TTY check: `process.stdout.isTTY`. If not a TTY, either fail fast with a clear message ("Run handover init in an interactive terminal") or auto-apply defaults without prompting.
+- Add a `--yes` / `--defaults` flag to `handover init` that accepts all defaults non-interactively. Document this as the CI-safe invocation.
+- Test `handover init` with stdin closed (simulating non-TTY) in the test suite.
+- Do not assume that because `@clack/prompts` is already used elsewhere in the codebase that it is safe to add more prompts without TTY guards.
+
+**Warning signs:**
+- `handover init` hangs in CI without a timeout mechanism.
+- No `--yes` or `--defaults` flag exists on the init command.
+- Tests for the init command only run in interactive mode.
+- Issue reports of CI pipelines hanging on `handover init`.
+
+**Phase to address:**
+Documentation and onboarding phase — implement TTY guard and `--yes` flag before shipping interactive init.
+
+---
+
+### Pitfall 9: `init` Command Re-Runs Full Setup on Already-Configured Projects
+
+**What goes wrong:**
+A user who already has a configured Handover project (`.handover/config.toml` exists) runs `handover init` accidentally or as part of onboarding documentation. The command overwrites their configuration with defaults. Customizations (model choices, embedding config, custom output paths) are silently lost.
+
+**Why it happens:**
+The init command is designed for first-run setup. Adding detection for existing configuration requires an additional code path. Under time pressure, the "detect existing config and bail" check is omitted.
+
+**How to avoid:**
+- At the start of `handover init`, check for an existing config file. If found, prompt: "A Handover configuration already exists at .handover/config.toml. Overwrite? [y/N]" with the default being no.
+- In non-TTY mode with `--yes`, fail with an explicit error if a config file exists unless `--force` is also passed.
+- Distinguish between "init" (first setup) and "reconfigure" (update existing config) in the CLI surface if both are needed.
+
+**Warning signs:**
+- `handover init` has no check for existing `config.toml`.
+- The command writes config without reading current state.
+- User reports that running init again reset their configuration.
+
+**Phase to address:**
+Documentation and onboarding phase — implement existing-config detection before the init command is documented.
+
+---
+
+### Pitfall 10: Astro Starlight Docs Break on Relative Link and Base Path Changes
+
+**What goes wrong:**
+The existing Starlight documentation site uses relative links within markdown content. When new pages are added, reorganized into subdirectories, or the `base` config option is changed, internal links break silently. The Astro build succeeds (it does not validate internal links by default). Users encounter 404s on production docs.
+
+**Why it happens:**
+Starlight does not ship with link validation. The community-built `starlight-links-validator` package exists but is not automatically enabled. Developers adding new documentation pages do not always update links pointing to moved content. The base path issue is well-documented in community discussions: markdown links do not automatically prefix the `base` config value.
+
+**How to avoid:**
+- Add `starlight-links-validator` to the docs build process and fail CI on broken links.
+- When reorganizing doc pages, run a find-and-replace on link references rather than updating only the new file's front matter.
+- Test the docs build (`npm run docs:build`) in CI as part of the documentation phase, not just locally.
+- Avoid changing the Starlight `base` configuration without doing a full link audit.
+
+**Warning signs:**
+- The docs build step is not in CI.
+- New documentation pages are added without a link validation step.
+- Internal links use absolute paths (`/user/getting-started`) rather than relative paths (`../getting-started`), making them fragile to base path changes.
+
+**Phase to address:**
+Documentation and onboarding phase — add docs:build to CI and install link validator before writing new pages.
 
 ---
 
 ## Technical Debt Patterns
 
-Shortcuts that seem reasonable but create long-term problems.
-
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Store OAuth tokens in same JSON file as API keys | One credential store, simple code | Refresh token persists indefinitely in plaintext; different security requirements get same weak treatment | Never |
-| One generic `retryWithBackoff` for all 429s | Simple code | Subscription 429s require hours-long wait, not seconds; wrong backoff confuses users and wastes time | Never in production |
-| Implement Claude subscription OAuth "because users want it" | Feature request satisfied | Active TOS violation; Anthropic will server-block it with no notice; user accounts at risk | Never |
-| Check auth method only at startup, not per-round | Simpler startup flow | OAuth token expires mid-run, round 4-6 fail silently with 401 | MVP only if tokens are long-lived (24h+), never for OAuth |
-| Display "using Claude" without specifying which auth method | Less verbose output | User cannot diagnose billing/limit issues; "it's charging my API key when I set up subscription" complaints | Never |
-| Skip `handover auth status` command | Saves implementation time | Users cannot verify their configuration; first sign of problems is a failed run | Acceptable to defer until v2, but ship before subscription auth goes stable |
+| Add new files to vitest coverage exclusion list instead of writing tests | CI stays green immediately | Coverage % measures a shrinking denominator; exclusion list grows unbounded | Never during a coverage uplift phase |
+| Mock all dependencies in new tests with `vi.mock()` | Fast to write, hits line counts | Tests pass when real behavior is broken; mock-only tests have near-zero regression value | Acceptable only for non-deterministic dependencies (time, crypto, network) |
+| Implement git change detection with only `git.diff()` (no `git.status()`) | Simple implementation | New untracked files are invisible; users lose documents without warning | Never — always pair diff with status check |
+| Wire `src/regeneration/` directly into CLI without defining a shared runner | Fastest path to incremental regeneration | CLI and MCP diverge on regeneration behavior; module becomes untestable | Never — define the runner interface first |
+| Return all K KNN results without surfacing distances | Simpler output format | Users see low-relevance results with no signal that quality is poor | Never in a search UX polish phase |
+| Skip TTY check on `handover init` interactive prompts | No extra code | CI pipelines hang indefinitely when onboarding docs instruct users to run init | Never — TTY guard is one line of code |
+| Auto-generate tests with AI to hit the 90% threshold | Fast coverage gains | High-coverage test suite with zero regression value; maintenance burden grows | Never as a primary strategy; acceptable for scaffolding test structure only |
 
 ---
 
 ## Integration Gotchas
 
-Common mistakes when connecting to external services.
-
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Anthropic subscription auth | Implementing OAuth token exchange for Claude Max/Pro | Use API keys only for third-party tools; subscription OAuth is blocked server-side and violates TOS |
-| OpenAI subscription auth | Assuming ChatGPT Plus credentials work with the API | OpenAI API and ChatGPT are completely separate products with separate billing; no bridge exists |
-| OAuth token refresh | Loading token once at startup, assuming it's valid for the run | Validate and refresh before each LLM round; short-lived tokens can expire in minutes |
-| Subscription 429 errors | Treating subscription rate limits like API rate limits (seconds-long backoff) | Subscription 429s may mean a 5-hour window is exhausted; backoff logic must be provider-and-auth-method-aware |
-| Credential file storage | Writing tokens to plaintext JSON alongside project files | Use OS keychain for OAuth tokens; use scoped dotfiles with restrictive permissions for API keys |
-| npm publish with credentials | Relying on default publish behavior or incomplete .npmignore | Use explicit `files` allowlist in package.json; run `npm pack --dry-run` in CI |
+| `simple-git` + incremental detection | Using only `git.diff()` to detect changed files | Pair `git.diff()` with `git.status()` to capture untracked files; check `StatusResult.detached` before any branch-relative operations |
+| `sqlite-vec` KNN search | Assuming K results means K relevant results | Surface raw distance scores; warn when best-match distance exceeds relevance threshold |
+| `@clack/prompts` in `handover init` | Running interactive prompts without TTY check | Guard all prompts with `process.stdout.isTTY`; provide `--yes` flag for non-interactive mode |
+| `src/regeneration/` + CLI | Calling job-manager internals directly from CLI command | Define a shared runner interface; extract runner to a module both CLI and MCP can inject |
+| Vitest v8 + TypeScript `/* v8 ignore */` comments | Ignore hint stripped by esbuild transpilation | Use `/* v8 ignore if -- @preserve */` syntax; v8 AST remapping introduced in v3.2.0 handles most cases |
+| Astro Starlight docs + `base` config | Markdown links break silently when base path changes | Use relative links throughout; add `starlight-links-validator` to CI build |
+| Coverage thresholds + `coverage.all` | Files not loaded by any test show 0% and drag down threshold | Set `coverage.all: true` and `coverage.include` to see the real uncovered surface; do not be surprised when the number drops |
 
 ---
 
 ## Performance Traps
 
-Patterns that work at small scale but fail as usage grows.
-
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| 6-round analysis with growing context on subscription auth | 3rd or 4th run in a day hits 5-hour message limit | Estimate token usage before runs; warn user; use API key for heavy workloads | Immediately visible on Claude Pro; Max 5x gives more headroom |
-| Same token used across concurrent Handover runs | First run depletes window; second fails mid-analysis | Subscription auth is inherently single-user, single-session; document this constraint | Any parallel usage scenario |
-| No pre-run auth validation | Failure at round 3 of 6 with no partial save | Validate credentials before starting; surface expiry warnings before committing to run | Every token expiry event |
-
----
-
-## Security Mistakes
-
-Domain-specific security issues beyond general web security.
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Storing OAuth refresh tokens in plaintext dotfiles | Persistent account compromise if file is read (supply chain attack, shared machine, git leak) | Use OS keychain via `keytar`; warn explicitly when falling back to plaintext |
-| Publishing credential fixtures to npm | Immediate automated scraping by bots monitoring npm publish feed | Use `files` allowlist in `package.json`; `npm pack --dry-run` in CI |
-| Implementing Claude subscription OAuth | TOS violation; Anthropic server-block; account suspension risk | API key only for Claude in third-party tools |
-| No distinction between auth methods in logs | Cannot audit which auth was used; security incident investigation fails | Always log auth method (not credential value) at run start |
-| Logging full API keys or tokens in debug output | Key exposure in CI logs, shared terminals | Redact tokens in all log output; never log credential values, only last 4 chars or `[redacted]` |
+| Full `git.log()` call on large repo during incremental check | `handover generate` startup is slow on repos with thousands of commits | Use `git.diff(['--name-only', 'HEAD~1', 'HEAD'])` or limit log depth; do not fetch full history for change detection | Any repo with > 1,000 commits and no depth limit |
+| Running all 254+ unit tests before allowing incremental mode to skip | CI time increases with each new test file | Keep unit tests and incremental mode decisions separate; incremental mode should run before the test suite, not after | When test suite grows to 400+ tests |
+| sqlite-vec KNN with large index and no limit on result set | Search takes seconds on 10K+ document index | Always apply `LIMIT` on vec0 queries; index is doing full scan by default | When the index exceeds ~5K chunks |
+| Watching all source files for changes in `handover serve` + incremental | inotify limits hit on large monorepos | Limit file watching to output directories and config files; use gitignore patterns to exclude `node_modules` and build artifacts | Monorepos with > 50K files |
 
 ---
 
 ## UX Pitfalls
 
-Common user experience mistakes in this domain.
-
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| No indication of which auth method is active | User pays API costs when they believe subscription is being used; impossible to diagnose billing disputes | Print `[auth] method: API key (claude-3-5-sonnet-20241022)` at run start |
-| Generic "rate limited" error on subscription 429 | User retries in 10 seconds; fails again; retries indefinitely | Surface remaining window time: "Rate limit reached. Your subscription window resets in 4h 12m." |
-| No per-provider auth configuration documentation | Users configure wrong credential type (ChatGPT account for OpenAI API, Max subscription for Claude) | Provide per-provider setup guide: "Claude requires an API key from console.anthropic.com. Subscription plans are not supported." |
-| Silent fallback to API key when subscription fails | User thinks subscription worked; gets an unexpected API bill | Never silently switch auth methods; fail explicitly with which method failed and why |
-| No `auth status` command | User cannot verify configuration before running an expensive multi-round analysis | Implement `handover auth status` showing configured providers, active method, and validity state |
+| Search returns 5 results for a nonsense query with no quality signal | User trusts irrelevant results; wastes time following up on false leads | Show distance score per result and a low-quality warning when best distance exceeds threshold |
+| `handover init` hangs silently in a script | CI pipeline times out; no error message to diagnose | TTY check + `--yes` flag + immediate failure message when non-TTY and no flag |
+| `handover init` overwrites existing config without confirmation | User loses custom model/embedding config silently | Detect existing config; prompt before overwrite; default to no-overwrite |
+| Coverage report in CI shows 90% but excludes all complex logic | Team has false confidence; regressions go undetected | Track the excluded-file list alongside coverage%; alert when exclusions grow |
+| Incremental mode silently skips new untracked files | User thinks regeneration ran; search index is stale | Warn explicitly: "N untracked files were not indexed. Stage them with git add or run with --no-incremental." |
+| Search stats show count without quality distribution | User cannot distinguish "10 great results" from "10 poor results" | Add distance min/median/max to stats output |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-Things that appear complete but are missing critical pieces.
-
-- [ ] **Subscription auth for Claude:** "It works" may mean TOS violation — verify that no OAuth flows are used, only API keys, and document this constraint for users explicitly.
-- [ ] **OAuth token refresh:** Token refresh at startup is not enough — verify that refresh is checked before each LLM round in the 6-round sequence.
-- [ ] **Rate limit handling:** Generic 429 retry works for API keys — verify that subscription-mode 429s surface the remaining window time, not just "retry in Xs."
-- [ ] **Auth method display:** Output shows "using Claude" — verify that the specific auth method (API key vs subscription) is printed, not just the provider name.
-- [ ] **Credential file security:** Config file exists — verify that OAuth refresh tokens use OS keychain, not plaintext JSON; verify API key files have restrictive permissions (chmod 600).
-- [ ] **npm publish safety:** Build succeeds — verify `npm pack --dry-run` output contains no credential or config files; verify `files` field in `package.json` is an explicit allowlist.
-- [ ] **Multi-round auth failure:** 6-round analysis completes on valid credentials — verify that partial output is saved with clear incomplete marker when auth fails mid-run.
+- [ ] **Coverage at 90%**: Check whether the exclusion list grew during the phase — verify denominator (eligible LOC) stayed constant or grew, not shrank.
+- [ ] **Incremental mode works**: Test specifically with (a) new untracked file, (b) detached HEAD repo, (c) shallow clone. All three are silently broken by a naive `git.diff()` implementation.
+- [ ] **Git-aware mode wired to CLI**: Verify `src/regeneration/` module is connected via a defined runner interface, not via direct internal imports from the CLI command file.
+- [ ] **Search stats added**: Verify distance scores are surfaced alongside stats — a count-only stat is not useful for quality assessment.
+- [ ] **Search filters implemented**: Verify that filtering against a type not present in the index produces a diagnostic message, not silent zero results.
+- [ ] **`handover init` implemented**: Verify TTY guard exists; verify `--yes` flag exists; verify existing-config detection exists.
+- [ ] **Docs built in CI**: Verify `npm run docs:build` is in the CI pipeline; verify link validator runs.
+- [ ] **New doc pages linked**: Verify new pages appear in sidebar navigation and are reachable from the index page.
 
 ---
 
 ## Recovery Strategies
 
-When pitfalls occur despite prevention, how to recover.
-
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| TOS violation via Claude subscription OAuth | HIGH | Remove OAuth code immediately; communicate to users that API keys are required; monitor for account suspension notifications from Anthropic |
-| Credentials published to npm | HIGH | Immediately revoke all exposed keys; publish a new clean version; audit all npm publish history; notify users to rotate their credentials if any were in test fixtures |
-| OAuth refresh token in plaintext file leaked | HIGH | User must revoke token at provider dashboard; rotate to new credentials; migrate storage to OS keychain |
-| Mid-run auth failure corrupts output | MEDIUM | Add partial-save recovery; mark incomplete output clearly; implement pre-run auth validation |
-| User confusion about active auth method | LOW | Add `auth status` command; add auth method to run output; update documentation |
+| Coverage exclusion creep produces 90% on shrinking denominator | MEDIUM | Freeze exclusions; reset threshold to reflect true uncovered surface; document which files require integration tests instead of unit tests |
+| Mock-only tests that game coverage metrics | MEDIUM | Identify tests with no output assertions; replace with memfs-backed or behavior-focused tests; expect short-term coverage drop before real gain |
+| Untracked files missed by incremental mode | LOW | Add `git.status()` call alongside `git.diff()`; add test for untracked-file scenario |
+| Detached HEAD crashes incremental mode | LOW | Add `StatusResult.detached` check; fallback to full hash-based mode with warning |
+| `handover init` hangs in CI | LOW | Add TTY check; ship `--yes` flag; update onboarding docs to specify interactive terminal requirement |
+| Config overwritten by re-running init | LOW | Add existing-config detection; re-run init with `--force` to recover (document recovery path) |
+| Broken links in Starlight docs | LOW | Run `starlight-links-validator` locally to find all broken links; update references; add validator to CI to prevent recurrence |
 
 ---
 
 ## Pitfall-to-Phase Mapping
 
-How roadmap phases should address these pitfalls.
-
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Claude subscription OAuth TOS violation | Auth design phase (decision: API key only for Claude) | No OAuth code paths exist in codebase for Claude; documented in README |
-| OpenAI subscription confusion | Auth design phase + documentation | Provider setup docs explicitly state API key requirement per provider |
-| OAuth tokens in plaintext config | Auth implementation phase | keytar dependency present; plaintext fallback emits security warning |
-| Token expiry mid-run | Auth implementation + integration testing | Integration test: run with token that expires after round 2; verify graceful failure and partial save |
-| Subscription vs API rate limit confusion | Rate limit handling phase | Subscription 429 error messages include window reset time; separate retry logic per auth type |
-| Credential file in npm publish | Pre-release security phase | CI includes `npm pack --dry-run` output check; `files` field verified in package.json |
-| Auth method invisible to user | Auth UX phase | Auth method printed at run start; `auth status` command exits 0 with clear output |
+| Coverage exclusion creep (Pitfall 1) | Test coverage uplift — freeze exclusions at phase start | Exclusion list line count in vitest.config.ts did not increase during phase |
+| Mock-only coverage gaming (Pitfall 2) | Test coverage uplift — establish test quality policy | Random sample of 5 new test files; each must have output assertions, not only mock assertions |
+| Untracked files invisible to git diff (Pitfall 3) | Git-aware incremental regeneration | Integration test: add untracked file, run incremental mode, verify file is processed |
+| Detached HEAD breaks incremental mode (Pitfall 4) | Git-aware incremental regeneration | Integration test: run incremental mode in detached HEAD fixture; verify graceful fallback |
+| `src/regeneration/` wired without a contract (Pitfall 5) | Git-aware incremental regeneration — define interface first | CLI and MCP both call the same exported runner function; no direct job-store imports in CLI |
+| KNN returns K irrelevant results (Pitfall 6) | Search UX polish | Search for a nonsense string; verify distance scores are shown and warning appears when distance is high |
+| Filters against absent document types (Pitfall 7) | Search UX polish | Run `handover search "x" --type nonexistent`; verify diagnostic message, not empty output |
+| `handover init` hangs in non-TTY (Pitfall 8) | Documentation and onboarding | Run `echo "" \| handover init` in CI; verify it exits with error code, not hang |
+| Init overwrites existing config (Pitfall 9) | Documentation and onboarding | Run `handover init` with existing config present; verify prompt and no-overwrite default |
+| Broken Starlight doc links (Pitfall 10) | Documentation and onboarding — add link validator to CI | `npm run docs:build` succeeds in CI; zero broken-link warnings in build output |
 
 ---
 
 ## Sources
 
-- Anthropic Consumer Terms of Service + Legal and Compliance: https://support.claude.com/en/articles/11145838-using-claude-code-with-your-pro-or-max-plan
-- The Register: "Anthropic clarifies ban on third-party tool access to Claude" (2026-02-20): https://www.theregister.com/2026/02/20/anthropic_clarifies_ban_third_party_claude_access/
-- Natural20: "Anthropic Banned OpenClaw: The OAuth Lockdown" (2026): https://natural20.com/coverage/anthropic-banned-openclaw-oauth-claude-code-third-party
-- Hacker News discussion on Anthropic subscription auth ban (2026): https://news.ycombinator.com/item?id=47069299
-- Groundy: "Anthropic Bans Third-Party Use of Subscription Auth" (2026): https://groundy.com/articles/anthropic-bans-third-party-use-subscription-auth-what-it/
-- OpenAI Terms of Use: https://openai.com/policies/row-terms-of-use/
-- OpenAI Services Agreement: https://openai.com/policies/services-agreement/
-- Roo-Code GitHub Issue #6993 — community discussion on OpenAI Plus for API provider: https://github.com/RooCodeInc/Roo-Code/issues/6993
-- Claude Pro & Max Weekly Rate Limits Guide (2026): https://hypereal.tech/a/weekly-rate-limits-claude-pro-max-guide
-- RFC 9700 OAuth Token Lifetime Guidance (January 2025): https://www.obsidiansecurity.com/blog/refresh-token-security-best-practices
-- Google OAuth Best Practices: https://developers.google.com/identity/protocols/oauth2/resources/best-practices
-- Auth0 Token Storage guidance: https://auth0.com/docs/secure/security-guidance/data-security/token-storage
-- GitHub CLI OAuth keychain issue #449: https://github.com/cli/cli/issues/449
-- Semgrep Security Advisory: npm packages using secret scanning tools to steal credentials (2025): https://semgrep.dev/blog/2025/security-advisory-npm-packages-using-secret-scanning-tools-to-steal-credentials/
-- The Hacker News: "Malicious npm Packages Harvest Crypto Keys, CI Secrets, and API Tokens" (February 2026): https://thehackernews.com/2026/02/malicious-npm-packages-harvest-crypto.html
-- npm classic tokens revoked, session-based auth (December 2025): https://github.blog/changelog/2025-12-09-npm-classic-tokens-revoked-session-based-auth-and-cli-token-management-now-available/
-- Portkey: "Retries, fallbacks, and circuit breakers in LLM apps": https://portkey.ai/blog/retries-fallbacks-and-circuit-breakers-in-llm-apps/
-- OpenAI Codex usage limits: https://community.openai.com/t/codex-usage-after-the-limit-reset-update-single-prompt-eats-7-of-weekly-limits-plus-tier/1365284
+- Vitest Coverage Guide (official): https://vitest.dev/guide/coverage.html
+- Vitest per-file threshold update issue #5803: https://github.com/vitest-dev/vitest/issues/5803
+- Vitest V8 includes test files in coverage issue #7216: https://github.com/vitest-dev/vitest/issues/7216
+- Anthony Sciamanna, "Code Coverage Complications" (post-mortem on coverage anti-patterns): https://anthonysciamanna.com/2020/01/26/code-coverage-complications.html
+- Xebia, "Pitfalls of Mocking in Tests and How to Avoid It": https://xebia.com/blog/pitfalls-mocking-tests-how-to-avoid/
+- git-scm official git-diff documentation (untracked file limitations): https://git-scm.com/docs/git-diff
+- git-scm "How to handle untracked files in diff" (LabEx): https://labex.io/tutorials/git-how-to-handle-untracked-files-in-diff-419781
+- simple-git library README and changelog: https://github.com/steveukx/git-js
+- sqlite-vec distance threshold constraint tracking issue #165: https://github.com/asg017/sqlite-vec/issues/165
+- sqlite-vec performance tuning issue #186: https://github.com/asg017/sqlite-vec/issues/186
+- Alex Garcia, "Hybrid full-text search and vector search with SQLite" (authoritative sqlite-vec pitfalls): https://alexgarcia.xyz/blog/2024/sqlite-vec-hybrid-search/index.html
+- Command Line Interface Guidelines (clig.dev) — authoritative CLI UX reference: https://clig.dev/
+- Gemini CLI issue #3144 — existing credentials + interactive onboarding conflict: https://github.com/google-gemini/gemini-cli/issues/3144
+- Starlight broken link validator discussion #946: https://github.com/withastro/starlight/discussions/946
+- Astro/Starlight index.md link resolution issue #5680: https://github.com/withastro/astro/issues/5680
+- Astro for Documentation Sites — real-world insights: https://maciekpalmowski.dev/blog/astro-for-documentation-sites-insights-after-6-months/
 
 ---
-*Pitfalls research for: Subscription-based provider auth added to existing Handover CLI (Claude Max, OpenAI Plus/Pro, Codex)*
-*Researched: 2026-02-26*
+*Pitfalls research for: Test coverage uplift, git-aware incremental regeneration, search UX polish, and documentation/onboarding on the Handover TypeScript CLI*
+*Researched: 2026-03-01*

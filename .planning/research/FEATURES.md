@@ -1,28 +1,23 @@
 # Feature Research
 
-**Domain:** Subscription-based provider authentication for CLI tools
-**Researched:** 2026-02-26
-**Confidence:** HIGH (subscription policies and CLI auth patterns verified against official sources and live policy enforcement)
+**Domain:** TypeScript CLI tool — test coverage uplift, git-aware incremental regeneration, search/QA UX polish, documentation/onboarding enhancements
+**Researched:** 2026-03-01
+**Confidence:** HIGH (vitest docs verified via official source; git patterns confirmed via simple-git already in codebase; CLI UX confirmed via clig.dev; all coverage numbers from live `vitest --coverage` run on actual codebase)
 
 ## Context: What Already Exists
 
-The existing Handover CLI (v0.1.x) already has:
-- API key-based auth for 8 providers (`anthropic`, `openai`, `ollama`, `groq`, `together`, `deepseek`, `azure-openai`, `custom`)
-- Config loading via `.handover.yml` + env vars + CLI flags (layered precedence)
-- `resolveApiKey()` reads API key from environment variable at runtime
-- `validateProviderConfig()` fails fast if key not set
-- `createProvider()` instantiates provider from config
-- No auth storage, no auth commands, no session management
+The existing Handover CLI already has:
+- 254 tests in 21 `.test.ts` files across 145 source files
+- Coverage threshold at 80% (lines/functions/branches/statements), currently failing: 79% lines, 67% branches
+- `src/analyzers/git-history.ts` using `simple-git` for branch/commit analysis
+- `src/vector/reindex.ts` with content-hash change detection against stored SQLite fingerprints
+- `handover search` with fast mode (semantic retrieval) and qa mode (grounded Q&A)
+- `handover reindex` with `--force` flag to bypass change detection
+- `docs/src/content/docs/user/` with 5 Astro/Starlight guides
+- `docs/src/content/docs/reference/commands.mdx` auto-generated from CLI help output
+- `src/cli/onboarding.ts` and `src/cli/init.ts` for first-run experience
 
-Everything below describes only features needed for the NEW subscription auth milestone.
-
----
-
-## Critical Finding: Anthropic Policy (HIGH confidence)
-
-**Claude Max/Pro subscription OAuth is banned for third-party tools.** Anthropic updated terms on 2026-02-19 to explicitly prohibit using OAuth tokens obtained through Claude Free, Pro, or Max accounts in any tool other than the official Claude Code CLI and Claude.ai. Server-side fingerprinting was deployed on 2026-01-09 to detect and block non-official clients.
-
-**What this means for handover:** The `anthropic` provider with subscription auth is NOT implementable without violating Anthropic's terms. OpenAI Codex (ChatGPT Plus/Pro) subscription auth IS implementable and actively supported. This shapes what the feature set can deliver.
+Everything below describes only features for the NEW milestone.
 
 ---
 
@@ -30,121 +25,115 @@ Everything below describes only features needed for the NEW subscription auth mi
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist in a CLI with subscription auth. Missing these = product feels incomplete.
+Features that developers expect in a mature TypeScript CLI tool. Missing these makes the project feel incomplete or unreliable.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **`handover auth login [provider]` command** | Every CLI with subscription auth (gh, codex, claude) exposes `auth login`; users copy this pattern | MEDIUM | Opens browser OAuth flow (PKCE); for headless, fall back to device code flow. Returns success/error message. |
-| **`handover auth logout [provider]` command** | Paired with login; users expect to clear credentials | LOW | Deletes stored token for named provider; warns if no active session |
-| **`handover auth status` command** | Users need to verify what is authenticated without running a generate job | LOW | Shows: provider name, auth method (api-key vs subscription), subscription tier if discoverable, token expiry if applicable |
-| **Auth method selector in config** | When user has both an API key env var AND subscription auth, the tool needs to know which to use | LOW | Add `authMethod: "api-key" \| "subscription"` field to `.handover.yml` / config schema; default to `"api-key"` to not break existing users |
-| **Subscription auth path through `generate` command** | The whole point is that `handover generate` works without an API key if subscription auth is active | MEDIUM | `generate` must check credential store before checking env var API key; provider factory wires the right client |
-| **Graceful error when no auth exists** | Current error is "missing API key" — this is confusing to subscription users who have never set a key | LOW | Detect subscription auth attempt in config, provide clear message: "Run `handover auth login openai` to authenticate with your subscription" |
-| **Secure credential storage** | Users expect tokens not stored in plaintext in config files | MEDIUM | macOS Keychain preferred; fallback to `~/.handover/credentials.json` with 0600 permissions; never write tokens to `.handover.yml` |
-| **Token refresh on 401** | Subscription tokens expire (OpenAI Codex tokens auto-refresh on active sessions) | MEDIUM | On HTTP 401 from provider: attempt token refresh before surfacing error to user; refresh is transparent |
-| **Precedence: env var API key overrides subscription** | Power users and CI pipelines must be able to override subscription auth with an explicit API key | LOW | Auth resolution order: CLI `--api-key` flag > env var (`OPENAI_API_KEY`) > subscription token from credential store. This matches how Codex handles it (they have an issue where the reverse caused problems, so explicit ordering matters). |
+| **90%+ test coverage gate** | Professional npm packages use 90%+ as the industry standard; 80% is widely considered the baseline minimum, not a target | MEDIUM | Current state: 21 test files for 145 source files; live run shows 67% branch coverage. Gap is concentrated in `renderers/utils.ts` (63%), `auth/resolve.ts` (72%), `context/packer.ts` (88%), `ai-rounds/validator.ts` (83%). Requires new tests for branch paths, not wholesale rewrites. |
+| **Branch coverage parity** | Statement/line coverage hitting 90% while branch coverage stays at 67% is a code quality smell; reviewers notice the gap | MEDIUM | V8 provider (in use) does not track implicit `if` branches without an `else`; Istanbul would catch more. Using `/* v8 ignore next */` for intentional omissions is the correct pattern; do not over-use. |
+| **`handover generate --since <ref>` or `--changed-only`** | Power users regenerating docs after small edits expect only touched documents to re-run; full regeneration on every save is prohibitive for large codebases | HIGH | Requires: (1) `git diff --name-only <ref>` via simple-git to get changed source files, (2) map source files to which of the 14 document renderers are affected, (3) pass filtered renderer list to DAG orchestrator. The `analyzeGitHistory` module already uses simple-git; the pattern is established. |
+| **`handover search` result count line** | "Showing 5 of 23 results" is the universal pattern for search results; the current output already includes this but should be consistent across all output paths | LOW | Already present in `runFastMode` — `Showing ${result.matches.length} of ${result.totalMatches} results`. Needs audit: is this present for empty results, QA mode, and piped output? |
+| **Search index status in `reindex` output** | Developers running `handover reindex` need to know what changed: X docs processed, Y skipped, Z chunks created | LOW | `ReindexResult` already returns all fields (`documentsProcessed`, `documentsSkipped`, `chunksCreated`, etc.); the CLI just needs to render them clearly as a summary table or stats block |
+| **`handover search` --type completions in --help** | Users don't know what type names are valid; the help text currently says only "Filter by document type (repeatable)" with no list of valid values | LOW | Valid types derive from document filenames (`architecture`, `modules`, `dependencies`, etc.); hard-code or derive them and show in help text |
+| **User guide for `handover search`** | Existing docs cover `getting-started`, `configuration`, `providers`, `output-documents`, `mcp-setup` — but there is no guide explaining search, QA mode, and reindex | MEDIUM | Missing guide is the most obvious gap in docs; users must discover search by trial and error |
+| **User guide for `handover init` behavior** | The `init` command creates `.handover.yml` with interactive prompts but this is not explained in any doc page | LOW | Can be folded into `getting-started.md` or a new `init.md` |
 
 ### Differentiators (Competitive Advantage)
 
-Features that set the product apart. Not required, but valuable.
+Features that make this CLI stand out beyond baseline correctness.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Clear "free tier vs subscription" cost display** | Subscription users do not pay per-token; showing a $0.00 cost or "subscription" badge instead of a dollar amount is genuinely useful and removes confusion | LOW | When auth method is `subscription`, suppress cost tracker output and show "subscription credits" label instead of dollar cost |
-| **Multi-provider subscription auth in one tool** | Other CLI tools authenticate with only their own provider; handover supports multiple providers — users can pick the subscription they already pay for | MEDIUM | Auth store keyed by provider; each provider holds its own token independently; no conflicts |
-| **Auth method visible in startup banner** | Users can see at a glance whether a run is consuming API credits vs subscription credits | LOW | Extend existing banner display with auth method indicator alongside provider/model |
-| **Headless device code flow support** | Developers running handover over SSH or in containers can authenticate via device code without browser access on the target machine | MEDIUM | Device code flow is in beta for Codex; support `--device-code` flag in `auth login`; poll token endpoint until user completes browser flow on another device |
-| **`handover auth token` command** | CI/CD users need a way to export a long-lived token to inject via env var | LOW | Prints the current access token to stdout; user can set `HANDOVER_AUTH_TOKEN` in CI secrets; follows claude `setup-token` pattern |
+| **Git-aware regeneration using file-to-document mapping** | No other documentation CLI regenerates only the documents affected by recent git changes; typical tools either regenerate everything or nothing | HIGH | The core insight: each of the 14 renderers depends on specific analysis results (e.g., renderer 3 reads `ast` and `gitHistory`; renderer 7 reads `dependencies`). A static mapping from `AnalysisContext` fields to document IDs enables a precise "which docs need updating" calculation. |
+| **Diff-to-renderer dependency graph** | When `src/analyzers/dependency-graph.ts` changes, only the dependencies document needs regeneration; this kind of surgical precision is novel in the space | HIGH | Requires building a `source-file-pattern → analyzer → document` dependency map. The `analyzeGitHistory` module already identifies `mostChangedFiles` — the new work is using this in the generate pipeline. |
+| **`handover search` result file links (OSC8 clickable terminal paths)** | Modern terminals (iTerm2, Ghostty, Warp) support OSC8 hyperlinks; clicking a search result and jumping to the file is a markedly better experience than copy-pasting paths | MEDIUM | OSC8 escape sequence: `\x1b]8;;file:///absolute/path\x1b\\link text\x1b]8;;\x1b\\`. Detect via `TERM_PROGRAM`, `TERM`, and fall back to plain text. Only a TTY enhancement; piped output stays plain. |
+| **QA session timing and token stats** | Showing "Answer generated in 2.3s using 1,240 tokens from 4 sources" gives users cost and latency awareness; no other CLI in this space shows this | LOW | `answerQuestion` in `src/qa/answerer.ts` returns `citations`; timing can be added at the `runQaMode` wrapper level; token counts are available from the provider call |
+| **Vitest `autoUpdate` threshold** | Setting `coverage.thresholds.autoUpdate: true` ratchets the threshold upward automatically when coverage improves, preventing regression without manual config updates | LOW | This is a Vitest v2.x feature. Set it once; it self-maintains. Combined with raising the threshold to 90% in this milestone, it permanently locks in higher standards. |
+| **New contributor setup guide** | Documenting the test architecture, coverage exclusion rationale, and "how to add a test for module X" pattern removes friction for contributors | MEDIUM | Currently `docs/src/content/docs/contributor/development.md` exists but does not explain the coverage exclusion list in `vitest.config.ts` or how to write tests for the integration-excluded modules |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem good but create problems.
+Features that seem like good ideas but create problems in this specific codebase context.
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| **Claude Max/Pro subscription OAuth support** | Claude Max is the most popular subscription; developers want to use $100-$200/month plans they already pay for | Explicitly prohibited by Anthropic's updated Terms of Service (Feb 2026); server-side fingerprinting blocks non-official clients regardless of technical implementation | Support only providers that explicitly permit third-party subscription auth (OpenAI Codex); document Anthropic restriction clearly |
-| **Proxy/relay architecture to "launder" subscription tokens** | Workaround for Anthropic ban via CLIProxyAPI-style relay | Still violates Anthropic ToS; accounts get banned; project becomes legally exposed | Do not implement; document why in code comments and help text |
-| **Store subscription tokens in `.handover.yml`** | "Simple" config-file-centric design | Tokens in YAML committed to git = immediate credential exposure; YAML config is meant to be committed | Store in OS keychain or `~/.handover/credentials.json` (separate from project config, in home dir) |
-| **Auto-login on first `generate` run without any auth configured** | "Zero friction" onboarding | Unexpected browser pop-ups during automated runs (CI, pre-commit hooks) are disruptive; user may be mid-run | Fail fast with a clear message directing user to run `handover auth login [provider]` explicitly |
-| **Subscription rate limit retry with automatic backoff hiding from user** | "Just works" expectation | Subscription rate limits (5-hour rolling windows) can pause jobs for minutes; silent retry obscures this from users who may think the tool hung | Show explicit "Rate limited — waiting Xs (subscription limit)" message; let user cancel; do not silently sleep for >30s without feedback |
+| **Remove all coverage exclusions and test integration modules** | "Real" 90% coverage should include the CLI commands and providers | CLI commands (generate, search, reindex) require a live LLM API key and a filesystem; running them in CI would mean real API spend and environment setup that defeats unit test isolation | Keep the exclusion list but document the rationale explicitly; add integration test suite as a separate `npm run test:integration` target with a clear "requires real API key" guard |
+| **Git-dirty check (refuse to run if working tree is dirty)** | "Safer" to only generate docs from clean commits | Developers almost always run handover on a dirty working tree while iterating; blocking this causes constant friction | Only warn (not block) when git status is dirty; make the warning informational |
+| **Interactive `handover search` REPL mode** | "Better UX" to stay in a search loop rather than re-invoking the CLI | The streaming QA sessions already exist; a full REPL adds readline complexity that conflicts with TTY detection and piped-output compatibility | The existing `--mode qa` with streaming handles the multi-turn pattern; document it well |
+| **Coverage badge in README from external service** | Visual credibility signal | External badge services add flakiness; Codecov is already integrated via CI and lcov; a badge that diverges from CI gate creates confusion | Show the Codecov badge (already wired) and let the CI gate enforce the threshold; the badge will auto-update |
+| **Per-file 100% coverage requirements** | "High confidence" in individual critical modules | Per-file 100% thresholds are brittle; adding any new uncovered line in a hot module breaks CI; the cognitive overhead of maintaining is high | Use global 90% threshold with `autoUpdate`; only use `/* v8 ignore */` annotations on provably untestable branches (e.g., defensive error catches) |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Auth Method Config Field]
-    └──required-by──> [generate: subscription auth path]
-    └──required-by──> [auth login command]
-    └──required-by──> [auth status command]
+[90%+ coverage gate]
+    └──requires──> [New test suites for uncovered modules]
+                       └──targets──> [renderers/utils.ts] (63% → 90%)
+                       └──targets──> [auth/resolve.ts] (72% → 90%)
+                       └──targets──> [context/packer.ts] (88% → 90%)
+                       └──targets──> [ai-rounds/validator.ts] (83% → 90%)
+    └──requires──> [Branch coverage improvement in validator.ts, packer.ts]
+    └──enhances──> [vitest autoUpdate threshold config]
 
-[auth login command]
-    └──requires──> [OAuth PKCE browser flow]
-                       └──optional-fallback──> [Device code flow]
-    └──requires──> [Credential storage layer]
-                       └──requires──> [OS keychain OR ~/.handover/credentials.json]
-    └──produces──> [Stored token (access + refresh + expiry)]
+[git-aware incremental regeneration]
+    └──requires──> [source-file → analyzer → document mapping]
+    └──requires──> [simple-git diff integration] (simple-git already in use)
+    └──requires──> [--since <ref> flag in handover generate]
+    └──integrates-with──> [existing DAG orchestrator] (src/orchestrator/)
+    └──integrates-with──> [existing AnalysisCache] (src/analyzers/cache.ts)
 
-[generate: subscription auth path]
-    └──requires──> [Auth method selector in config]
-    └──requires──> [Credential storage layer] (read)
-    └──requires──> [Token refresh on 401]
-    └──requires──> [Auth resolution precedence logic]
+[search UX improvements]
+    └──requires──> [OSC8 terminal link detection] (TTY-only)
+    └──requires──> [QA mode timing wrapper]
+    └──enhances──> [existing runFastMode output] (result stats already present)
+    └──enhances──> [existing runQaMode output] (add elapsed time, token count)
 
-[Token refresh on 401]
-    └──requires──> [Stored refresh token] (from auth login)
+[search user documentation]
+    └──requires──> [search UX improvements] (doc should reflect final output format)
+    └──extends──> [existing docs/user/ Astro/Starlight site]
 
-[auth token command]
-    └──requires──> [Credential storage layer] (read)
-
-[auth logout command]
-    └──requires──> [Credential storage layer] (delete)
-
-[Cost display suppression]
-    └──requires──> [Auth method selector in config]
-    └──enhances──> [generate: startup banner]
+[contributor guide expansion]
+    └──requires──> [90%+ coverage gate] (guide documents the new threshold)
+    └──extends──> [existing contributor/development.md]
 ```
 
 ### Dependency Notes
 
-- **Auth method config field is the root dependency:** everything else gates on knowing whether the user intends subscription or api-key auth. This field must be added to the Zod schema before any other auth work.
-- **Credential storage is shared infrastructure:** `auth login`, `auth logout`, `auth status`, `auth token`, and `generate` all depend on a credential store abstraction. Build it once as a module used by all auth commands.
-- **Auth resolution precedence must not break existing users:** the default `authMethod` must be `"api-key"`, so zero existing users are affected unless they explicitly set `authMethod: "subscription"`.
-- **Token refresh depends on login having stored a refresh token:** if user logged in before refresh was supported, refresh will fail gracefully and prompt re-login.
+- **Coverage work is prerequisite to documentation:** The contributor guide section on testing should describe the final coverage setup, so the tests must be written before the guide is finalized.
+- **Git-aware regeneration is independent of search/docs work:** Can be phased separately; shares no code with the search UX or documentation changes.
+- **OSC8 links require TTY detection already present:** `src/cli/search.ts` already uses `process.stdout.isTTY` to conditionally apply bold styling; OSC8 detection follows the same pattern.
+- **simple-git is already a production dependency** (used in `src/analyzers/git-history.ts`); no new dependency for git-aware regeneration.
 
 ---
 
 ## MVP Definition
 
-### Launch With (v1, this milestone)
+### Launch With (this milestone)
 
-Minimum viable product — lets a user with an OpenAI Plus/Pro subscription run `handover generate` without an API key.
+Minimum scope that delivers the milestone value.
 
-- [ ] **`authMethod` config field** — schema addition; defaults to `"api-key"`; required before all other work
-- [ ] **Credential storage module** — `~/.handover/credentials.json` with 0600 perms as baseline; OS keychain as stretch goal
-- [ ] **`handover auth login openai`** — browser OAuth PKCE flow; stores access + refresh + expiry
-- [ ] **`handover auth logout openai`** — clears credential store entry
-- [ ] **`handover auth status`** — shows auth method and login state per configured provider
-- [ ] **Auth resolution in `generate`** — reads credential store when `authMethod: subscription`; respects env var override precedence
-- [ ] **Clear error for missing subscription auth** — "Run `handover auth login openai` to authenticate" instead of generic API key error
-- [ ] **Cost display suppression for subscription mode** — shows "subscription credits" instead of dollar amount
+- [ ] **Raise coverage threshold to 90%** — vitest.config.ts thresholds: lines/functions/branches/statements: 90; add `autoUpdate: true`
+- [ ] **New test suites for the five coverage gaps** — `renderers/utils.test.ts`, `auth/resolve.test.ts` expansion, `context/packer.test.ts` expansion, `ai-rounds/validator.test.ts` expansion, `ai-rounds/quality.test.ts` expansion
+- [ ] **`handover generate --since <ref>`** — git diff + source-to-document map; only reruns affected documents
+- [ ] **Reindex summary output** — structured stats block: docs processed/skipped/failed, chunks created, model used
+- [ ] **`handover search` --type help text** — list valid type names in `--help` output
+- [ ] **New `docs/user/search.md`** — covers fast mode, QA mode, `--type` filters, `--top-k`, examples
+- [ ] **OSC8 clickable file links in search output** — TTY-gated; falls back to plain path
 
 ### Add After Validation (v1.x)
 
-Features to add once core subscription auth is working and users are testing it.
-
-- [ ] **Token refresh on 401** — trigger: first report of session expiry during a generate run
-- [ ] **OS keychain storage (macOS Keychain, Windows Credential Manager)** — trigger: user reports `credentials.json` security concern
-- [ ] **Headless device code flow** — trigger: first user running handover over SSH hits browser-open failure
-- [ ] **`handover auth token` command for CI export** — trigger: first CI/CD integration request
+- [ ] **QA mode timing and token stats** — trigger: user feedback requesting cost/latency awareness
+- [ ] **Contributor guide: testing section** — trigger: first external PR that breaks coverage threshold
+- [ ] **Diff-to-renderer dependency graph (precise)** — trigger: users with large codebases report full regeneration is too slow
+- [ ] **`handover init` guide** — trigger: user confusion reports about what `init` does vs `generate`
 
 ### Future Consideration (v2+)
 
-Features to defer until subscription auth is stable and adoption is visible.
-
-- [ ] **Team/workspace shared auth tokens** — defer: complex; requires org-level OAuth scope negotiation
-- [ ] **Multiple simultaneous subscription sessions (personal + work)** — defer: profile/workspace concept not yet in handover
-- [ ] **Automatic subscription tier detection and model selection** — defer: requires plan introspection API that may not exist in stable form
+- [ ] **Integration test suite (`test:integration`)** — deferred: requires real API key, env setup, and isolated test fixtures; high setup cost
+- [ ] **REPL-mode search** — deferred: the streaming QA session already handles the primary use case
+- [ ] **Coverage per-subsystem breakdown in CI output** — deferred: Codecov already provides this; duplication
 
 ---
 
@@ -152,90 +141,121 @@ Features to defer until subscription auth is stable and adoption is visible.
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| `authMethod` config field | HIGH | LOW | P1 |
-| Credential storage module | HIGH | MEDIUM | P1 |
-| `auth login openai` command | HIGH | MEDIUM | P1 |
-| `auth logout openai` command | HIGH | LOW | P1 |
-| `auth status` command | HIGH | LOW | P1 |
-| Auth resolution in `generate` | HIGH | MEDIUM | P1 |
-| Clear error for missing subscription auth | HIGH | LOW | P1 |
-| Cost display suppression for subscription | MEDIUM | LOW | P1 |
-| Token refresh on 401 | HIGH | MEDIUM | P2 |
-| OS keychain storage | MEDIUM | MEDIUM | P2 |
-| Headless device code flow | MEDIUM | MEDIUM | P2 |
-| `auth token` command for CI | MEDIUM | LOW | P2 |
-| Team/workspace shared tokens | LOW | HIGH | P3 |
-| Multiple simultaneous sessions | LOW | HIGH | P3 |
-| Automatic tier detection | LOW | HIGH | P3 |
+| 90%+ coverage gate + new tests | HIGH | MEDIUM | P1 |
+| git-aware incremental regeneration | HIGH | HIGH | P1 |
+| `handover search` documentation page | HIGH | LOW | P1 |
+| Reindex summary output | MEDIUM | LOW | P1 |
+| `--type` valid values in --help | MEDIUM | LOW | P1 |
+| OSC8 clickable file links | MEDIUM | MEDIUM | P2 |
+| vitest `autoUpdate` threshold | LOW | LOW | P1 |
+| QA mode timing + token stats | MEDIUM | LOW | P2 |
+| Contributor testing guide | LOW | LOW | P2 |
+| `handover init` guide | LOW | LOW | P2 |
+| Precise diff-to-renderer dependency graph | HIGH | HIGH | P3 |
+| Integration test suite | HIGH | HIGH | P3 |
 
 **Priority key:**
-- P1: Must have for milestone acceptance
-- P2: Should have, add when core is working
-- P3: Defer until subscription auth has real adoption
+- P1: Required for milestone acceptance
+- P2: Should have; add within milestone if scope allows
+- P3: Defer to next milestone
 
 ---
 
-## User Journey: "I Have a ChatGPT Plus Subscription"
+## Coverage Gap Analysis (Current State)
 
-This is the complete flow from zero to working `handover generate` with subscription credits:
+From live `vitest --coverage` run against the codebase:
 
-```
-1. User has ChatGPT Plus ($20/month), no OPENAI_API_KEY set
-2. User sets authMethod: subscription in .handover.yml
-3. User runs: handover auth login openai
-   → Browser opens to accounts.openai.com OAuth consent screen
-   → User grants access
-   → Browser redirects to localhost:PORT/callback
-   → CLI captures code, exchanges for access+refresh tokens
-   → Tokens written to ~/.handover/credentials.json (mode 0600)
-   → Terminal: "Logged in to OpenAI (ChatGPT Plus)"
-4. User runs: handover auth status
-   → Terminal: "openai  subscription (ChatGPT Plus)  active  expires 2026-04-01"
-5. User runs: handover generate
-   → Config loaded; authMethod=subscription detected for openai
-   → Credential store read; valid token found
-   → AnthropicProvider/OpenAICompatProvider instantiated with subscription token
-   → Banner shows: "OpenAI  gpt-4o  subscription credits"
-   → Pipeline runs normally
-   → Completion shows: "subscription credits" (not "$X.XX")
-6. Token expires mid-session
-   → HTTP 401 received from OpenAI
-   → Refresh token used to obtain new access token
-   → Credentials.json updated
-   → Request retried transparently
-   → User sees no interruption
-```
+| Module | Lines | Branches | Functions | Gap Type |
+|--------|-------|----------|-----------|----------|
+| `renderers/utils.ts` | 63% | 58% | 67% | Missing tests entirely |
+| `auth/resolve.ts` | 78% | 73% | 71% | Token refresh and OAuth paths |
+| `auth/pkce-login.ts` | 75% | 50% | 75% | PKCE exchange branches |
+| `context/packer.ts` | 88% | 78% | 88% | Oversized file two-pass path |
+| `ai-rounds/validator.ts` | 83% | 59% | 100% | Branch paths in import/claim validation |
+| `auth/token-store.ts` | 90% | 88% | 100% | Edge cases in serialization |
+| `vector/chunker.ts` | 99% | 85% | 100% | Fine-grained header parsing edge |
+
+**Global gap:** Branch coverage is 67.77% vs the new 90% target. The largest contributor is `auth/resolve.ts` and `ai-rounds/validator.ts`. These modules have clear pure-function logic that is testable with mocked inputs; the low coverage is a gap in test authorship, not architectural constraint.
+
+**Exclusion list health:** The existing exclusion list in `vitest.config.ts` is well-justified. CLI commands, providers, vector store, and MCP runtime all require live external dependencies. Do not remove exclusions — document them.
 
 ---
 
-## Competitor Feature Analysis
+## Git-Aware Regeneration: Source-to-Document Mapping
 
-| Feature | GitHub CLI (`gh auth`) | Claude Code (`claude auth`) | OpenAI Codex CLI | Our Approach |
-|---------|------------------------|------------------------------|------------------|--------------|
-| **Login command** | `gh auth login` (browser + device code) | `claude auth login` (browser only) | `codex login` (browser + device code `--device-auth`) | `handover auth login [provider]` with browser + `--device-code` flag |
-| **Logout command** | `gh auth logout` | `/logout` slash command (in REPL) | `codex logout` | `handover auth logout [provider]` |
-| **Status command** | `gh auth status` (shows token scopes, expiry) | `claude auth status` | `codex auth status` | `handover auth status` (shows method + expiry per provider) |
-| **Token storage** | OS keychain (default), falls back to `~/.config/gh/hosts.yml` | macOS Keychain | `~/.codex/auth.json` or OS keychain (configurable) | `~/.handover/credentials.json` (baseline), OS keychain (v1.x upgrade) |
-| **CI/CD export** | `GH_TOKEN` env var; `gh auth token` prints token | `CLAUDE_CODE_OAUTH_TOKEN` env var | `OPENAI_API_KEY` env var override | `handover auth token` prints token; `HANDOVER_AUTH_TOKEN` env var |
-| **Precedence** | Env var `GH_TOKEN` beats stored token | `ANTHROPIC_API_KEY` env var = API mode; no env var = subscription | Env var `OPENAI_API_KEY` conflicts with stored session (known bug) | Env var always wins; `authMethod: subscription` only used when no env var present |
+The core data structure needed for `--since`:
+
+```
+Source file pattern → Analyzer → Documents affected
+─────────────────────────────────────────────────────
+src/analyzers/**    → ast          → modules (06), architecture (03), features (05)
+package.json        → dependencies → dependencies (07)
+*.ts                → ast, git     → overview (01), edge-cases (09), conventions (11)
+*.md, docs/**       → doc-analysis → getting-started (02), deployment (13)
+src/**              → git-history  → all 14 (git metadata appears in many docs)
+.env*, Dockerfile   → env-scanner  → environment (08)
+*test*, *.test.ts   → test-analyzer → testing-strategy (12)
+```
+
+This mapping is static and can be hardcoded as a lookup table in the generate pipeline. The git diff provides changed source files; the table maps those to affected document IDs; the DAG orchestrator receives only those IDs via `--only`.
+
+**Integration point:** `src/cli/generate.ts` already supports `--only <docs>` (comma-separated aliases). The `--since <ref>` flag would compute the `--only` list automatically using simple-git + the mapping table.
+
+---
+
+## Search UX: Current Output vs Target Output
+
+**Current fast mode output:**
+```
+Mode: fast (retrieval-only semantic search)
+Embedding route: mode local-first, provider local (preferred)
+
+Result 1
+rank: 1
+relevance: 92.00%
+source: 03-ARCHITECTURE.md
+section: # Architecture > ## DAG Orchestrator
+snippet: The DAG orchestrator manages concurrent...
+
+Showing 3 of 3 results (top-k requested: 10).
+```
+
+**Target fast mode output (this milestone):**
+```
+Mode: fast (retrieval-only semantic search)
+
+Result 1                                                    [92%]
+source: 03-ARCHITECTURE.md (clickable OSC8 link in TTY)
+section: # Architecture > ## DAG Orchestrator
+snippet: The DAG orchestrator manages concurrent...
+
+Result 2                                                    [87%]
+...
+
+─────────────────────────────────────────────────────────────
+3 results  (top-k: 10)  embedding: local/nomic-embed-text
+Valid --type values: architecture, modules, dependencies, overview, ...
+```
+
+Key changes:
+1. Relevance score on same line as result header (scannable at a glance)
+2. OSC8 hyperlink on source file (TTY-only)
+3. Stats line moved to footer and condensed
+4. Valid `--type` values shown when no `--type` was used (discoverability)
 
 ---
 
 ## Sources
 
-- [Using Claude Code with Pro or Max plan — Claude Help Center](https://support.claude.com/en/articles/11145838-using-claude-code-with-your-pro-or-max-plan)
-- [Anthropic clarifies ban on third-party tool access to Claude — The Register (2026-02-20)](https://www.theregister.com/2026/02/20/anthropic_clarifies_ban_third_party_claude_access/)
-- [Claude Code Authentication docs](https://code.claude.com/docs/en/authentication)
-- [OpenAI Codex CLI Authentication — developers.openai.com](https://developers.openai.com/codex/auth/)
-- [OpenAI Codex CLI docs](https://developers.openai.com/codex/cli/)
-- [Claude Code CLI 2.1.41 changelog — added `claude auth login/status/logout`](https://x.com/ClaudeCodeLog/status/2022191647996416304)
-- [GitHub CLI gh auth login manual](https://cli.github.com/manual/gh_auth_login)
-- [WorkOS: Best practices for CLI authentication](https://workos.com/guide/best-practices-for-cli-authentication-a-technical-guide)
-- [PKCE for CLI OAuth — kevcodez.de](https://kevcodez.de/posts/2020-06-07-pkce-oauth2-auth-flow-cli-desktop-app/)
-- [Sign in with API key via env variable conflicts with ChatGPT login — openai/codex#3286](https://github.com/openai/codex/issues/3286)
-- [Claude Max subscription rate limits — IntuitionLabs](https://intuitionlabs.ai/articles/claude-max-plan-pricing-usage-limits)
-- [keyring-node: keytar alternative — Brooooooklyn/keyring-node](https://github.com/Brooooooklyn/keyring-node)
+- [Vitest Coverage Guide — vitest.dev](https://vitest.dev/guide/coverage.html) — thresholds, autoUpdate, per-file config, V8 vs Istanbul
+- [Vitest Coverage Config Reference — vitest.dev](https://vitest.dev/config/coverage) — all coverage config options
+- [Command Line Interface Guidelines — clig.dev](https://clig.dev/) — output design, help text, error messaging, onboarding patterns
+- [CLI UX Best Practices — Evil Martians blog](https://evilmartians.com/chronicles/cli-ux-best-practices-3-patterns-for-improving-progress-displays) — progress display patterns
+- [OSC8 Terminal Hyperlinks — Hyperlinks in Terminal Emulators gist](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda) — OSC8 escape sequence specification and terminal support matrix
+- [Node.js CLI Apps Best Practices — lirantal/nodejs-cli-apps-best-practices](https://github.com/lirantal/nodejs-cli-apps-best-practices) — npm CLI best practices
+- Live `vitest --coverage` run on handover codebase (2026-03-01) — all coverage numbers are direct measurements
+- `src/cli/search.ts`, `src/vector/reindex.ts`, `src/analyzers/git-history.ts` — current implementation reviewed directly
 
 ---
-*Feature research for: Subscription-based provider auth (Claude Max, OpenAI Plus/Pro, Codex)*
-*Researched: 2026-02-26*
+*Feature research for: test coverage uplift, git-aware incremental regeneration, search/QA UX polish, documentation/onboarding*
+*Researched: 2026-03-01*

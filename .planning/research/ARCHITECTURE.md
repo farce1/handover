@@ -1,589 +1,620 @@
-# Architecture Research: Subscription Auth Integration
+# Architecture Research
 
-**Domain:** Subscription-based provider authentication (Claude Max, OpenAI Codex/ChatGPT Plus)
-**Researched:** 2026-02-26
-**Confidence:** HIGH (existing codebase read directly; auth mechanisms confirmed via official docs and GitHub issues)
+**Domain:** TypeScript CLI — test coverage uplift, git-aware incremental regeneration, search UX polish, documentation
+**Researched:** 2026-03-01
+**Confidence:** HIGH (all findings from direct codebase inspection)
 
----
+## Standard Architecture
 
-## Existing Architecture Baseline
-
-Before describing the integration, here is the actual current provider pipeline as read from source:
+### System Overview (Existing)
 
 ```
-CLI entry (src/cli/generate.ts)
-    |
-loadConfig() — src/config/loader.ts
-    Layers: CLI flags > env vars > .handover.yml > Zod defaults
-    |
-createProvider(config) — src/providers/factory.ts
-    validateProviderConfig() — fail-fast: checks API key presence in env
-    switch(preset.sdkType):
-      'anthropic'     -> new AnthropicProvider(apiKey, model, concurrency)
-      'openai-compat' -> new OpenAICompatibleProvider(preset, apiKey, model, concurrency, baseUrl)
-    |
-LLMProvider (interface: src/providers/base.ts)
-    complete(request, schema, options): Promise<CompletionResult & { data: T }>
-    |
-BaseProvider (src/providers/base-provider.ts)
-    rateLimiter.withLimit(() =>
-      retryWithBackoff(() => this.doComplete(request, schema, onToken))
-    )
-    |
-provider.doComplete() — provider-specific SDK call
-    AnthropicProvider: Anthropic SDK -> messages.create / messages.stream
-    OpenAICompatibleProvider: OpenAI SDK -> chat.completions.create / stream
-```
++-----------------------------------------------------------------+
+|                     CLI Layer (src/cli/)                        |
+|  generate  search  reindex  serve  init  auth  analyze  estimate|
++---------------------------+------------------------------------+
+                            |
++---------------------------v------------------------------------+
+|               DAG Orchestrator (src/orchestrator/)             |
+|   dag.ts: Kahn's algorithm, parallel branches, skip-on-fail    |
++--+-------------------------+----------------------------+------+
+   |                         |                            |
+   v                         v                            v
++----------+     +---------------------+     +---------------------+
+| Static   |     | AI Rounds 1-6       |     | Document Render     |
+| Analysis |     | (src/ai-rounds/)    |     | (src/renderers/)    |
+| 8 analyz-|     | runner.ts drives    |     | 14 renderers, par-  |
+| ers in   |     | LLM calls via       |     | allel Promise.all-  |
+| src/ana- |     | provider.complete() |     | Settled, write to   |
+| lyzers/  |     | wrapWithCache wraps |     | outputDir           |
++----+-----+     | each round step     |     +---------------------+
+     |           +----------+----------+
+     v                      v
++-----------+   +-------------------------+
+|AnalysisCa-|   | RoundCache              |
+|che        |   | .handover/cache/        |
+|.handover/ |   | rounds/round-N.json     |
+|cache/     |   | SHA-256 fingerprint +   |
+|analysis.  |   | cascade chain (CACHE-02)|
+|json       |   +-------------------------+
++-----------+
 
-**MCP path:** `src/mcp/tools.ts` receives `config: HandoverConfig` and passes it to session managers, which call `createProvider(config)`. The provider creation path is shared between CLI and MCP.
-
-**Auth today:** `apiKey` is a plain string read from `process.env[preset.apiKeyEnv]` at factory time. No refresh, no expiry, no storage — just environment lookup.
-
-**Config schema:** `src/config/schema.ts` defines `HandoverConfigSchema` with `provider`, `model`, `apiKeyEnv`, `baseUrl` fields. Auth is entirely env-based — no auth block exists today.
-
----
-
-## Subscription Auth Reality (Critical Context for Design)
-
-### Anthropic (Claude Max/Pro) — February 2026 Policy Change
-
-**What is available technically:** Claude Code CLI uses OAuth 2.0 with PKCE against `console.anthropic.com/api/oauth/token`. Access tokens have the format `sk-ant-oat01-...`, expire after 8 hours, and are refreshed via refresh tokens (`sk-ant-ort01-...`). Credentials are stored in `~/.claude/.credentials.json`:
-
-```json
-{
-  "claudeAiOauth": {
-    "accessToken": "sk-ant-oat01-...",
-    "refreshToken": "sk-ant-ort01-...",
-    "expiresAt": 1748658860401,
-    "scopes": ["user:inference", "user:profile"],
-    "subscriptionType": "max",
-    "rateLimitTier": "..."
-  }
-}
-```
-
-**The January 2026 enforcement block:** Anthropic deployed server-side blocks on January 9, 2026, that reject subscription OAuth tokens in any tool other than Claude Code CLI and claude.ai. Any request using `Authorization: Bearer sk-ant-oat01-...` in a third-party tool returns:
-
-> "This credential is only authorized for use with Claude Code and cannot be used for other API requests."
-
-**Conclusion for Handover:** Do NOT implement Anthropic subscription OAuth. It is ToS-prohibited and actively blocked server-side. The existing `ANTHROPIC_API_KEY` path is the only legitimate path for Anthropic in Handover.
-
-**Source (HIGH confidence):** The Register, Feb 2026 — Anthropic clarifies ban; openclaw.rocks analysis; Claude Code official authentication docs.
-
-### OpenAI (Codex/ChatGPT Plus/Pro)
-
-**What is available and permitted:** OpenAI Codex CLI uses an open, documented OAuth flow. There is no ToS prohibition on third-party tools using the ChatGPT OAuth flow. The Codex CLI is open-source (github.com/openai/codex). Other tools implementing the same flow is legitimate.
-
-**OAuth flow mechanics:** Browser-based PKCE — Codex starts a local HTTP server on port 1455, opens a browser to auth.openai.com, receives tokens via redirect. Tokens stored in `~/.codex/auth.json`:
-
-```json
-{
-  "auth_mode": "chatgpt",
-  "tokens": {
-    "access_token": "...",
-    "refresh_token": "...",
-    "id_token": "...",
-    "expires_at": "2024-12-31T23:59:59Z"
-  }
-}
-```
-
-Alternatively `cli_auth_credentials_store: keyring` uses the OS credential store (macOS Keychain, Linux libsecret, Windows Credential Vault).
-
-**Token refresh:** Automatic during active sessions. On 401 response: client uses refresh token, gets new access token, retries. Refresh tokens can be single-use (rotate on each use), causing issues with concurrent sessions — parallel processes that both attempt refresh will cause one to fail.
-
-**Rate limits with ChatGPT subscription:**
-- Plus: 45-225 local messages / 10-60 cloud tasks per 5 hours
-- Pro: 300-1500 local messages / 50-400 cloud tasks per 5 hours
-- These limits are hard server-side constraints, not adjustable by concurrency config
-
-**Source (HIGH confidence):** Codex authentication docs (developers.openai.com/codex/auth/); Codex pricing (developers.openai.com/codex/pricing/); Codex GitHub issues on token refresh.
-
----
-
-## Recommended Integration Architecture
-
-Given the policy constraints:
-- **Anthropic subscription:** Only API key path — no change to existing architecture
-- **OpenAI subscription:** Add OAuth auth mode — legitimate, requires new components
-
-The architecture adds one new auth mode with a token lifecycle layer sitting between config loading and provider construction.
-
-### System Overview
-
-```
-+------------------------------------------------------------------+
-|                         Config Layer                             |
-|  loadConfig()  -->  HandoverConfigSchema (Zod)                   |
-|  NEW: auth.mode: 'api-key' | 'subscription-oauth'               |
-+------------------------------+-----------------------------------+
++----------------------------------------------------------------+
+|                   MCP Server (src/mcp/)                        |
+|  stdio or HTTP transport  |  6 tools registered               |
+|  semantic_search  regenerate_docs  regenerate_docs_status      |
+|  qa_stream_start  qa_stream_status  qa_stream_resume/cancel    |
++------------------------------+---------------------------------+
                                |
-+------------------------------v-----------------------------------+
-|                 Auth Resolution Layer (NEW)                      |
-|                                                                  |
-|  resolveAuth(config): Promise<AuthToken>                         |
-|      +-- AuthMode.API_KEY  -> read from env (existing path)      |
-|      +-- AuthMode.OAUTH    -> TokenStore -> TokenRefresher        |
-|                                                                  |
-|  src/auth/types.ts                                               |
-|      AuthToken { accessToken, refreshToken, expiresAt, mode }    |
-|                                                                  |
-|  src/auth/token-store.ts                                         |
-|      read/write ~/.handover/.credentials.json                    |
-|      fallback: OS keychain via keytar                            |
-|                                                                  |
-|  src/auth/token-refresher.ts                                     |
-|      check expiresAt, refresh if within 5-min window            |
-|      POST to provider's token endpoint with refresh_token        |
-|      write updated tokens back to TokenStore                     |
-|                                                                  |
-|  src/auth/oauth-flow.ts                                          |
-|      PKCE browser flow for initial token acquisition             |
-|      local redirect server on ephemeral port                     |
-+------------------------------+-----------------------------------+
-                               | AuthToken { accessToken, ... }
-+------------------------------v-----------------------------------+
-|                 Provider Factory (MODIFIED)                      |
-|  createProvider(config) -> Promise<LLMProvider>  (now async)     |
-|  calls resolveAuth(config) internally                            |
-|  existing switch on sdkType unchanged                            |
-|  for subscription mode: forces concurrency = 1                   |
-+------------------------------+-----------------------------------+
-                               |
-+------------------------------v-----------------------------------+
-|              Provider Layer (MINIMALLY MODIFIED)                 |
-|                                                                  |
-|  AnthropicProvider -- UNCHANGED                                  |
-|  OpenAICompatibleProvider -- gains optional refreshCallback      |
-|      for mid-generation 401 handling                             |
-+------------------------------------------------------------------+
+              +----------------+-------------------+
+              v                v                   v
++------------------+  +--------------+  +---------------------+
+| Vector Search    |  | QA Sessions  |  | RegenerationJobMgr  |
+| (src/vector/)    |  | (src/qa/)    |  | (src/regeneration/) |
+| sqlite-vec at    |  | streaming    |  | spawns CLI child    |
+| .handover/       |  | answer       |  | process, job store, |
+| search.db        |  | sessions     |  | dedupe, polling     |
++------------------+  +--------------+  +---------------------+
 ```
 
-### Component Boundaries
+### Component Responsibilities
 
-| Component | File | Responsibility | Communicates With |
-|-----------|------|----------------|-------------------|
-| AuthToken type | `src/auth/types.ts` | Shared data structure | All auth components |
-| TokenStore | `src/auth/token-store.ts` | Read/write credentials (file or keychain) | TokenRefresher, OAuthFlow |
-| TokenRefresher | `src/auth/token-refresher.ts` | Expiry check, POST refresh, update store | TokenStore, provider HTTP |
-| OAuthFlow | `src/auth/oauth-flow.ts` | PKCE browser flow, local redirect server | TokenStore, OS browser |
-| resolveAuth() | `src/auth/index.ts` | Entry point — dispatch API key vs OAuth | Config, TokenStore, OAuthFlow |
-| createProvider() | `src/providers/factory.ts` | Modified: async, threads AuthToken | resolveAuth, all providers |
-| Subscription flags | `src/providers/presets.ts` | Add `isSubscription`, override `defaultConcurrency: 1` | factory.ts |
+| Component | Responsibility | Key Files |
+|-----------|---------------|-----------|
+| `src/cli/generate.ts` | Pipeline orchestration, cache wiring, display state | `generate.ts` (1055 lines, integration nexus) |
+| `src/orchestrator/dag.ts` | Kahn's algorithm DAG, parallel execution, skip-on-fail | `dag.ts`, `step.ts` |
+| `src/analyzers/coordinator.ts` | Runs 8 static analyzers with onProgress callback | `coordinator.ts`, `git-history.ts`, `ast-analyzer.ts`, etc. |
+| `src/cache/round-cache.ts` | SHA-256 fingerprint + cascade chain for AI rounds | `round-cache.ts` |
+| `src/analyzers/cache.ts` | Per-file content hash for incremental context packing | `cache.ts` |
+| `src/ai-rounds/runner.ts` | Single-round execution: retry, quality check, fallback | `runner.ts` |
+| `src/context/packer.ts` | Scores files, packs into token budget; accepts changedFiles set | `packer.ts`, `scorer.ts` |
+| `src/renderers/registry.ts` | DOCUMENT_REGISTRY of 14 renderers, aliases, requiredRounds | `registry.ts` |
+| `src/vector/query-engine.ts` | Embedding routing, VectorStore search, type filtering | `query-engine.ts` |
+| `src/vector/chunker.ts` | Markdown-aware chunker (header/code/table boundaries) | `chunker.ts` |
+| `src/mcp/tools.ts` | MCP tool registration: search, QA, regeneration | `tools.ts` |
+| `src/mcp/regeneration-executor.ts` | Spawns `handover generate/reindex` child process | `regeneration-executor.ts` |
+| `src/regeneration/job-manager.ts` | Job lifecycle state machine, dedup by target | `job-manager.ts`, `job-store.ts` |
+| `src/providers/` | Factory pattern, 8 LLM provider impls, base interface | `factory.ts`, `base.ts`, `__mocks__/index.ts` |
+| `src/config/schema.ts` | Zod schema for `.handover.yml` with full defaults | `schema.ts`, `loader.ts` |
 
 ---
 
-## Data Flow: Auth Token Acquisition
+## New Feature Integration Points
 
-### First Use (no stored token)
+### 1. Test Coverage Uplift (to 90%+)
 
+**Current state.** `vitest.config.ts` excludes 40+ files from coverage measurement. Current threshold is 80%. The CI workflow runs `npm test -- --coverage` and uploads lcov.info to Codecov. 21 test files exist today at `src/**/*.test.ts`.
+
+**What already exists as test harness:**
+- `createMockProvider()` factory at `src/providers/__mocks__/index.ts` — typed mock for `LLMProvider`
+- `memfs` in devDependencies for filesystem mocking
+- `vitest-mock-extended` for typed deep mocks
+- `vi.hoisted()` pattern documented in the mock factory file
+- All 21 existing tests use colocated `src/module/file.test.ts` naming
+
+**Integration approach — what changes vs what is new:**
+
+| File | Change Type | What |
+|------|------------|------|
+| `vitest.config.ts` | MODIFY | Remove exclusions for pure-function modules; raise threshold from 80% to 90% incrementally |
+| `src/cache/round-cache.test.ts` | NEW | Unit test `RoundCache` using `memfs` to mock `node:fs/promises`; cover get/set/clear/getCachedRounds/computeHash/wasMigrated/ensureGitignored |
+| `src/analyzers/cache.test.ts` | NEW | Unit test `AnalysisCache` using `memfs`; cover load/save/isUnchanged/update/getChangedFiles |
+| `src/mcp/tools.test.ts` | NEW | Inject mock `searchFn`, mock `RegenerationJobManager`, mock QA session manager; test all tool handler branches |
+| `src/regeneration/job-manager.test.ts` | NEW | Unit test job lifecycle state machine (queued/running/completed/failed); use mock runner function |
+| `src/renderers/render-*.test.ts` (selected) | NEW | Pure-function renderers accept `RenderContext`; test by constructing minimal typed context |
+| `src/config/loader.test.ts` | NEW | Mock `node:fs` with memfs; test env-var overrides, missing file behavior, YAML parse errors |
+| `src/analyzers/git-history.test.ts` | NEW | Mock `simple-git` module; test branch pattern detection, commit parsing, graceful non-repo handling |
+
+**Modules that stay excluded from unit coverage (require real I/O or heavy SDKs):**
+- `src/vector/vector-store.ts` — requires real SQLite + sqlite-vec WASM bindings
+- `src/vector/embedder.ts`, `local-embedder.ts` — require real HTTP endpoint or WASM model
+- `src/providers/anthropic.ts`, `openai-compat.ts` — require real SDK initialization
+- `src/mcp/regeneration-executor.ts` — spawns real child processes via `node:child_process`
+- `src/cli/generate.ts`, `src/cli/serve.ts` — full pipeline integration, test in `tests/integration/`
+
+These stay in `tests/integration/` only. Do not remove their coverage exclusions.
+
+**Incremental threshold strategy:**
 ```
-handover generate (config: auth.mode = 'subscription-oauth', provider = 'openai')
-    |
-loadConfig() -- validates config including auth fields
-    |
-createProvider(config)
-    |
-resolveAuth(config)
-    |
-TokenStore.read() -> null (no stored token)
-    |
-OAuthFlow.run('openai')
-    1. Generate PKCE code_verifier + code_challenge (SHA-256)
-    2. Start local HTTP server on random ephemeral port (e.g., :49832)
-    3. Open browser: auth.openai.com/authorize
-       ?response_type=code
-       &code_challenge=<sha256(verifier)>
-       &redirect_uri=http://localhost:49832/callback
-    4. User authenticates in browser, grants permission
-    5. OpenAI redirects: localhost:49832/callback?code=<auth_code>
-    6. Exchange: POST /oauth/token
-       { grant_type: 'authorization_code', code, code_verifier }
-    7. Receive: { access_token, refresh_token, expires_in }
-    |
-TokenStore.write(credentials)  ->  ~/.handover/.credentials.json (mode 0o600)
-                                   or OS keychain if available
-    |
-AuthToken returned to factory -> provider constructed with accessToken as apiKey string
-```
-
-### Subsequent Use (stored token, valid)
-
-```
-resolveAuth(config)
-    |
-TokenStore.read() -> { accessToken, refreshToken, expiresAt }
-    |
-TokenRefresher.checkExpiry(expiresAt)
-    expiresAt - Date.now() > 5 minutes? -> return as-is
-    expiresAt - Date.now() <= 5 minutes? -> proactive refresh (see refresh flow)
-    |
-AuthToken returned to factory
+Phase start  :  lines/functions/branches/statements: 80
+After batch 1 (cache + config):    raise to 85
+After batch 2 (renderers + regen): raise to 88
+After batch 3 (mcp tools + analyzers): raise to 90
 ```
 
-### Proactive Refresh (approaching expiry)
-
-```
-TokenRefresher.refresh(token, store)
-    |
-POST https://auth.openai.com/oauth/token
-    { grant_type: 'refresh_token', refresh_token: token.refreshToken }
-    |
-Receive: { access_token, refresh_token, expires_in }
-    |
-TokenStore.write(new credentials)
-    |
-Return new AuthToken
-```
-
-### Mid-Generation 401 (token expired during a long request)
-
-```
-OpenAICompatibleProvider.doComplete() receives HTTP 401
-    |
-Caught inside doComplete() (not surfaced to BaseProvider retry logic)
-    |
-calls this.refreshCallback()
-    -> TokenRefresher.refresh() -> TokenStore.write()
-    -> returns new AuthToken
-    |
-Retry the original request once with new access_token in SDK client
-    |
-If 401 again: throw ProviderError.authExpired()
-    User must run: handover auth login
-```
-
-### Storage Location Selection
-
-```
-keytar available (npm package, native bindings)?
-    YES -> OS keychain (macOS Keychain, Linux libsecret, Windows Credential Vault)
-    NO  -> ~/.handover/.credentials.json (chmod 600, user-scoped)
-```
+The threshold lives in `vitest.config.ts` under `coverage.thresholds`. Raise it only after the new tests pass and coverage is confirmed above the new bar.
 
 ---
 
-## Config Schema Changes (Additive Only)
+### 2. Git-Aware Incremental Regeneration
 
-New fields in `src/config/schema.ts`. All new fields are optional — existing configs continue working without change:
+**Current state.** Two independent cache mechanisms exist:
 
-```typescript
-// New discriminated union for auth block
-const AuthConfigSchema = z.discriminatedUnion('mode', [
-  z.object({
-    mode: z.literal('api-key'),
-    // existing apiKeyEnv behavior, no new fields
-  }),
-  z.object({
-    mode: z.literal('subscription-oauth'),
-    provider: z.enum(['openai']),  // anthropic excluded (ToS violation)
-    credentialsPath: z.string().optional(),  // override default path
-    useKeychain: z.boolean().default(true),
-  }),
-]);
+1. `AnalysisCache` (`src/analyzers/cache.ts`) — per-file content hash at `.handover/cache/analysis.json`. Already computes `changedFiles` set and passes it to `packFiles()` for incremental context packing (see `generate.ts` lines 490-534).
 
-// HandoverConfigSchema addition:
-export const HandoverConfigSchema = z.object({
-  // ... all existing fields unchanged ...
-  auth: AuthConfigSchema.optional(),
-  // auth: undefined means existing api-key behavior (backward compatible)
-});
-```
+2. `RoundCache` (`src/cache/round-cache.ts`) — computes `analysisFingerprint` from ALL file content hashes via `computeAnalysisFingerprint()`. Any file change invalidates all 6 round caches even for unrelated changes.
 
-**Backward compatibility:** `auth` is optional. Existing `.handover.yml` files with `apiKeyEnv` and no `auth` block continue to work identically. Factory checks `config.auth?.mode === 'subscription-oauth'` and falls through to existing path if absent.
+**The gap:** The round cache uses a whole-repo fingerprint. Adding a git HEAD SHA to this fingerprint adds a natural invalidation boundary at commit granularity, and surfaces git-derived context (which files actually changed since last commit) for smarter cache decisions.
 
----
-
-## Provider Factory Changes
-
-`createProvider()` becomes async because `resolveAuth()` performs I/O (token refresh is a network call):
+**New component: `src/cache/git-fingerprint.ts`**
 
 ```typescript
-// Before (existing):
-export function createProvider(config: HandoverConfig): LLMProvider
+// NEW FILE: src/cache/git-fingerprint.ts
+import { createHash } from 'node:crypto';
+import { simpleGit } from 'simple-git';
 
-// After (modified):
-export async function createProvider(config: HandoverConfig): Promise<LLMProvider>
-```
+export interface GitState {
+  headCommit: string;   // HEAD SHA, empty string if not a git repo
+  isGitRepo: boolean;
+}
 
-Internal change inside the factory:
-
-```typescript
-export async function createProvider(config: HandoverConfig): Promise<LLMProvider> {
-  const authToken = await resolveAuth(config);  // new
-
-  validateProviderConfig(config, authToken);     // updated to accept authToken
-
-  const preset = PROVIDER_PRESETS[config.provider];
-  const apiKey = authToken.accessToken;           // was: process.env[envVarName]
-  const isSubscription = authToken.mode === 'subscription-oauth';
-
-  // Hard cap concurrency to 1 for subscription auth
-  const concurrency = isSubscription
-    ? 1
-    : (config.analysis.concurrency ?? preset.defaultConcurrency);
-
-  switch (preset.sdkType) {
-    case 'anthropic':
-      return new AnthropicProvider(apiKey, model, concurrency);
-    case 'openai-compat':
-      const refreshCallback = isSubscription
-        ? async () => (await resolveAuth(config)).accessToken
-        : undefined;
-      return new OpenAICompatibleProvider(
-        preset, apiKey, model, concurrency, config.baseUrl, refreshCallback,
-      );
+export async function getGitState(rootDir: string): Promise<GitState> {
+  try {
+    const git = simpleGit(rootDir);
+    const isRepo = await git.checkIsRepo();
+    if (!isRepo) return { headCommit: '', isGitRepo: false };
+    const headCommit = await git.revparse(['HEAD']);
+    return { headCommit: headCommit.trim(), isGitRepo: true };
+  } catch {
+    return { headCommit: '', isGitRepo: false };
   }
+}
+
+export function computeGitAwareFingerprint(
+  files: Array<{ path: string; contentHash: string }>,
+  headCommit: string,
+): string {
+  const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path));
+  const data = sorted.map(f => `${f.path}:${f.contentHash}`).join('\n');
+  return createHash('sha256')
+    .update(data)
+    .update(headCommit)  // mix in HEAD SHA; empty string is safe (degrades to content-only)
+    .digest('hex');
 }
 ```
 
-**Callsites requiring `await` (all must be updated):**
-- `src/cli/generate.ts`
-- `src/cli/serve.ts`
-- Any test setup that calls `createProvider()` directly
-
-The change is mechanical — add `await` at each callsite. No logic changes needed at callsites.
-
----
-
-## MCP Server Impact
-
-The MCP server creates a provider at startup and reuses it across all tool calls:
+**Integration point: `src/cli/generate.ts`** (static-analysis step, lines 468-481)
 
 ```typescript
-// src/cli/serve.ts — before
-const provider = createProvider(config);
+// MODIFY: after computing fileEntries, before assigning analysisFingerprint
+import { getGitState, computeGitAwareFingerprint } from '../cache/git-fingerprint.js';
 
-// src/cli/serve.ts — after
-const provider = await createProvider(config);
+const gitState = await getGitState(rootDir);
+analysisFingerprint = gitState.isGitRepo
+  ? computeGitAwareFingerprint(fileEntries, gitState.headCommit)
+  : RoundCache.computeAnalysisFingerprint(fileEntries);  // existing fallback
 ```
 
-**Mid-session refresh concern:** MCP servers are long-lived (hours). OAuth tokens expire in ~1 hour. The `refreshCallback` inside `OpenAICompatibleProvider.doComplete()` handles this per-request. No MCP session restart is required on token refresh. The callback captures a closure that always reads the latest credentials from `TokenStore`.
+This is the only callsite change. `RoundCache.computeHash()` signature is unchanged — it receives an already-computed fingerprint string.
 
-**Startup timing:** If subscription auth requires interactive login (first use), the `await createProvider()` call at startup blocks until the browser flow completes. This is acceptable behavior — MCP server start fails loudly if the user hasn't authenticated, with a clear message: "Run `handover auth login` first."
+**Optional config key (`src/config/schema.ts`):**
+
+```typescript
+// ADDITIVE: new optional field in HandoverConfigSchema
+cache: z.object({
+  mode: z.enum(['content-hash', 'git-aware']).default('content-hash'),
+}).default({ mode: 'content-hash' }).optional(),
+```
+
+When `cache.mode = 'git-aware'`, the generate step calls `computeGitAwareFingerprint`. Default remains `content-hash` for backward compatibility — no existing `.handover.yml` needs updating.
+
+**Data flow:**
+```
+git HEAD SHA + file content hashes
+        |
+computeGitAwareFingerprint()  OR  computeAnalysisFingerprint() (fallback)
+        |
+analysisFingerprint (string)
+        |
+RoundCache.computeHash(roundNum, model, analysisFingerprint, priorHashes)
+        |
+round-N.json cache lookup: hit skips API call, miss triggers executeRound()
+```
+
+**What is NOT changed:** The cascade chain mechanism (`priorRoundHashes` in `RoundCache`), `RoundCache` API surface, `AnalysisCache` behavior, or any renderer/MCP code.
 
 ---
 
-## New File Build Order
+### 3. Search UX Enhancements
 
-Dependencies must be built in this order:
+**Current state.** `searchDocuments()` returns `SearchDocumentsResult` with `matches[]` containing `relevance`, `sourceFile`, `sectionPath`, `contentPreview` (200 chars), and full `content`. Type filtering uses Levenshtein fuzzy suggestions. The MCP `semantic_search` tool exposes only `{ relevance, source, section, snippet }`. There is no zero-results guidance.
+
+**Integration points for UX improvements:**
+
+**A. Zero-results suggestion — new `VectorStore.getDocTypeSummary()` method**
+
+This is a pure additive extension to the existing `VectorStore` class in `src/vector/vector-store.ts`. No schema migration required:
+
+```typescript
+// ADD to VectorStore class in src/vector/vector-store.ts
+getDocTypeSummary(): Array<{ docType: string; chunkCount: number }> {
+  return this.db
+    .prepare('SELECT doc_type AS docType, COUNT(*) AS chunkCount FROM chunks GROUP BY doc_type ORDER BY chunkCount DESC')
+    .all() as Array<{ docType: string; chunkCount: number }>;
+}
+```
+
+**B. Zero-results path in `src/vector/query-engine.ts`**
+
+After the search returns empty rows, surface available doc types:
+
+```typescript
+// MODIFY in searchDocuments() after vectorStore.search():
+if (rows.length === 0) {
+  const available = vectorStore.getDocTypeSummary();
+  // Attach to result for CLI/MCP to use in user guidance
+  return { ...result, availableDocTypes: available };
+}
+```
+
+The `SearchDocumentsResult` type gains an optional `availableDocTypes` field (additive, no breaking change).
+
+**C. MCP `semantic_search` response — expose `content` and `docType`**
+
+Current handler in `src/mcp/tools.ts` maps matches to `{ relevance, source, section, snippet }`. Adding full content for top results and docType for all is additive:
+
+```typescript
+// MODIFY in registerMcpTools() semantic_search handler
+results: result.matches.map((match, i) => ({
+  relevance: match.relevance,
+  source: match.sourceFile,
+  section: match.sectionPath,
+  snippet: match.contentPreview,
+  content: i < 3 ? match.content : undefined,  // full content for top 3 only
+  docType: match.docType,                        // always include for client filtering
+})),
+```
+
+Limit full content to top 3 results to avoid oversized MCP response payloads (50 results * ~500 char chunks = ~25KB without limit).
+
+**D. CLI search formatting (`src/cli/search.ts`)**
+
+This command is excluded from unit coverage and handles terminal display. Improvements are purely presentational: color-coded relevance banding (green >80%, yellow 50-80%, dim <50%), section path breadcrumbs, grouped by doc type. No changes to the query engine interface needed.
+
+**E. `--format json` flag for `handover search`**
+
+Adds programmatic output for scripting. Pure CLI layer addition at `src/cli/search.ts` and `src/cli/index.ts` command registration. The `generate-docs-command-reference.mjs` script picks up new flags automatically from commander.js definitions.
+
+---
+
+### 4. Documentation and Onboarding
+
+**Current state.** Documentation lives in `docs/` (Astro + Starlight). Scripts at `scripts/generate-docs-changelog.mjs` and `scripts/generate-docs-command-reference.mjs` auto-generate content from CHANGELOG.md and commander.js definitions respectively. `src/cli/onboarding.ts` handles first-run setup. `llms.txt` exists at root.
+
+**Integration points (all additive, no TypeScript changes except onboarding):**
+
+| Area | Change | Files |
+|------|--------|-------|
+| Command reference | New flags (`--cache-mode`, `--format`) auto-generated via `npm run docs:commands` | `scripts/generate-docs-command-reference.mjs` (reads commander automatically) |
+| Guide pages | New `.mdx` pages for git-aware cache, search UX | `docs/src/content/guides/git-aware-cache.mdx`, `docs/src/content/guides/search-usage.mdx` |
+| Config reference | Document `cache.mode` key | `docs/src/content/reference/configuration.mdx` (MODIFY) |
+| Onboarding | Mention `cache.mode` in generated `.handover.yml` template | `src/cli/onboarding.ts` (MODIFY: add comment in config template) |
+| llms.txt | Update with new commands and config keys | `llms.txt` (MODIFY: content only) |
+| README.md | Mention incremental mode and search enhancements | `README.md` (content only) |
+
+No TypeScript interface changes are needed for documentation. The Astro site builds independently from the CLI source.
+
+---
+
+## Recommended Project Structure (New Files Only)
 
 ```
-Phase 1 — Types and storage (no external deps)
-  src/auth/types.ts
-      AuthToken, AuthMode, ProviderCredentials, OAuthTokenResponse types
+src/
++-- cache/
+|   +-- round-cache.ts              # existing, unchanged API
+|   +-- round-cache.test.ts         # NEW: unit tests with memfs
+|   +-- git-fingerprint.ts          # NEW: git-aware fingerprint computation
+|   +-- git-fingerprint.test.ts     # NEW: unit tests (mock simple-git)
++-- analyzers/
+|   +-- cache.ts                    # existing, unchanged
+|   +-- cache.test.ts               # NEW: unit tests with memfs
+|   +-- git-history.test.ts         # NEW: unit tests mocking simple-git
++-- vector/
+|   +-- query-engine.ts             # MODIFY: zero-results path, availableDocTypes
+|   +-- query-engine.test.ts        # NEW: type validation, suggestDocTypes, zero-results
+|   +-- vector-store.ts             # MODIFY: add getDocTypeSummary()
++-- mcp/
+|   +-- tools.ts                    # MODIFY: expose content+docType in search response
+|   +-- tools.test.ts               # NEW: tool handler unit tests with injected mocks
++-- regeneration/
+|   +-- job-manager.test.ts         # NEW: job lifecycle state machine tests
++-- renderers/
+|   +-- render-01-overview.test.ts  # NEW: pure function tests with minimal RenderContext
+|   +-- render-03-architecture.test.ts  # NEW
+|   +-- (other selected render-*.test.ts as coverage requires)
++-- config/
+|   +-- schema.ts                   # MODIFY: add optional cache.mode key
+|   +-- loader.test.ts              # NEW: memfs-based config loading tests
 
-  src/auth/token-store.ts
-      TokenStore class: read(), write(), clear()
-      Keychain-first strategy with file fallback
-      Uses keytar (npm) for OS keychain; falls back to JSON file
-
-Phase 2 — Token lifecycle (depends on Phase 1)
-  src/auth/token-refresher.ts
-      ensureFresh(token, store): check 5-min buffer, call refresh if needed
-      refresh(token, store): POST to token endpoint, update store
-
-  src/auth/oauth-flow.ts
-      OAuthFlow.run(provider): PKCE flow
-      local HTTP server on ephemeral port
-      browser open via 'open' npm package
-      5-minute timeout before abandoning
-
-Phase 3 — Entry point (depends on Phase 1 + 2)
-  src/auth/index.ts
-      resolveAuth(config): Promise<AuthToken>
-          if config.auth?.mode === 'subscription-oauth': OAuth path
-          else: API key path (reads from env, same as today)
-
-  src/cli/auth.ts (NEW CLI command)
-      handover auth login   -> runs OAuthFlow
-      handover auth logout  -> clears TokenStore
-      handover auth status  -> shows token expiry
-
-Phase 4 — Config changes (depends on Phase 3 types)
-  src/config/schema.ts
-      Add AuthConfigSchema, optional auth field to HandoverConfigSchema
-
-Phase 5 — Factory changes (depends on Phase 3 + 4)
-  src/providers/factory.ts
-      createProvider() becomes async
-      call resolveAuth(config) internally
-      force concurrency = 1 for subscription mode
-      pass refreshCallback to OpenAICompatibleProvider
-
-Phase 6 — Provider changes (depends on Phase 5)
-  src/providers/openai-compat.ts
-      Add optional refreshCallback constructor parameter
-      In doComplete(): catch 401, call refreshCallback(), update SDK client, retry once
-
-Phase 7 — Callsite updates (depends on Phase 5)
-  src/cli/generate.ts       await createProvider()
-  src/cli/serve.ts          await createProvider()
-  src/providers/factory.test.ts  update tests for async factory
+docs/src/content/
++-- guides/
+|   +-- git-aware-cache.mdx         # NEW
+|   +-- search-usage.mdx            # NEW: expanded search docs
++-- reference/
+    +-- configuration.mdx           # MODIFY: add cache.mode field documentation
 ```
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Auth-Agnostic Provider Interface
+### Pattern 1: Coverage Exclusion Removal Strategy
 
-The `LLMProvider` interface (`src/providers/base.ts`) does not change. Auth is resolved before the provider is constructed, and the access token is passed as a string (identical to an API key from the provider's SDK perspective). This means:
+**What:** The `vitest.config.ts` exclusion list exists because certain modules require real I/O or SDK initialization. Remove exclusions only for modules where all I/O can be replaced with mocks.
 
-- All existing runner, round, and DAG code calling `provider.complete()` requires zero changes
-- Mock providers in tests require zero changes
-- The DAG orchestrator is untouched
+**Decision criteria for each excluded module:**
+- Can every dependency (fs, network, SDK, process) be replaced with a vi.mock or memfs? YES: remove exclusion. NO: keep excluded.
+- Is the module's logic primarily pure computation? YES: high value to unit test.
 
-**When to use:** Auth is a construction-time concern. Keep auth lifecycle outside the call-time interface.
+**Modules amenable to unit testing:**
+- `src/cache/round-cache.ts` — uses `node:fs/promises`, mockable with memfs
+- `src/analyzers/cache.ts` — same pattern
+- `src/config/loader.ts` — uses `node:fs`, mockable with memfs
+- `src/analyzers/git-history.ts` — uses `simple-git`, mockable with `vi.mock('simple-git')`
+- `src/renderers/render-*.ts` — pure functions taking `RenderContext`, zero I/O
+- `src/regeneration/job-manager.ts` — pure state machine with injected runner, zero I/O
+- `src/mcp/tools.ts` — accepts injected `searchFn` and `regenerationManager`
 
-### Pattern 2: Proactive Token Refresh (5-Minute Window)
+**Trade-offs:** memfs is a process-global mock. Tests using memfs must be isolated to avoid cross-test file system state leakage. Use `beforeEach` to reset the virtual fs.
 
-Check token expiry at `resolveAuth()` time and refresh proactively if within 5 minutes of expiry. This prevents mid-generation 401s, which are harder to recover from cleanly during streaming responses.
+### Pattern 2: Git-Fingerprint Injection Without API Changes
 
+**What:** `generate.ts` constructs `analysisFingerprint` before passing it to `RoundCache.computeHash()`. The fingerprint is an opaque string — enriching it at the construction site requires no downstream API changes.
+
+**When to use:** Any time the cache invalidation criteria need new inputs. Adding a config version hash, a dependency manifest hash, or other signals follows the same pattern: enrich the fingerprint string before it enters `computeHash`.
+
+**Example:**
 ```typescript
-// src/auth/token-refresher.ts
-const REFRESH_BUFFER_MS = 5 * 60 * 1000;
-
-export async function ensureFresh(token: AuthToken, store: TokenStore): Promise<AuthToken> {
-  if (token.expiresAt - Date.now() < REFRESH_BUFFER_MS) {
-    return refresh(token, store);
-  }
-  return token;
+// src/cache/git-fingerprint.ts
+export function computeGitAwareFingerprint(
+  files: Array<{ path: string; contentHash: string }>,
+  headCommit: string,
+): string {
+  const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path));
+  const data = sorted.map(f => `${f.path}:${f.contentHash}`).join('\n');
+  return createHash('sha256')
+    .update(data)
+    .update(headCommit)
+    .digest('hex');
 }
 ```
 
-**When to use:** Always for subscription auth. Avoids the harder mid-stream refresh problem.
+**Trade-off:** Mixing the HEAD SHA into the fingerprint means the cache misses on every commit, even for commits that touch only docs or test files. This is intentional and conservative. A future refinement could scope the fingerprint to only source files that feed each round's prompt domain, but that requires a per-round file relevance map that does not currently exist.
 
-### Pattern 3: Keychain-First with File Fallback
+### Pattern 3: MCP Tool Handler Isolation for Testing
 
-OS keychain is more secure but unavailable in headless/CI environments:
+**What:** `registerMcpTools()` in `src/mcp/tools.ts` accepts `searchFn` and `regenerationManager` as injected optional dependencies. The regeneration handlers are already extracted via `createRegenerationToolHandlers()`. Testing is possible by constructing handlers directly with mocks.
 
+**When to use:** Always when adding new MCP tools. Accept all external dependencies via injection, never import them directly inside the handler body.
+
+**Example test pattern:**
 ```typescript
-// src/auth/token-store.ts
-async write(credentials: ProviderCredentials): Promise<void> {
-  if (this.useKeychain && await isKeychainAvailable()) {
-    await keytar.setPassword(SERVICE_NAME, credentials.provider, JSON.stringify(credentials));
-  } else {
-    await writeFile(this.credentialsPath, JSON.stringify(credentials), { mode: 0o600 });
-  }
-}
+// In src/mcp/tools.test.ts
+const mockSearch = vi.fn().mockResolvedValue({
+  query: 'auth', topK: 5, totalMatches: 2, matches: [...], filters: { types: [] }
+});
+const mockManager = { trigger: vi.fn(), getStatus: vi.fn() };
+
+// Test can construct and invoke handlers without a real McpServer
 ```
 
-**When to use:** Any CLI tool that stores secrets and must work in both interactive and CI environments.
+### Pattern 4: Additive Schema Extensions
 
-### Pattern 4: Concurrency Override at Factory Time
+**What:** New config fields and response fields are always optional with defaults. Existing configs continue to work without modification.
 
-Subscription plans enforce serial request limits server-side. Override concurrency to 1 in the factory when subscription auth is detected, regardless of user config:
+**When to use:** For every new config key, type it as `z.something().optional().default(...)`. For every new response field, type it as optional in the interface. Avoid required fields in new schema additions.
 
+**Example:**
 ```typescript
-const concurrency = isSubscription ? 1 : (config.analysis.concurrency ?? preset.defaultConcurrency);
+// src/config/schema.ts — ADDITIVE, backward compatible
+cache: z.object({
+  mode: z.enum(['content-hash', 'git-aware']).default('content-hash'),
+}).default({ mode: 'content-hash' }).optional(),
 ```
 
-Document this override in the startup log: "Subscription auth detected: concurrency set to 1 (provider limit)."
+Existing `.handover.yml` files without a `cache` block continue to use the default behavior.
+
+---
+
+## Data Flow
+
+### Generate Pipeline (Existing + Git-Aware Modification)
+
+```
+handover generate
+    |
+loadConfig() + resolveAuth()
+    |
+DAGOrchestrator.execute()
+    |
+    +-> static-analysis step
+    |     runStaticAnalysis() -> 8 analyzers (parallel via coordinator)
+    |     [MODIFY] getGitState(rootDir) -> { headCommit, isGitRepo }
+    |     computeGitAwareFingerprint(fileEntries, headCommit)  <- NEW code path
+    |     OR computeAnalysisFingerprint(fileEntries)           <- existing fallback
+    |     -> analysisFingerprint (string, unchanged type)
+    |     AnalysisCache.getChangedFiles() -> changedFiles set
+    |     packFiles(scored, ast, budget, estimateFn, changedFiles)
+    |     AnalysisCache.save()
+    |
+    +-> ai-round-1 ... ai-round-6 (wrapWithCache wraps each, unchanged)
+    |     RoundCache.get(roundNum, hash) -> hit: return cached, miss: executeRound()
+    |     executeRound() -> provider.complete() -> validate -> quality -> compress
+    |     RoundCache.set(roundNum, hash, result, model)
+    |
+    +-> render step (unchanged)
+          Promise.allSettled(selectedDocs.map(doc => doc.render(ctx)))
+          writeFile(join(outputDir, doc.filename), content)
+          renderIndex(ctx, statuses) -> 00-INDEX.md
+```
+
+### Search Flow (Existing + Enhancements)
+
+```
+handover search "query" [--type arch] [--top-k 5] [--format json]
+    |
+searchDocuments({ config, query, topK, types, outputDir })
+    |
+EmbeddingRouter.resolve() -> select local or remote provider
+assertRetrievalCompatibility(storedMetadata, activeModel, dims)
+VectorStore.open()
+provider.embedBatch([query]) -> queryEmbedding
+VectorStore.search(queryEmbedding, { topK, docTypes }) -> rows
+    |
+    +-> (zero results path - NEW)
+    |     VectorStore.getDocTypeSummary() -> available types + counts
+    |     surface as availableDocTypes in SearchDocumentsResult
+    |
+format results
+    |
+    +-> CLI renderer (MODIFY: color-coded relevance, breadcrumbs, --format json)
+    +-> MCP tool (MODIFY: add content for top 3 results, add docType for all)
+```
+
+### Git-Aware Cache Invalidation Flow (New)
+
+```
+generate static-analysis step
+    |
+simpleGit(rootDir).checkIsRepo() -> true/false
+simpleGit(rootDir).revparse(['HEAD']) -> headCommit SHA (e.g., "a3f9b2c")
+    |
+computeGitAwareFingerprint(fileEntries, headCommit)
+    |
+analysisFingerprint (SHA-256 of all file content hashes + HEAD commit)
+    |
+wrapWithCache: RoundCache.computeHash(roundNum, model, analysisFingerprint, priorHashes)
+    |
+.handover/cache/rounds/round-N.json lookup
+    hit: return cached result (skip LLM API call)
+    miss: executeRound() -> cache write
+```
+
+---
+
+## Integration Points Summary
+
+| Feature | Files Modified | Files Created | Integration Seam |
+|---------|---------------|---------------|-----------------|
+| Test coverage uplift | `vitest.config.ts` (remove exclusions, raise threshold) | `src/cache/round-cache.test.ts`, `src/cache/git-fingerprint.test.ts`, `src/analyzers/cache.test.ts`, `src/mcp/tools.test.ts`, `src/regeneration/job-manager.test.ts`, `src/renderers/render-*.test.ts` (selected), `src/config/loader.test.ts`, `src/analyzers/git-history.test.ts` | `memfs` for fs mocking, `vi.mock('simple-git')` for git, injected mock providers |
+| Git-aware regeneration | `src/cli/generate.ts` (enrich analysisFingerprint), `src/config/schema.ts` (optional cache.mode key) | `src/cache/git-fingerprint.ts`, `src/cache/git-fingerprint.test.ts` | `analysisFingerprint` construction site only; `RoundCache` API unchanged |
+| Search UX polish | `src/vector/vector-store.ts` (add `getDocTypeSummary()`), `src/vector/query-engine.ts` (zero-results path), `src/mcp/tools.ts` (expose content+docType), `src/cli/search.ts` (richer formatting) | `src/vector/query-engine.test.ts` (expanded) | `SearchDocumentsResult` type (additive), `VectorStore` new method (additive) |
+| Documentation | `docs/src/content/**/*.mdx` (MODIFY + NEW), `llms.txt`, `README.md`, `src/cli/onboarding.ts` (template comment) | `docs/src/content/guides/git-aware-cache.mdx`, `docs/src/content/guides/search-usage.mdx` | No TypeScript integration; new CLI flags auto-picked-up by command reference script |
+
+---
+
+## Suggested Build Order
+
+Build order is determined by dependency direction: test infrastructure is a foundation for later work; git-aware cache is self-contained; search UX touches `VectorStore` and benefits from the test harness being in place first.
+
+```
+Phase 1: Test infrastructure (no production code changes)
+  - Add unit tests for cache, analyzers/cache, config/loader, renderers (pure functions)
+  - Add unit tests for job-manager (state machine) and mcp/tools (handler injection)
+  - Raise vitest.config.ts threshold incrementally as tests pass
+  Reason: Pure additions. Zero regression risk. Builds harness for Phase 2+3.
+
+Phase 2: Git-aware incremental regeneration
+  - Create src/cache/git-fingerprint.ts
+  - Modify src/cli/generate.ts static-analysis step to inject headCommit
+  - Add optional cache.mode key to src/config/schema.ts
+  - Add src/cache/git-fingerprint.test.ts
+  Reason: Self-contained change at analysisFingerprint construction site only.
+           RoundCache API, MCP, and vector code are all untouched.
+
+Phase 3: Search UX enhancements
+  - Add VectorStore.getDocTypeSummary()
+  - Modify query-engine.ts zero-results path (add availableDocTypes)
+  - Modify mcp/tools.ts to expose content+docType
+  - Modify src/cli/search.ts display formatting and --format json flag
+  - Expand src/vector/query-engine.test.ts
+  Reason: VectorStore and tool changes are additive. Phase 1 test harness
+           means mcp/tools.ts modifications have immediate test coverage.
+
+Phase 4: Documentation
+  - Update llms.txt, README.md
+  - Add docs/src/content guide pages for new features
+  - Run npm run docs:generate to regenerate command reference
+  Reason: Last because it documents completed Phase 2+3 behaviors.
+           No code integration; purely content.
+```
+
+**Key constraint:** Phase 3 (search UX) must not begin before `src/mcp/tools.test.ts` exists from Phase 1. The MCP tool modifications in Phase 3 should have a test harness already in place before production code is changed.
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Implementing Anthropic Subscription OAuth
+### Anti-Pattern 1: Removing All Coverage Exclusions at Once
 
-**What people do:** Implement the PKCE flow to use `sk-ant-oat01-...` tokens from a Claude Max/Pro subscription, since the technical mechanism is documented.
+**What people do:** Delete the entire exclusion block in `vitest.config.ts` to push coverage numbers higher quickly.
 
-**Why it's wrong:** Anthropic deployed server-side enforcement on January 9, 2026. Requests using subscription OAuth tokens outside Claude Code CLI are rejected with a clear error. This violates Anthropic's Consumer ToS and fails at runtime regardless of implementation quality.
+**Why it's wrong:** Modules like `src/vector/vector-store.ts` require real SQLite + sqlite-vec WASM native bindings. Tests fail in CI without those bindings. `src/providers/anthropic.ts` requires real SDK initialization that imports the Anthropic package. Coverage numbers become misleading.
 
-**Do this instead:** Use `ANTHROPIC_API_KEY` (Console pay-per-token) for Anthropic. Document this explicitly in Handover's docs.
+**Do this instead:** Remove exclusions one module at a time after verifying the module can run fully with mocks. Keep integration-only modules excluded and test them in `tests/integration/` (which correctly stays outside the coverage measurement).
 
-### Anti-Pattern 2: Storing Tokens in `.handover.yml`
+### Anti-Pattern 2: Modifying RoundCache API for Git Awareness
 
-**What people do:** Add `auth.accessToken` as a config field so users can paste their OAuth token directly.
+**What people do:** Add a `gitHeadCommit` parameter to `RoundCache.computeHash()` to incorporate git state.
 
-**Why it's wrong:** Config files get committed to git. `.handover.yml` is project-scoped and often shared. OAuth tokens are short-lived (1-hour expiry), making manual pasting fragile. This caused real credential leaks in other tools.
+**Why it's wrong:** `computeHash()` is called inside `wrapWithCache` for all 6 rounds in `generate.ts`. Adding a parameter requires coordinated updates across a 1055-line file and would invalidate all existing cached round files on upgrade.
 
-**Do this instead:** Store tokens only in `~/.handover/.credentials.json` (user-scoped) or the OS keychain. Config holds only `auth.mode` and optional path overrides — never the token value.
+**Do this instead:** Enrich `analysisFingerprint` before it enters `computeHash()`. The fingerprint is the sole external variable between runs — all git state can be mixed into it at the construction site in `generate.ts`. `RoundCache.computeHash()` stays stable.
 
-### Anti-Pattern 3: Keeping Concurrency at 4 for Subscription Auth
+### Anti-Pattern 3: Exposing Full Chunk Content for All MCP Search Results
 
-**What people do:** Leave `analysis.concurrency: 4` (cloud default) when using a ChatGPT subscription that enforces serial request limits.
+**What people do:** Map every search result to `content: match.content` in the MCP `semantic_search` response to give AI clients maximum context.
 
-**Why it's wrong:** ChatGPT Plus/Pro allows only one parallel Codex request. Concurrent requests receive "usage limit reached" or queue server-side, causing timeout failures and confusing retry behavior.
+**Why it's wrong:** With `topK=50` and ~500-char average chunks, the response payload reaches ~25KB. Large MCP responses degrade LLM context efficiency and may exceed transport size limits.
 
-**Do this instead:** Factory detects subscription auth and hard-caps concurrency to 1. This override is logged at startup and cannot be overridden by user config.
+**Do this instead:** Include full `content` only for the top 3 results by relevance (highest relevance scores first). Use `contentPreview` (200 chars) for the remainder. Alternatively, add an opt-in `includeFullContent: boolean` parameter that defaults to false.
 
-### Anti-Pattern 4: Keeping `createProvider()` Synchronous
+### Anti-Pattern 4: Colocating New Tests in `tests/integration/` for Coverage
 
-**What people do:** Keep factory sync and do token refresh inside constructors or in `doComplete()` on every call.
+**What people do:** Place all new tests in `tests/integration/` to avoid touching `vitest.config.ts`.
 
-**Why it's wrong:** Constructors cannot be async. Refreshing in `doComplete()` means every request pays the expiry-check cost, and concurrent calls create refresh race conditions (single-use refresh tokens become a problem with concurrency even at 1 when multiple processes run).
+**Why it's wrong:** The vitest `include` pattern is `src/**/*.test.ts`. Files in `tests/integration/` are executed by vitest but do NOT count toward coverage measurement. Pure-function unit tests must be at `src/module/file.test.ts` to raise the coverage threshold.
 
-**Do this instead:** Make `createProvider()` async. Resolve auth once at startup. Handle mid-stream 401 as a bounded single retry inside `doComplete()`, distinct from the proactive refresh at startup.
+**Do this instead:** Colocate unit tests as `src/module/file.test.ts` for coverage. Use `tests/integration/` only for tests that require real filesystem state, running CLI processes, or actual git repositories.
 
-### Anti-Pattern 5: Sharing Token State Across Processes Without Locking
+### Anti-Pattern 5: Requiring `cache.mode: git-aware` to Get Cache Benefits
 
-**What people do:** Two `handover` invocations running simultaneously both read the credentials file, both detect expiry, and both attempt refresh. One succeeds; the other uses the rotated refresh token that is now invalid.
+**What people do:** Make git-aware fingerprinting the new default, removing the content-hash fallback.
 
-**Why it's wrong:** Single-use refresh tokens (OpenAI's model) cause the second refresh attempt to fail with "refresh token already used."
+**Why it's wrong:** Projects that are not in a git repository (new projects, some CI environments, projects with `.git` on a different mount) lose all round caching if git is required.
 
-**Do this instead:** Use OS keychain atomics where available. For file-based storage, use a lockfile (or accept the occasional re-auth as a known edge case with a clear error message prompting `handover auth login`). Document that concurrent `handover` invocations with subscription auth are not supported.
-
----
-
-## Integration Points
-
-### External Services
-
-| Service | Auth Method | Endpoint | Token Lifetime |
-|---------|-------------|----------|----------------|
-| OpenAI (subscription) | PKCE OAuth 2.0 + browser | auth.openai.com | ~1hr access / days refresh |
-| Anthropic (subscription) | BLOCKED — ToS violation | N/A | N/A |
-| Anthropic (API key) | Env var — existing path | N/A | Indefinite |
-| OpenAI (API key) | Env var — existing path | N/A | Indefinite |
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| resolveAuth() -> factory | AuthToken value object passed in | Factory does not access credentials store directly |
-| TokenStore <-> TokenRefresher | File/keychain I/O | Refresher writes new tokens after refresh |
-| OAuthFlow <-> TokenStore | Write-once on flow completion | Flow writes, store reads thereafter |
-| factory <-> providers | Constructor injection (token as string) | Provider unaware of token origin |
-| OpenAICompatibleProvider <-> TokenRefresher | Callback closure | 401 handler calls back into auth layer for new token |
-| MCP server <-> provider | Single instance reused across all requests | Refresh callback transparent per-request |
-| CLI auth command <-> OAuthFlow | Direct call to initiate browser flow | Used by `handover auth login` |
+**Do this instead:** Default to `content-hash`. Fall back to `content-hash` silently if `simpleGit.checkIsRepo()` returns false. The `git-aware` mode is opt-in via config. The existing `emptyGitResult` pattern in `analyzeGitHistory` shows the established graceful-degradation approach.
 
 ---
 
 ## Scaling Considerations
 
-This is a CLI tool — scaling is per-user-process, not multi-tenant. Relevant constraints:
+This is a local CLI tool with single-user operation per invocation. Scaling concerns apply to the MCP HTTP server and long-running sessions.
 
-| Concern | Subscription Auth | API Key Auth |
-|---------|-------------------|--------------|
-| Concurrency | Hard cap 1 (per provider ToS) | 4 default, configurable |
-| Token refresh | Required (~1hr expiry) | Not required (static) |
-| Headless/CI use | File-based credential store; initial browser login required once | Works anywhere (env var) |
-| Rate limits | Provider-defined, non-configurable | Per-key limits, typically higher |
-| Long-running MCP | Refresh callback per 401 | No concern |
-| Parallel invocations | Refresh race condition risk | No concern |
-
-**CI/automated use:** Subscription auth is unsuitable for CI environments. Requires interactive browser login, cannot be injected via env vars, and enforces serial execution. Document API key as the correct choice for automation. The CLI should detect headless environments and warn when subscription auth is configured.
+| Concern | Current State | Implication for This Milestone |
+|---------|--------------|-------------------------------|
+| Coverage CI time | `npm test -- --coverage` runs in one CI job; ~21 tests today | Adding ~15-20 new test files will increase CI time; no architecture concern, just runtime |
+| Git fingerprint cost | `simpleGit().revparse(['HEAD'])` adds ~10ms | Negligible; already running `git.branch()` in `analyzeGitHistory()` during same static-analysis step |
+| VectorStore per-query open/close | Opens and closes SQLite connection per `searchDocuments()` call | `getDocTypeSummary()` is called within the existing open/close block; no additional connection overhead |
+| MCP response size | Current search response ~1-2KB for 10 results | Adding `content` for top 3 adds ~1.5KB; acceptable; do not add `content` for all results |
 
 ---
 
 ## Sources
 
-- Codebase files read directly: `src/providers/base.ts`, `src/providers/base-provider.ts`, `src/providers/factory.ts`, `src/providers/anthropic.ts`, `src/providers/openai-compat.ts`, `src/providers/presets.ts`, `src/config/schema.ts`, `src/config/loader.ts`, `src/utils/errors.ts`, `src/utils/rate-limiter.ts`, `src/ai-rounds/runner.ts`, `src/mcp/server.ts`, `src/mcp/tools.ts` — HIGH confidence
-- [Anthropic clarifies ban on third-party tool access to Claude, The Register, Feb 2026](https://www.theregister.com/2026/02/20/anthropic_clarifies_ban_third_party_claude_access/) — HIGH confidence
-- [openclaw.rocks: Anthropic OAuth ban technical details and enforcement](https://openclaw.rocks/blog/anthropic-oauth-ban) — HIGH confidence (server-side block confirmed)
-- [Claude Code official authentication docs](https://code.claude.com/docs/en/authentication) — HIGH confidence (official Anthropic)
-- [Claude Code GitHub issue #19456: OAuth token structure and storage](https://github.com/anthropics/claude-code/issues/19456) — HIGH confidence (community-verified field names match official behavior)
-- [Claude Code GitHub issue #22602: token refresh and expiry bugs](https://github.com/anthropics/claude-code/issues/22602) — MEDIUM confidence (documents real behavior)
-- [OpenAI Codex authentication docs](https://developers.openai.com/codex/auth/) — HIGH confidence (official OpenAI)
-- [OpenAI Codex pricing and limits](https://developers.openai.com/codex/pricing/) — HIGH confidence (official OpenAI)
-- [OpenAI Codex GitHub issue #9634: refresh token already used](https://github.com/openai/codex/issues/9634) — MEDIUM confidence (documents single-use refresh token behavior)
-- [LiteLLM Claude Code Max subscription tutorial](https://docs.litellm.ai/docs/tutorials/claude_code_max_subscription) — MEDIUM confidence (third-party, technically specific)
-- [alif.web.id: Claude OAuth token format and endpoint details](https://www.alif.web.id/posts/claude-oauth-api-key) — LOW confidence (unofficial, useful for token format only)
+- Direct codebase inspection (all findings HIGH confidence):
+  - `src/cli/generate.ts` — pipeline integration nexus and cache wiring
+  - `src/cache/round-cache.ts` — fingerprint and cascade chain mechanism
+  - `src/analyzers/cache.ts` — per-file content hash mechanism
+  - `vitest.config.ts` — current exclusion list and thresholds
+  - `src/mcp/tools.ts` — tool handler injection points and response shapes
+  - `src/vector/query-engine.ts` — search interface, type filtering, result structure
+  - `src/vector/vector-store.ts` — SQLite query surface for getDocTypeSummary extension
+  - `src/analyzers/git-history.ts` — simple-git usage pattern and graceful degradation
+  - `src/providers/__mocks__/index.ts` — existing mock factory pattern
+  - `.github/workflows/ci.yml` — CI coverage pipeline
+  - `package.json` — devDependencies (memfs, vitest-mock-extended confirmed present)
 
 ---
-
-*Architecture research for: subscription-based provider auth integration with existing BaseProvider pipeline*
-*Researched: 2026-02-26*
+*Architecture research for: TypeScript CLI — test coverage uplift, git-aware incremental regeneration, search UX polish, documentation*
+*Researched: 2026-03-01*
