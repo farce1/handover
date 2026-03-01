@@ -290,4 +290,86 @@ describe('validateRoundClaims', () => {
     // At least one corrected (the bad import claim)
     expect(result.corrected).toBeGreaterThan(0);
   });
+
+  test('single-segment filenames are ignored by file path extraction filter', () => {
+    const analysis = mkAnalysis(['src/real.ts']);
+    const output = {
+      notes: 'Potential files: config.ts, package.json, README.md',
+    };
+
+    const result = validateRoundClaims(1, output, analysis);
+
+    expect(result.validated).toBe(0);
+    expect(result.corrected).toBe(0);
+    expect(result.total).toBe(0);
+  });
+
+  test('round 3 crossModuleFlows extracts valid path edges and filters invalid ones', () => {
+    const analysis = mkAnalysisWithImports(
+      ['src/a.ts', 'src/b.ts', 'src/c.ts'],
+      [
+        { path: 'src/a.ts', imports: [{ source: 'src/b.ts' }] },
+        { path: 'src/b.ts', imports: [{ source: 'src/c.ts' }] },
+      ],
+    );
+
+    const output = {
+      crossModuleFlows: [
+        { path: ['src/a.ts', 'src/b.ts', 'src/c.ts'] },
+        { path: ['no-slash', 'still-no-slash'] },
+      ],
+    };
+
+    const result = validateRoundClaims(3, output, analysis);
+
+    expect(result.total).toBeGreaterThan(0);
+    expect(result.validated).toBeGreaterThan(0);
+    expect(result.corrected).toBe(0);
+  });
+
+  test('round 3 ignores non-array and malformed crossModuleFlows path fields', () => {
+    const analysis = mkAnalysisWithImports(['src/a.ts'], [{ path: 'src/a.ts', imports: [] }]);
+    const output = {
+      crossModuleFlows: [{ path: 'module-a to module-b' }, { path: null }, { noPath: true }],
+    };
+
+    const result = validateRoundClaims(3, output, analysis);
+
+    expect(result.total).toBe(0);
+    expect(result.validated).toBe(0);
+    expect(result.corrected).toBe(0);
+  });
+
+  test('round 2 ignores relationships that are not import-path strings', () => {
+    const analysis = mkAnalysisWithImports(['src/a.ts'], [{ path: 'src/a.ts', imports: [] }]);
+    const output = {
+      relationships: [
+        { from: 'foo', to: 'bar' },
+        { from: 123, to: 'module-b' },
+        { from: 'module-a', to: 456 },
+      ],
+    };
+
+    const result = validateRoundClaims(2, output, analysis);
+
+    expect(result.total).toBe(0);
+    expect(result.validated).toBe(0);
+    expect(result.corrected).toBe(0);
+  });
+
+  test('round 2 ignores non-array relationships payload', () => {
+    const analysis = mkAnalysisWithImports(['src/a.ts'], [{ path: 'src/a.ts', imports: [] }]);
+    const output = {
+      relationships: {
+        from: 'module-a',
+        to: 'module-b',
+      },
+    };
+
+    const result = validateRoundClaims(2, output, analysis);
+
+    expect(result.total).toBe(0);
+    expect(result.validated).toBe(0);
+    expect(result.corrected).toBe(0);
+  });
 });

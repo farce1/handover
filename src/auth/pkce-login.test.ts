@@ -302,4 +302,75 @@ describe('pkceLogin', () => {
     expect(mockClack.confirm).not.toHaveBeenCalled();
     expect(result.token).toBe('access-token');
   });
+
+  test('uses fallback OAuth endpoints when discovery fails', async () => {
+    mockOpenIdClient.discovery.mockRejectedValue(new Error('discovery unavailable'));
+    const store = createStore();
+
+    const result = await pkceLogin('openai', store as unknown as TokenStore);
+
+    expect(result.token).toBe('access-token');
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.stringContaining('OpenID discovery failed, using hard-coded endpoints'),
+    );
+  });
+
+  test('falls back to printing URL when browser open fails', async () => {
+    mockOpenIdClient.discovery.mockRejectedValue('no discovery service');
+    mockOpen.mockRejectedValue(new Error('cannot open browser'));
+    const store = createStore();
+
+    const loginPromise = pkceLogin('openai', store as unknown as TokenStore);
+    await vi.waitFor(() => {
+      expect(mockClack.log.info).toHaveBeenCalled();
+    });
+
+    const infoMessage = String(mockClack.log.info.mock.calls[0][0] ?? '');
+    const urlMatch = infoMessage.match(/https?:\/\/\S+/);
+    expect(urlMatch).toBeTruthy();
+    await triggerCallbackFromAuthorizationUrl(urlMatch![0]);
+
+    const result = await loginPromise;
+
+    expect(result.token).toBe('access-token');
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.stringContaining('OpenID discovery failed, using hard-coded endpoints: unknown error'),
+    );
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to open browser automatically'),
+    );
+  });
+
+  test('throws AUTH_TOKEN_EXCHANGE_FAILED when token response has empty access token', async () => {
+    mockOpenIdClient.authorizationCodeGrant.mockResolvedValue({
+      access_token: '',
+      refresh_token: 'refresh-token',
+      expires_in: 3600,
+    });
+    const store = createStore();
+
+    await expect(pkceLogin('openai', store as unknown as TokenStore)).rejects.toMatchObject({
+      code: 'AUTH_TOKEN_EXCHANGE_FAILED',
+    });
+  });
+
+  test('throws AUTH_TOKEN_EXCHANGE_FAILED when authorizationCodeGrant throws', async () => {
+    mockOpenIdClient.authorizationCodeGrant.mockRejectedValue(new Error('token endpoint down'));
+    const store = createStore();
+
+    await expect(pkceLogin('openai', store as unknown as TokenStore)).rejects.toMatchObject({
+      code: 'AUTH_TOKEN_EXCHANGE_FAILED',
+      reason: 'token endpoint down',
+    });
+  });
+
+  test('wraps non-AuthError failures as AUTH_LOGIN_FAILED', async () => {
+    const store = createStore();
+    store.write.mockRejectedValue('write failed');
+
+    await expect(pkceLogin('openai', store as unknown as TokenStore)).rejects.toMatchObject({
+      code: 'AUTH_LOGIN_FAILED',
+      reason: 'Unknown authentication error',
+    });
+  });
 });

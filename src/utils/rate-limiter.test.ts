@@ -117,6 +117,31 @@ describe('retryWithBackoff', () => {
     expect(result).toBe('ok');
     expect(fn).toHaveBeenCalledTimes(2);
   });
+
+  test('default isRetryable returns false for non-object errors', async () => {
+    const fn = vi.fn().mockRejectedValue('rate-limited-string');
+
+    await expect(
+      retryWithBackoff(fn, {
+        maxRetries: 2,
+        baseDelayMs: 30_000,
+      }),
+    ).rejects.toBeInstanceOf(ProviderError);
+
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  test('rethrows ProviderError instances directly after retries', async () => {
+    const providerError = ProviderError.rateLimited(1_000);
+    const fn = vi.fn().mockRejectedValue(providerError);
+
+    await expect(
+      retryWithBackoff(fn, {
+        maxRetries: 2,
+        baseDelayMs: 30_000,
+      }),
+    ).rejects.toBe(providerError);
+  });
 });
 
 // ─── RateLimiter tests ────────────────────────────────────────────────────────

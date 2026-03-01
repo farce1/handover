@@ -30,6 +30,23 @@ describe('resolveSelectedDocs()', () => {
       const ids = result.map((d) => d.id);
       expect(ids).toContain('00-index');
     });
+
+    test('index renderer shim delegates to renderIndex and returns index markdown', () => {
+      const indexDoc = DOCUMENT_REGISTRY.find((d) => d.id === '00-index');
+      expect(indexDoc).toBeDefined();
+
+      const rendered = indexDoc!.render({
+        rounds: {},
+        staticAnalysis: {} as never,
+        config: {} as never,
+        audience: 'human',
+        generatedAt: '2026-03-01T00:00:00Z',
+        projectName: 'handover',
+      });
+
+      expect(rendered).toContain('# Handover Knowledge Base');
+      expect(rendered).toContain('## Documents');
+    });
   });
 
   describe('resolves group alias "core"', () => {

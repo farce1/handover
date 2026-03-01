@@ -138,6 +138,18 @@ ${largeParagraph}`;
     }
   });
 
+  it('falls back to hard chunk boundaries when no separator exists near chunk end', () => {
+    const longToken = 'a'.repeat(2_600);
+    const markdown = `# Dense\n\n${longToken}`;
+
+    const chunks = chunkMarkdown(markdown, { chunkSize: 64, chunkOverlap: 0 });
+
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(chunk.content.length).toBeGreaterThan(0);
+    }
+  });
+
   it('should handle empty and minimal input', () => {
     expect(chunkMarkdown('')).toEqual([]);
 

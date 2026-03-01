@@ -26,6 +26,16 @@ describe('DAGOrchestrator', () => {
   // ─── Step ordering ──────────────────────────────────────────────────────
 
   describe('step ordering', () => {
+    it('addSteps registers multiple steps and executes them', async () => {
+      const dag = new DAGOrchestrator();
+      dag.addSteps([mkStep('a', []), mkStep('b', ['a'])]);
+
+      const results = await dag.execute();
+
+      expect(results.get('a')?.status).toBe('completed');
+      expect(results.get('b')?.status).toBe('completed');
+    });
+
     it('single step with no deps completes successfully', async () => {
       const dag = new DAGOrchestrator();
       dag.addStep(mkStep('a', []));
@@ -151,6 +161,24 @@ describe('DAGOrchestrator', () => {
   // ─── Validation ─────────────────────────────────────────────────────────
 
   describe('validation', () => {
+    it('throws generic ORCHESTRATOR_ERROR when validation errors are malformed', async () => {
+      const dag = new DAGOrchestrator() as DAGOrchestrator & {
+        validate: () => { valid: boolean; errors: string[] };
+      };
+      dag.validate = () => ({
+        valid: false,
+        errors: ['validation failed for unknown reason'],
+      });
+
+      try {
+        await dag.execute();
+        expect.unreachable('should have thrown');
+      } catch (e) {
+        expect(e).toBeInstanceOf(OrchestratorError);
+        expect((e as OrchestratorError).code).toBe('ORCHESTRATOR_ERROR');
+      }
+    });
+
     it('cycle A->B->A throws OrchestratorError with code ORCHESTRATOR_CYCLE', async () => {
       const dag = new DAGOrchestrator();
       dag.addStep(mkStep('a', ['b']));
@@ -268,6 +296,28 @@ describe('DAGOrchestrator', () => {
 
       expect(results.get('b')?.status).toBe('failed');
       expect(results.get('c')?.status).toBe('completed');
+      expect(results.get('d')?.status).toBe('skipped');
+    });
+
+    it('skips dependent when one dependency already failed and another completes later', async () => {
+      const dag = new DAGOrchestrator();
+
+      dag.addStep(
+        mkStep('a', [], async () => {
+          throw new Error('a failed first');
+        }),
+      );
+      dag.addStep(
+        mkStep('b', [], async () => {
+          await new Promise<void>((resolve) => setTimeout(resolve, 10));
+        }),
+      );
+      dag.addStep(mkStep('d', ['a', 'b']));
+
+      const results = await dag.execute();
+
+      expect(results.get('a')?.status).toBe('failed');
+      expect(results.get('b')?.status).toBe('completed');
       expect(results.get('d')?.status).toBe('skipped');
     });
 
