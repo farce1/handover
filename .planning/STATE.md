@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Quality, Performance & Polish
 status: unknown
-last_updated: "2026-03-01T19:04:55.113Z"
+last_updated: "2026-03-01T20:16:00.000Z"
 progress:
   total_phases: 16
   completed_phases: 15
   total_plans: 40
-  completed_plans: 38
+  completed_plans: 40
 ---
 
 # Project State
@@ -18,17 +18,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v7.0 Phase 27 — Test Coverage & Infrastructure
+**Current focus:** v7.0 Phase 27 gap closure — Branch coverage shortfall (TEST-01)
 
 ## Current Position
 
 Milestone: v7.0 Quality, Performance & Polish
 Phase: 27 of 30 (Test Coverage & Infrastructure)
-Plan: 01 of 04 (Coverage exclusions + CI coverage comments)
-Status: In progress
-Last activity: 2026-03-01 — Completed Plan 27-01 (frozen exclusions, json-summary reporter, CI PR coverage comment)
+Plan: 04 of 04 completed (verification gaps found)
+Status: In progress (phase goal not met)
+Last activity: 2026-03-01 — Completed execution plans 27-01..27-04, generated 27-VERIFICATION.md with TEST-01 gap
 
-Progress: [██░░░░░░░░] 25%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -38,9 +38,9 @@ Progress: [██░░░░░░░░] 25%
 - Total execution time: ~110 min
 
 **v7.0 Velocity:**
-- Total plans completed: 1
-- Average duration: ~8 min/plan
-- Total execution time: ~8 min
+- Total plans completed: 4
+- Average duration: ~9.5 min/plan
+- Total execution time: ~38 min
 
 ## Accumulated Context
 
@@ -60,6 +60,9 @@ Key decisions locked for v7.0 planning:
 - [Research]: Add `starlight-links-validator` to CI before writing any new doc pages
 - [Phase 27]: Replaced broad src/mcp/** exclusion with explicit MCP runtime file exclusions while keeping mcp/tools.ts/mcp/errors.ts testable. — Expose testable MCP surfaces so branch coverage can be raised with focused unit tests in plans 27-02/27-03.
 - [Phase 27]: Added json-summary coverage reporter and SHA-pinned PR coverage comment action in CI. — Provide machine-readable coverage output and deterministic PR feedback in pull requests.
+- [Phase 27]: Expanded tests for renderers/config/packer/auth/mcp handlers with output assertions to raise line/function/statement coverage above 85%. — Prioritized branch-rich, low-risk unit targets before threshold adjustments.
+- [Phase 27]: resolveAuth now honors config.apiKeyEnv before provider defaults. — Align auth behavior with config schema and avoid ignoring explicit env-var overrides.
+- [Phase 27]: Locked thresholds at 85/85/85/75 as highest passing gate after branch target failed at 80. — Maintain enforced quality gate while explicitly surfacing remaining branch-coverage gap for follow-up.
 
 ### Pending Todos
 
@@ -67,7 +70,8 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 27]: Coverage is still below threshold because `mcp/tools.ts` and `mcp/errors.ts` are now testable but untested; close in plans 27-02/27-03 before threshold-raise plan 27-04
+- [Phase 27]: TEST-01 remains open — target thresholds `90/90/90/85` not met; current passing gate is `85/85/85/75` (branch coverage 75.16%)
+- [Phase 27]: Low-coverage branch hotspots are `src/mcp/tools.ts`, `src/mcp/errors.ts`, and `src/auth/pkce-login.ts`; requires gap-closure plan before phase completion
 - [Phase 28]: `src/regeneration/` has no CLI integration; define shared runner interface before implementing `--since`
 - [Phase 28]: Verify `.github/workflows/ci.yml` checkout depth before Phase 28 ships (shallow clone breaks `--since`)
 
@@ -80,5 +84,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed 27-01-PLAN.md
-Resume file: .planning/phases/27-test-coverage-infrastructure/27-02-PLAN.md
+Stopped at: Phase 27 verification completed with gaps_found
+Resume file: .planning/phases/27-test-coverage-infrastructure/27-VERIFICATION.md
