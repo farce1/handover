@@ -27,6 +27,13 @@ export type AnswerQuestionResult =
       kind: 'answer';
       query: string;
       answer: QaAnswer;
+      stats: {
+        durationMs: number;
+        inputTokens: number;
+        outputTokens: number;
+        sourceCount: number;
+        sourceFiles: string[];
+      };
     }
   | {
       mode: 'qa';
@@ -151,10 +158,21 @@ export async function answerQuestion(input: AnswerQuestionInput): Promise<Answer
     citations,
   });
 
+  const sourceFiles = Array.from(new Set(searchResult.matches.map((match) => match.sourceFile)))
+    .filter((sourceFile) => sourceFile.length > 0)
+    .sort((left, right) => left.localeCompare(right));
+
   return {
     mode: 'qa',
     kind: 'answer',
     query: searchResult.query,
     answer,
+    stats: {
+      durationMs: synthesis.duration,
+      inputTokens: synthesis.usage.inputTokens,
+      outputTokens: synthesis.usage.outputTokens,
+      sourceCount: sourceFiles.length,
+      sourceFiles,
+    },
   };
 }
