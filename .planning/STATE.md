@@ -85,5 +85,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Phase 29 ready to plan after Phase 28 completion
-Resume file: .planning/ROADMAP.md
+Stopped at: Phase 29 context gathered
+Resume file: .planning/phases/29-search-qa-ux-polish/29-CONTEXT.md
