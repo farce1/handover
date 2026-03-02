@@ -35,6 +35,7 @@ export default defineConfig({
             { label: 'MCP setup', link: '/user/mcp-setup/' },
             { label: 'Output documents', link: '/user/output-documents/' },
             { label: 'Search', link: '/user/search/' },
+            { label: 'Regeneration', link: '/user/regeneration/' },
           ],
         },
         {
@@ -44,6 +45,7 @@ export default defineConfig({
             { label: 'Architecture', link: '/contributor/architecture/' },
             { label: 'Adding providers', link: '/contributor/adding-providers/' },
             { label: 'Adding analyzers', link: '/contributor/adding-analyzers/' },
+            { label: 'Testing', link: '/contributor/testing/' },
           ],
         },
         {

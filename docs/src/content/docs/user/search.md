@@ -104,3 +104,4 @@ Search output includes signals to help you diagnose weak results:
 ## Next steps
 
 - [configuration](/handover/user/configuration/) for embedding and output settings
+- [regeneration](/handover/user/regeneration/) for incremental runs with `--since`
