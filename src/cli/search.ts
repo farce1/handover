@@ -1,7 +1,8 @@
+import path from 'node:path';
 import pc from 'picocolors';
 import { loadConfig } from '../config/loader.js';
 import { answerQuestion, formatCitationFootnotes } from '../qa/answerer.js';
-import { SYMBOLS } from '../ui/formatters.js';
+import { formatDuration, formatTokens, SYMBOLS } from '../ui/formatters.js';
 import { ConfigError, HandoverError, ProviderError, handleCliError } from '../utils/errors.js';
 import { DISTANCE_WARNING_THRESHOLD, searchDocuments } from '../vector/query-engine.js';
 import { DEFAULT_EMBEDDING_LOCALITY_MODE } from '../vector/types.js';
@@ -22,6 +23,16 @@ function createStyler(isTty: boolean): (value: string) => string {
 
 function normalizeSnippet(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function formatSourceLink(sourceFile: string, isTty: boolean, outputDir: string): string {
+  if (!isTty) {
+    return sourceFile;
+  }
+
+  const absolutePath = path.resolve(outputDir, sourceFile);
+  const fileUrl = `file://${absolutePath}`;
+  return `\x1B]8;;${fileUrl}\x1B\\${sourceFile}\x1B]8;;\x1B\\`;
 }
 
 function normalizeMode(value: string | undefined): SearchMode {
@@ -117,10 +128,27 @@ function toQaModeError(err: unknown): unknown {
   return err;
 }
 
-function renderFootnotes(emphasize: (value: string) => string, citations: string[]): void {
+function renderFootnotes(
+  emphasize: (value: string) => string,
+  citations: string[],
+  isTty = false,
+  outputDir = '.',
+): void {
   console.log(emphasize('Sources'));
-  for (const citation of citations) {
-    console.log(citation);
+  for (const rawCitation of citations) {
+    if (!isTty) {
+      console.log(rawCitation);
+      continue;
+    }
+
+    const match = rawCitation.match(/^(\[\d+\]\s)(.+?)( :: .*)$/);
+    if (!match) {
+      console.log(rawCitation);
+      continue;
+    }
+
+    const [, prefix, sourceFile, suffix] = match;
+    console.log(`${prefix}${formatSourceLink(sourceFile, isTty, outputDir)}${suffix}`);
   }
 }
 
@@ -129,6 +157,8 @@ async function runFastMode(
   config: ReturnType<typeof loadConfig>,
   options: SearchCommandOptions,
   emphasize: (value: string) => string,
+  isTty: boolean,
+  outputDir: string,
 ): Promise<void> {
   const result = await searchDocuments({
     config,
@@ -172,7 +202,7 @@ async function runFastMode(
     console.log(`${emphasize(`Result ${rank}`)}`);
     console.log(`rank: ${rank}`);
     console.log(`relevance: ${score}`);
-    console.log(`source: ${match.sourceFile}`);
+    console.log(`source: ${formatSourceLink(match.sourceFile, isTty, outputDir)}`);
     console.log(`section: ${match.sectionPath}`);
     console.log(`snippet: ${snippet}`);
     if (index < result.matches.length - 1) {
@@ -197,6 +227,8 @@ async function runQaMode(
   config: ReturnType<typeof loadConfig>,
   options: SearchCommandOptions,
   emphasize: (value: string) => string,
+  isTty: boolean,
+  outputDir: string,
 ): Promise<void> {
   try {
     const result = await answerQuestion({
@@ -222,7 +254,7 @@ async function runQaMode(
       if (result.citations.length > 0) {
         console.log();
         const footnotes = formatCitationFootnotes(result.citations);
-        renderFootnotes(emphasize, footnotes);
+        renderFootnotes(emphasize, footnotes, isTty, outputDir);
       }
       return;
     }
@@ -233,7 +265,15 @@ async function runQaMode(
 
     const footnotes = formatCitationFootnotes(result.answer.citations);
 
-    renderFootnotes(emphasize, footnotes);
+    renderFootnotes(emphasize, footnotes, isTty, outputDir);
+
+    const totalTokens = result.stats.inputTokens + result.stats.outputTokens;
+    const statsLine = `Answer in ${formatDuration(result.stats.durationMs)} using ${formatTokens(totalTokens)} from ${result.stats.sourceCount} sources`;
+    console.log();
+    console.log(pc.dim(statsLine));
+    for (const sourceFile of result.stats.sourceFiles) {
+      console.log(pc.dim(`  ${formatSourceLink(sourceFile, isTty, outputDir)}`));
+    }
   } catch (err) {
     throw toQaModeError(err);
   }
@@ -245,16 +285,17 @@ export async function runSearch(query: string, options: SearchCommandOptions): P
     const emphasize = createStyler(isTty);
     const mode = normalizeMode(options.mode);
     const { config, mode: embeddingMode } = applyEmbeddingModeOverride(options);
+    const outputDir = config.output;
 
     printModeBanner(emphasize, mode);
     printEmbeddingRouteBanner(emphasize, embeddingMode);
 
     if (mode === 'qa') {
-      await runQaMode(query, config, options, emphasize);
+      await runQaMode(query, config, options, emphasize, isTty, outputDir);
       return;
     }
 
-    await runFastMode(query, config, options, emphasize);
+    await runFastMode(query, config, options, emphasize, isTty, outputDir);
   } catch (err) {
     handleCliError(err, 'Failed to run search command');
   }
