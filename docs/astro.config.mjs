@@ -34,6 +34,7 @@ export default defineConfig({
             { label: 'Providers', link: '/user/providers/' },
             { label: 'MCP setup', link: '/user/mcp-setup/' },
             { label: 'Output documents', link: '/user/output-documents/' },
+            { label: 'Search', link: '/user/search/' },
           ],
         },
         {
