@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Quality, Performance & Polish
 status: unknown
-last_updated: "2026-03-02T12:33:09Z"
+last_updated: "2026-03-02T13:28:54Z"
 progress:
-  total_phases: 17
+  total_phases: 18
   completed_phases: 17
-  total_plans: 44
-  completed_plans: 44
+  total_plans: 50
+  completed_plans: 47
 ---
 
 # Project State
@@ -18,17 +18,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v7.0 Phase 29 — Search & QA UX polish (next phase)
+**Current focus:** v7.0 Phase 30 — Documentation & Onboarding (next phase)
 
 ## Current Position
 
 Milestone: v7.0 Quality, Performance & Polish
-Phase: 29 of 30 (Search & QA UX Polish)
+Phase: 30 of 30 (Documentation & Onboarding)
 Plan: Not started
-Status: Ready to plan (Phase 28 complete)
-Last activity: 2026-03-02 — Completed plans 28-01/28-02, added `--since <ref>` git-aware incremental regeneration, and passed 28-VERIFICATION.md
+Status: Ready to plan (Phase 29 complete)
+Last activity: 2026-03-02 — Completed plans 29-01/29-02/29-03, shipped search UX polish + QA stats + MCP semantic enrichment, and passed 29-VERIFICATION.md
 
-Progress: [█████████░] 93%
+Progress: [██████████] 97%
 
 ## Performance Metrics
 
@@ -38,9 +38,9 @@ Progress: [█████████░] 93%
 - Total execution time: ~110 min
 
 **v7.0 Velocity:**
-- Total plans completed: 8
+- Total plans completed: 11
 - Average duration: ~8.5 min/plan
-- Total execution time: ~68 min
+- Total execution time: ~90 min
 
 ## Accumulated Context
 
@@ -67,6 +67,8 @@ Key decisions locked for v7.0 planning:
 - [Phase 27]: Added branch-focused tests across auth/validator/orchestrator/registry/rate-limiter/chunker and raised thresholds to `90/90/90/85`. — Achieved full-suite coverage totals `96.47/97.03/96.34/86.14` and closed TEST-01.
 - [Phase 28]: Added `getGitChangedFiles` (`diffSummary` + `status`) with explicit fallback reasons for non-git, shallow clone, and detached HEAD contexts.
 - [Phase 28]: Added `handover generate --since <ref>` with git-aware changed-file override, explicit zero-change early exit, and display propagation to TTY/CI incremental banners.
+- [Phase 29]: Added search UX guidance backed by live index metadata (`availableDocTypes`, `totalIndexed`) with explicit empty-index and low-relevance messaging.
+- [Phase 29]: Added TTY-gated OSC8 source links and QA answer stats footer; enriched MCP semantic search with `docType` for all results and top-3 `content`.
 
 ### Pending Todos
 
@@ -74,7 +76,7 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 29]: Implement search/QA UX polish scope (`SRCH-01` through `SRCH-06`) without regressing Phase 28 incremental behavior.
+- [Phase 30]: Ship docs/onboarding scope (`DOCS-01` through `DOCS-05`) and keep newly shipped Phase 29 CLI/MCP behavior accurately documented.
 
 External setup still required (unchanged from v5.0):
 - GitHub Sponsors enrollment
@@ -85,5 +87,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Phase 29 context gathered
-Resume file: .planning/phases/29-search-qa-ux-polish/29-CONTEXT.md
+Stopped at: Phase 30 ready to plan after Phase 29 completion
+Resume file: .planning/ROADMAP.md

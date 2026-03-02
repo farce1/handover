@@ -25,7 +25,7 @@ See milestone archives in `.planning/milestones/`.
 
 - [x] **Phase 27: Test Coverage & Infrastructure** - Raise the CI coverage gate from the currently-failing 80% to a verified 90%+ (completed 2026-03-01)
 - [x] **Phase 28: Git-Aware Incremental Regeneration** - Users can re-analyze only files changed since a git ref, with graceful fallback in non-git environments (completed 2026-03-02)
-- [ ] **Phase 29: Search & QA UX Polish** - Search output surfaces result quality signals, clickable links, zero-results guidance, and enriched MCP responses
+- [x] **Phase 29: Search & QA UX Polish** - Search output surfaces result quality signals, clickable links, zero-results guidance, and enriched MCP responses (completed 2026-03-02)
 - [ ] **Phase 30: Documentation & Onboarding** - User and contributor docs reflect final behavior, `handover init` gains TTY guard, broken-link CI check added
 
 ## Phase Details
@@ -77,12 +77,13 @@ Plans:
   4. Search results on a TTY show OSC8 clickable file links; piped/non-TTY output shows plain paths
   5. `handover search --mode qa` output includes timing and token stats ("Answer in 2.3s using 1,240 tokens from 4 sources")
   6. The MCP `semantic_search` tool response includes a `content` field (top 3 results only) and a `docType` field
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
+**Verification:** passed (`.planning/phases/29-search-qa-ux-polish/29-VERIFICATION.md`)
 
 Plans:
-- [ ] 29-01-PLAN.md — Add --type help text, zero-results guidance with live doc types, and distance warning to CLI search output
-- [ ] 29-02-PLAN.md — Add OSC8 TTY-gated clickable links to search results and QA timing/token stats
-- [ ] 29-03-PLAN.md — Enrich MCP semantic_search response with content (top 3) and docType fields
+- [x] 29-01-PLAN.md — Add --type help text, zero-results guidance with live doc types, and distance warning to CLI search output
+- [x] 29-02-PLAN.md — Add OSC8 TTY-gated clickable links to search results and QA timing/token stats
+- [x] 29-03-PLAN.md — Enrich MCP semantic_search response with content (top 3) and docType fields
 
 ### Phase 30: Documentation & Onboarding
 **Goal**: Users can find search/reindex/incremental-regen guidance in the docs, contributors can navigate the test patterns, and broken doc links are caught in CI
@@ -110,5 +111,5 @@ Phase 27 → Phase 28 (parallel with 29, after 27) → Phase 29 (parallel with 2
 |-------|-----------|----------------|--------|-----------|
 | 27. Test Coverage & Infrastructure | v7.0 | 6/6 | Complete | 2026-03-01 |
 | 28. Git-Aware Incremental Regeneration | v7.0 | 2/2 | Complete | 2026-03-02 |
-| 29. Search & QA UX Polish | v7.0 | 0/3 | Not started | - |
+| 29. Search & QA UX Polish | v7.0 | 3/3 | Complete | 2026-03-02 |
 | 30. Documentation & Onboarding | v7.0 | 0/3 | Not started | - |

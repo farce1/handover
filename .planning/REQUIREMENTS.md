@@ -20,12 +20,12 @@ Requirements for milestone v7.0 Quality, Performance & Polish. Each maps to road
 
 ### Search & QA
 
-- [ ] **SRCH-01**: `--type` valid values shown in `handover search --help` output
-- [ ] **SRCH-02**: Zero-results search displays available doc types as guidance
-- [ ] **SRCH-03**: Low-relevance results display distance warning when best match quality is poor
-- [ ] **SRCH-04**: Search results show OSC8 clickable terminal file links (TTY-gated, plain text fallback)
-- [ ] **SRCH-05**: QA mode displays timing and token stats ("Answer in 2.3s using 1,240 tokens from 4 sources")
-- [ ] **SRCH-06**: MCP `semantic_search` response includes `content` (top 3) and `docType` fields
+- [x] **SRCH-01**: `--type` valid values shown in `handover search --help` output
+- [x] **SRCH-02**: Zero-results search displays available doc types as guidance
+- [x] **SRCH-03**: Low-relevance results display distance warning when best match quality is poor
+- [x] **SRCH-04**: Search results show OSC8 clickable terminal file links (TTY-gated, plain text fallback)
+- [x] **SRCH-05**: QA mode displays timing and token stats ("Answer in 2.3s using 1,240 tokens from 4 sources")
+- [x] **SRCH-06**: MCP `semantic_search` response includes `content` (top 3) and `docType` fields
 
 ### Documentation & Onboarding
 
@@ -75,12 +75,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-03 | Phase 27 | Complete |
 | REGEN-01 | Phase 28 | Complete |
 | REGEN-02 | Phase 28 | Complete |
-| SRCH-01 | Phase 29 | Pending |
-| SRCH-02 | Phase 29 | Pending |
-| SRCH-03 | Phase 29 | Pending |
-| SRCH-04 | Phase 29 | Pending |
-| SRCH-05 | Phase 29 | Pending |
-| SRCH-06 | Phase 29 | Pending |
+| SRCH-01 | Phase 29 | Complete |
+| SRCH-02 | Phase 29 | Complete |
+| SRCH-03 | Phase 29 | Complete |
+| SRCH-04 | Phase 29 | Complete |
+| SRCH-05 | Phase 29 | Complete |
+| SRCH-06 | Phase 29 | Complete |
 | DOCS-01 | Phase 30 | Pending |
 | DOCS-02 | Phase 30 | Pending |
 | DOCS-03 | Phase 30 | Pending |
@@ -94,4 +94,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-01*
-*Last updated: 2026-03-02 after phase 28 completion*
+*Last updated: 2026-03-02 after phase 29 completion*
