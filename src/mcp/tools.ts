@@ -26,6 +26,7 @@ import type { SearchDocumentsInput, SearchDocumentsResult } from '../vector/quer
 import type { HandoverConfig } from '../config/schema.js';
 
 const DEFAULT_LIMIT = 10;
+const MCP_CONTENT_LIMIT = 3;
 const DEFAULT_LAST_ACK_SEQUENCE = 0;
 
 type ToolRequestExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
@@ -530,11 +531,13 @@ export function registerMcpTools(server: McpServer, options: RegisterMcpToolsOpt
           query: result.query,
           limit: result.topK,
           total: result.totalMatches,
-          results: result.matches.map((match) => ({
+          results: result.matches.map((match, index) => ({
             relevance: match.relevance,
             source: match.sourceFile,
             section: match.sectionPath,
             snippet: match.contentPreview,
+            docType: match.docType,
+            ...(index < MCP_CONTENT_LIMIT ? { content: match.content } : {}),
           })),
         };
 
