@@ -83,6 +83,8 @@ export interface DisplayState {
   isSubscription?: boolean;
   /** Whether this is an incremental run (some files changed, some unchanged). */
   isIncremental?: boolean;
+  /** Git ref used for --since incremental mode (e.g. "main", "HEAD~3"). */
+  sinceRef?: string;
   /** Number of files that changed since last run (only set on incremental runs). */
   changedFileCount?: number;
   /** Number of files skipped as unchanged (only set on incremental runs). */

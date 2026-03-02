@@ -22,6 +22,10 @@ program
   .option('--audience <mode>', 'Audience mode: human (default) or ai')
   .option('--static-only', 'Run static analysis only (no AI cost)')
   .option('--no-cache', 'Discard cached results and run all rounds fresh')
+  .option(
+    '--since <ref>',
+    'Only re-analyze files changed since this git ref (e.g. HEAD~3, main, v1.0)',
+  )
   .option('--stream', 'Show streaming token output during AI rounds')
   .option('-v, --verbose', 'Show detailed output')
   .action(runGenerate);
