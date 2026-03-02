@@ -95,12 +95,12 @@ Plans:
   3. `handover init` accepts `--yes` and silently skips prompts in non-TTY/CI environments; it detects and does not silently overwrite an existing config
   4. `docs/src/content/contributor/testing.md` documents `createMockProvider()`, `memfs` setup, and coverage exclusion rationale
   5. `starlight-links-validator` runs in CI and the `docs:build` job fails on broken internal links
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 30-01: Add `starlight-links-validator` to CI before writing any new pages; add `handover init` TTY guard and `--yes` flag
-- [ ] 30-02: Write `docs/src/content/user/search.md` and reindex walkthrough; wire sidebar entries
-- [ ] 30-03: Write `docs/src/content/user/regeneration.md` and `docs/src/content/contributor/testing.md`
+- [ ] 30-01-PLAN.md — Add starlight-links-validator plugin to docs build; add `handover init` TTY guard and `--yes` flag
+- [ ] 30-02-PLAN.md — Write `docs/src/content/docs/user/search.md` with reindex walkthrough; wire sidebar entry
+- [ ] 30-03-PLAN.md — Write `docs/src/content/docs/user/regeneration.md` and `docs/src/content/docs/contributor/testing.md`; wire sidebar entries
 
 ## Progress
 
@@ -112,4 +112,4 @@ Phase 27 → Phase 28 (parallel with 29, after 27) → Phase 29 (parallel with 2
 | 27. Test Coverage & Infrastructure | v7.0 | 6/6 | Complete | 2026-03-01 |
 | 28. Git-Aware Incremental Regeneration | v7.0 | 2/2 | Complete | 2026-03-02 |
 | 29. Search & QA UX Polish | v7.0 | 3/3 | Complete | 2026-03-02 |
-| 30. Documentation & Onboarding | v7.0 | 0/3 | Not started | - |
+| 30. Documentation & Onboarding | v7.0 | 0/3 | Planned | - |
