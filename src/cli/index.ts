@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { runInit } from './init.js';
 import { runGenerate } from './generate.js';
 import { createAuthCommand } from './auth/index.js';
+import { KNOWN_DOC_TYPES } from '../vector/query-engine.js';
 
 const program = new Command();
 
@@ -92,7 +93,7 @@ program
   )
   .option(
     '--type <type>',
-    'Filter by document type (repeatable)',
+    `Filter by document type (repeatable). Valid types: ${KNOWN_DOC_TYPES.join(', ')}`,
     (value, previous: string[]) => {
       return [...previous, value];
     },

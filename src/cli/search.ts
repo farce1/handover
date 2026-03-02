@@ -1,8 +1,9 @@
 import pc from 'picocolors';
 import { loadConfig } from '../config/loader.js';
 import { answerQuestion, formatCitationFootnotes } from '../qa/answerer.js';
+import { SYMBOLS } from '../ui/formatters.js';
 import { ConfigError, HandoverError, ProviderError, handleCliError } from '../utils/errors.js';
-import { searchDocuments } from '../vector/query-engine.js';
+import { DISTANCE_WARNING_THRESHOLD, searchDocuments } from '../vector/query-engine.js';
 import { DEFAULT_EMBEDDING_LOCALITY_MODE } from '../vector/types.js';
 import type { EmbeddingLocalityMode } from '../vector/types.js';
 
@@ -137,7 +138,18 @@ async function runFastMode(
   });
 
   if (result.totalMatches === 0) {
-    console.log('No results found.');
+    if ((result.totalIndexed ?? 0) === 0) {
+      console.log('No results found. The search index is empty.');
+      console.log(
+        "Run 'handover generate' to analyze your codebase, then 'handover reindex' to build the search index.",
+      );
+      return;
+    }
+
+    console.log(`No results found (${result.totalIndexed} documents indexed).`);
+    const availableTypes =
+      result.availableDocTypes.length > 0 ? result.availableDocTypes.join(', ') : '(none)';
+    console.log(`Available types: ${availableTypes}`);
     console.log();
     console.log('Try refining your query:');
     console.log('- Use more specific keywords (example: "auth middleware")');
@@ -166,6 +178,12 @@ async function runFastMode(
     if (index < result.matches.length - 1) {
       console.log();
     }
+  }
+
+  if (result.matches[0] && result.matches[0].distance > DISTANCE_WARNING_THRESHOLD) {
+    console.log(
+      `${SYMBOLS.warning} Low relevance (distance: ${result.matches[0].distance.toFixed(2)}). Try a more specific query or different --type`,
+    );
   }
 
   console.log();
