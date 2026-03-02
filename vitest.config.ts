@@ -74,8 +74,8 @@ export default defineConfig({
         // Static analyzers — require real filesystem and git context
         'src/analyzers/**',
 
-        // Cache layer — requires real filesystem I/O
-        'src/cache/**',
+        // Round cache — requires real filesystem I/O, git-fingerprint.ts is unit-testable
+        'src/cache/round-cache.ts',
 
         // UI components — require full renderer pipeline with TTY
         'src/ui/**',
