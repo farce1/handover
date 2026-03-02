@@ -246,6 +246,23 @@ export class VectorStore {
   }
 
   /**
+   * Get distinct document types currently indexed in the database.
+   *
+   * @returns Sorted distinct doc_type values
+   */
+  getDistinctDocTypes(): string[] {
+    if (!this.db) {
+      throw new Error('Database not open. Call open() first.');
+    }
+
+    const rows = this.db
+      .prepare('SELECT DISTINCT doc_type FROM vec_chunks ORDER BY doc_type ASC')
+      .all() as Array<{ doc_type: string }>;
+
+    return rows.map((row) => row.doc_type);
+  }
+
+  /**
    * Get number of indexed documents.
    *
    * @returns Document count

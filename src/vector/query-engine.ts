@@ -107,7 +107,7 @@ function createRemoteProvider(mode: EmbeddingLocalityMode, config: HandoverConfi
 
 const DEFAULT_TOP_K = 10;
 
-const KNOWN_DOC_TYPES = [
+export const KNOWN_DOC_TYPES = [
   'project-overview',
   'getting-started',
   'architecture',
@@ -122,6 +122,8 @@ const KNOWN_DOC_TYPES = [
   'testing-strategy',
   'deployment',
 ] as const;
+
+export const DISTANCE_WARNING_THRESHOLD = 0.65;
 
 const KNOWN_DOC_TYPE_SET = new Set<string>(KNOWN_DOC_TYPES);
 
@@ -152,6 +154,8 @@ export interface SearchDocumentsResult {
   filters: {
     types: string[];
   };
+  availableDocTypes: string[];
+  totalIndexed: number;
 }
 
 function toRelevance(distance: number): number {
@@ -324,13 +328,18 @@ export async function searchDocuments(input: SearchDocumentsInput): Promise<Sear
   try {
     const indexedChunks = vectorStore.getChunkCount();
     if (indexedChunks === 0) {
-      throw new HandoverError(
-        'Search index is empty',
-        'The vector database exists but contains no indexed chunks',
-        "Run 'handover reindex' to populate the search index",
-        'SEARCH_INDEX_EMPTY',
-      );
+      return {
+        query,
+        topK,
+        totalMatches: 0,
+        matches: [],
+        filters: { types: normalizedTypes },
+        availableDocTypes: [],
+        totalIndexed: 0,
+      };
     }
+
+    const availableDocTypes = vectorStore.getDistinctDocTypes();
 
     const { embeddings } = await route.provider.embedBatch([query]);
     const queryEmbedding = embeddings[0];
@@ -357,6 +366,8 @@ export async function searchDocuments(input: SearchDocumentsInput): Promise<Sear
       filters: {
         types: normalizedTypes,
       },
+      availableDocTypes,
+      totalIndexed: indexedChunks,
     };
   } finally {
     vectorStore.close();
