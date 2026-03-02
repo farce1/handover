@@ -12,7 +12,11 @@ program
   .description('Generate comprehensive codebase documentation for handover')
   .version('0.1.0');
 
-program.command('init').description('Create .handover.yml configuration file').action(runInit);
+program
+  .command('init')
+  .description('Create .handover.yml configuration file')
+  .option('--yes', 'Skip prompts and write a default config (for CI/non-interactive environments)')
+  .action(runInit);
 
 program
   .command('generate')
