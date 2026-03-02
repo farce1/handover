@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
+milestone: v7.0
 milestone_name: Quality, Performance & Polish
-status: unknown
-last_updated: "2026-03-02T13:28:54Z"
+status: complete
+last_updated: "2026-03-02T19:40:00Z"
 progress:
-  total_phases: 18
-  completed_phases: 17
+  total_phases: 19
+  completed_phases: 19
   total_plans: 50
-  completed_plans: 47
+  completed_plans: 50
 ---
 
 # Project State
@@ -18,17 +18,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v7.0 Phase 30 — Documentation & Onboarding (next phase)
+**Current focus:** v7.0 complete; ready for milestone archival/transition
 
 ## Current Position
 
 Milestone: v7.0 Quality, Performance & Polish
-Phase: 30 of 30 (Documentation & Onboarding)
-Plan: Not started
-Status: Ready to plan (Phase 29 complete)
-Last activity: 2026-03-02 — Completed plans 29-01/29-02/29-03, shipped search UX polish + QA stats + MCP semantic enrichment, and passed 29-VERIFICATION.md
+Phase: 30 of 30 (Documentation & Onboarding) — complete
+Plan: 3/3 complete
+Status: Phase complete and verified
+Last activity: 2026-03-02 — Completed plans 30-01/30-02/30-03, shipped docs onboarding updates, and passed 30-VERIFICATION.md
 
-Progress: [██████████] 97%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -38,9 +38,9 @@ Progress: [██████████] 97%
 - Total execution time: ~110 min
 
 **v7.0 Velocity:**
-- Total plans completed: 11
+- Total plans completed: 14
 - Average duration: ~8.5 min/plan
-- Total execution time: ~90 min
+- Total execution time: ~119 min
 
 ## Accumulated Context
 
@@ -69,6 +69,9 @@ Key decisions locked for v7.0 planning:
 - [Phase 28]: Added `handover generate --since <ref>` with git-aware changed-file override, explicit zero-change early exit, and display propagation to TTY/CI incremental banners.
 - [Phase 29]: Added search UX guidance backed by live index metadata (`availableDocTypes`, `totalIndexed`) with explicit empty-index and low-relevance messaging.
 - [Phase 29]: Added TTY-gated OSC8 source links and QA answer stats footer; enriched MCP semantic search with `docType` for all results and top-3 `content`.
+- [Phase 30]: Added starlight-links-validator to docs build and normalized user-guide links for `/handover/` base-path validation.
+- [Phase 30]: Added `handover init --yes` with non-interactive guard and overwrite-safe behavior.
+- [Phase 30]: Added user docs for search/reindex/regeneration and contributor docs for testing patterns/coverage policy.
 
 ### Pending Todos
 
@@ -76,7 +79,7 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 30]: Ship docs/onboarding scope (`DOCS-01` through `DOCS-05`) and keep newly shipped Phase 29 CLI/MCP behavior accurately documented.
+None.
 
 External setup still required (unchanged from v5.0):
 - GitHub Sponsors enrollment
@@ -87,5 +90,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Phase 30 context gathered
-Resume file: .planning/phases/30-documentation-onboarding/30-CONTEXT.md
+Stopped at: Phase 30 complete and verified
+Resume file: .planning/phases/30-documentation-onboarding/30-VERIFICATION.md

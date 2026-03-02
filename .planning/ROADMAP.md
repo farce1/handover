@@ -26,7 +26,7 @@ See milestone archives in `.planning/milestones/`.
 - [x] **Phase 27: Test Coverage & Infrastructure** - Raise the CI coverage gate from the currently-failing 80% to a verified 90%+ (completed 2026-03-01)
 - [x] **Phase 28: Git-Aware Incremental Regeneration** - Users can re-analyze only files changed since a git ref, with graceful fallback in non-git environments (completed 2026-03-02)
 - [x] **Phase 29: Search & QA UX Polish** - Search output surfaces result quality signals, clickable links, zero-results guidance, and enriched MCP responses (completed 2026-03-02)
-- [ ] **Phase 30: Documentation & Onboarding** - User and contributor docs reflect final behavior, `handover init` gains TTY guard, broken-link CI check added
+- [x] **Phase 30: Documentation & Onboarding** - User and contributor docs reflect final behavior, `handover init` gains TTY guard, broken-link CI check added (completed 2026-03-02)
 
 ## Phase Details
 
@@ -95,12 +95,13 @@ Plans:
   3. `handover init` accepts `--yes` and silently skips prompts in non-TTY/CI environments; it detects and does not silently overwrite an existing config
   4. `docs/src/content/contributor/testing.md` documents `createMockProvider()`, `memfs` setup, and coverage exclusion rationale
   5. `starlight-links-validator` runs in CI and the `docs:build` job fails on broken internal links
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
+**Verification:** passed (`.planning/phases/30-documentation-onboarding/30-VERIFICATION.md`)
 
 Plans:
-- [ ] 30-01-PLAN.md — Add starlight-links-validator plugin to docs build; add `handover init` TTY guard and `--yes` flag
-- [ ] 30-02-PLAN.md — Write `docs/src/content/docs/user/search.md` with reindex walkthrough; wire sidebar entry
-- [ ] 30-03-PLAN.md — Write `docs/src/content/docs/user/regeneration.md` and `docs/src/content/docs/contributor/testing.md`; wire sidebar entries
+- [x] 30-01-PLAN.md — Add starlight-links-validator plugin to docs build; add `handover init` TTY guard and `--yes` flag
+- [x] 30-02-PLAN.md — Write `docs/src/content/docs/user/search.md` with reindex walkthrough; wire sidebar entry
+- [x] 30-03-PLAN.md — Write `docs/src/content/docs/user/regeneration.md` and `docs/src/content/docs/contributor/testing.md`; wire sidebar entries
 
 ## Progress
 
@@ -112,4 +113,4 @@ Phase 27 → Phase 28 (parallel with 29, after 27) → Phase 29 (parallel with 2
 | 27. Test Coverage & Infrastructure | v7.0 | 6/6 | Complete | 2026-03-01 |
 | 28. Git-Aware Incremental Regeneration | v7.0 | 2/2 | Complete | 2026-03-02 |
 | 29. Search & QA UX Polish | v7.0 | 3/3 | Complete | 2026-03-02 |
-| 30. Documentation & Onboarding | v7.0 | 0/3 | Planned | - |
+| 30. Documentation & Onboarding | v7.0 | 3/3 | Complete | 2026-03-02 |

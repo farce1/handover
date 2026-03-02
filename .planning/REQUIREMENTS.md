@@ -29,11 +29,11 @@ Requirements for milestone v7.0 Quality, Performance & Polish. Each maps to road
 
 ### Documentation & Onboarding
 
-- [ ] **DOCS-01**: User guide for `handover search` and `handover reindex` workflows
-- [ ] **DOCS-02**: `handover init` has TTY guard and `--yes` flag for non-interactive/CI usage
-- [ ] **DOCS-03**: User guide for incremental regeneration (`--since` flag, cache behavior)
-- [ ] **DOCS-04**: Contributor guide documenting test patterns, mock factories, and coverage exclusion rationale
-- [ ] **DOCS-05**: `starlight-links-validator` added to CI to catch broken doc links
+- [x] **DOCS-01**: User guide for `handover search` and `handover reindex` workflows
+- [x] **DOCS-02**: `handover init` has TTY guard and `--yes` flag for non-interactive/CI usage
+- [x] **DOCS-03**: User guide for incremental regeneration (`--since` flag, cache behavior)
+- [x] **DOCS-04**: Contributor guide documenting test patterns, mock factories, and coverage exclusion rationale
+- [x] **DOCS-05**: `starlight-links-validator` added to CI to catch broken doc links
 
 ## Future Requirements
 
@@ -81,11 +81,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRCH-04 | Phase 29 | Complete |
 | SRCH-05 | Phase 29 | Complete |
 | SRCH-06 | Phase 29 | Complete |
-| DOCS-01 | Phase 30 | Pending |
-| DOCS-02 | Phase 30 | Pending |
-| DOCS-03 | Phase 30 | Pending |
-| DOCS-04 | Phase 30 | Pending |
-| DOCS-05 | Phase 30 | Pending |
+| DOCS-01 | Phase 30 | Complete |
+| DOCS-02 | Phase 30 | Complete |
+| DOCS-03 | Phase 30 | Complete |
+| DOCS-04 | Phase 30 | Complete |
+| DOCS-05 | Phase 30 | Complete |
 
 **Coverage:**
 - v7.0 requirements: 16 total
@@ -94,4 +94,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-01*
-*Last updated: 2026-03-02 after phase 29 completion*
+*Last updated: 2026-03-02 after phase 30 completion*
