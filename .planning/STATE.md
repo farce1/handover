@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Quality, Performance & Polish
 status: unknown
-last_updated: "2026-03-01T21:44:00.000Z"
+last_updated: "2026-03-02T12:33:09Z"
 progress:
-  total_phases: 16
-  completed_phases: 16
-  total_plans: 42
-  completed_plans: 42
+  total_phases: 17
+  completed_phases: 17
+  total_plans: 44
+  completed_plans: 44
 ---
 
 # Project State
@@ -18,17 +18,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute - within minutes, not hours.
-**Current focus:** v7.0 Phase 28 — Git-aware incremental regeneration, context gathered, ready to plan
+**Current focus:** v7.0 Phase 29 — Search & QA UX polish (next phase)
 
 ## Current Position
 
 Milestone: v7.0 Quality, Performance & Polish
-Phase: 28 of 30 (Git-Aware Incremental Regeneration)
+Phase: 29 of 30 (Search & QA UX Polish)
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-03-01 — Completed plans 27-05 and 27-06, updated thresholds to 90/90/90/85, and passed 27-VERIFICATION.md
+Status: Ready to plan (Phase 28 complete)
+Last activity: 2026-03-02 — Completed plans 28-01/28-02, added `--since <ref>` git-aware incremental regeneration, and passed 28-VERIFICATION.md
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -38,9 +38,9 @@ Progress: [█████████░] 90%
 - Total execution time: ~110 min
 
 **v7.0 Velocity:**
-- Total plans completed: 6
+- Total plans completed: 8
 - Average duration: ~8.5 min/plan
-- Total execution time: ~51 min
+- Total execution time: ~68 min
 
 ## Accumulated Context
 
@@ -65,6 +65,8 @@ Key decisions locked for v7.0 planning:
 - [Phase 27]: Locked thresholds at 85/85/85/75 as highest passing gate after branch target failed at 80. — Maintain enforced quality gate while explicitly surfacing remaining branch-coverage gap for follow-up.
 - [Phase 27]: Expanded MCP tool tests (`registerMcpTools` handlers + `createMcpStructuredError`) to close the largest branch coverage deficit. — Lifted `mcp/tools.ts` branch coverage to 70.58% and `mcp/errors.ts` to 100%.
 - [Phase 27]: Added branch-focused tests across auth/validator/orchestrator/registry/rate-limiter/chunker and raised thresholds to `90/90/90/85`. — Achieved full-suite coverage totals `96.47/97.03/96.34/86.14` and closed TEST-01.
+- [Phase 28]: Added `getGitChangedFiles` (`diffSummary` + `status`) with explicit fallback reasons for non-git, shallow clone, and detached HEAD contexts.
+- [Phase 28]: Added `handover generate --since <ref>` with git-aware changed-file override, explicit zero-change early exit, and display propagation to TTY/CI incremental banners.
 
 ### Pending Todos
 
@@ -72,8 +74,7 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 28]: `src/regeneration/` has no CLI integration; define shared runner interface before implementing `--since`
-- [Phase 28]: Verify `.github/workflows/ci.yml` checkout depth before Phase 28 ships (shallow clone breaks `--since`)
+- [Phase 29]: Implement search/QA UX polish scope (`SRCH-01` through `SRCH-06`) without regressing Phase 28 incremental behavior.
 
 External setup still required (unchanged from v5.0):
 - GitHub Sponsors enrollment
@@ -83,6 +84,6 @@ External setup still required (unchanged from v5.0):
 
 ## Session Continuity
 
-Last session: 2026-03-01
-Stopped at: Phase 28 context gathered
-Resume file: .planning/phases/28-git-aware-incremental-regeneration/28-CONTEXT.md
+Last session: 2026-03-02
+Stopped at: Phase 29 ready to plan after Phase 28 completion
+Resume file: .planning/ROADMAP.md

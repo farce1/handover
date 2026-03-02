@@ -15,8 +15,8 @@ Requirements for milestone v7.0 Quality, Performance & Polish. Each maps to road
 
 ### Incremental Regeneration
 
-- [ ] **REGEN-01**: User can run `handover generate --since <ref>` to only re-analyze files changed since a git ref
-- [ ] **REGEN-02**: Incremental mode falls back gracefully to content-hash in non-git, detached HEAD, and shallow clone environments
+- [x] **REGEN-01**: User can run `handover generate --since <ref>` to only re-analyze files changed since a git ref
+- [x] **REGEN-02**: Incremental mode falls back gracefully to content-hash in non-git, detached HEAD, and shallow clone environments
 
 ### Search & QA
 
@@ -73,8 +73,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-01 | Phase 27 | Complete |
 | TEST-02 | Phase 27 | Complete |
 | TEST-03 | Phase 27 | Complete |
-| REGEN-01 | Phase 28 | Pending |
-| REGEN-02 | Phase 28 | Pending |
+| REGEN-01 | Phase 28 | Complete |
+| REGEN-02 | Phase 28 | Complete |
 | SRCH-01 | Phase 29 | Pending |
 | SRCH-02 | Phase 29 | Pending |
 | SRCH-03 | Phase 29 | Pending |
@@ -94,4 +94,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-01*
-*Last updated: 2026-03-01 after phase 27 completion*
+*Last updated: 2026-03-02 after phase 28 completion*

@@ -24,7 +24,7 @@ See milestone archives in `.planning/milestones/`.
 **Milestone Goal:** Raise test coverage to 90%+, add git-aware incremental regeneration, polish search/QA UX, and close documentation gaps with smarter onboarding.
 
 - [x] **Phase 27: Test Coverage & Infrastructure** - Raise the CI coverage gate from the currently-failing 80% to a verified 90%+ (completed 2026-03-01)
-- [ ] **Phase 28: Git-Aware Incremental Regeneration** - Users can re-analyze only files changed since a git ref, with graceful fallback in non-git environments
+- [x] **Phase 28: Git-Aware Incremental Regeneration** - Users can re-analyze only files changed since a git ref, with graceful fallback in non-git environments (completed 2026-03-02)
 - [ ] **Phase 29: Search & QA UX Polish** - Search output surfaces result quality signals, clickable links, zero-results guidance, and enriched MCP responses
 - [ ] **Phase 30: Documentation & Onboarding** - User and contributor docs reflect final behavior, `handover init` gains TTY guard, broken-link CI check added
 
@@ -59,11 +59,12 @@ Plans:
   2. Running `handover generate --since <ref>` in a non-git directory, detached HEAD, or shallow clone prints an explicit warning and falls back to full content-hash mode without crashing
   3. `src/cache/git-fingerprint.ts` exists with unit tests that cover the untracked-file detection path (`git.status()` paired with `git.diff()`)
   4. Existing `.handover.yml` files without a `cache.mode` key continue to work (defaults to `content-hash`)
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
+**Verification:** passed (`.planning/phases/28-git-aware-incremental-regeneration/28-VERIFICATION.md`)
 
 Plans:
-- [ ] 28-01-PLAN.md — Implement and test `src/cache/git-fingerprint.ts` with TDD (simple-git diff+status detection, fallback paths, invalid ref error)
-- [ ] 28-02-PLAN.md — Wire `--since <ref>` CLI flag into generate.ts, integrate git-fingerprint at analysisFingerprint site, update display layer
+- [x] 28-01-PLAN.md — Implement and test `src/cache/git-fingerprint.ts` with TDD (simple-git diff+status detection, fallback paths, invalid ref error)
+- [x] 28-02-PLAN.md — Wire `--since <ref>` CLI flag into generate.ts, integrate git-fingerprint at analysisFingerprint site, update display layer
 
 ### Phase 29: Search & QA UX Polish
 **Goal**: Search output communicates result quality, guides users when results are absent, and MCP clients receive enriched structured responses
@@ -108,6 +109,6 @@ Phase 27 → Phase 28 (parallel with 29, after 27) → Phase 29 (parallel with 2
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 27. Test Coverage & Infrastructure | v7.0 | 6/6 | Complete | 2026-03-01 |
-| 28. Git-Aware Incremental Regeneration | v7.0 | 0/2 | Not started | - |
+| 28. Git-Aware Incremental Regeneration | v7.0 | 2/2 | Complete | 2026-03-02 |
 | 29. Search & QA UX Polish | v7.0 | 0/3 | Not started | - |
 | 30. Documentation & Onboarding | v7.0 | 0/3 | Not started | - |
