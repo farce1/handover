@@ -87,5 +87,5 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Phase 30 ready to plan after Phase 29 completion
-Resume file: .planning/ROADMAP.md
+Stopped at: Phase 30 context gathered
+Resume file: .planning/phases/30-documentation-onboarding/30-CONTEXT.md
