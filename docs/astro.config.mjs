@@ -1,4 +1,5 @@
 import starlight from '@astrojs/starlight';
+import starlightLinksValidator from 'starlight-links-validator';
 import { defineConfig } from 'astro/config';
 
 const basePath = '/handover/';
@@ -11,6 +12,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'handover',
+      plugins: [starlightLinksValidator()],
       tagline: 'Generate comprehensive codebase documentation for any project',
       social: [
         {
