@@ -77,12 +77,12 @@ Plans:
   4. Search results on a TTY show OSC8 clickable file links; piped/non-TTY output shows plain paths
   5. `handover search --mode qa` output includes timing and token stats ("Answer in 2.3s using 1,240 tokens from 4 sources")
   6. The MCP `semantic_search` tool response includes a `content` field (top 3 results only) and a `docType` field
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 29-01: Add `--type` help text, zero-results guidance (`VectorStore.getDocTypeSummary()`), and distance warning to CLI search output
-- [ ] 29-02: Add OSC8 TTY-gated clickable links to search results and QA timing/token stats
-- [ ] 29-03: Enrich MCP `semantic_search` response with `content` (top 3) and `docType` fields
+- [ ] 29-01-PLAN.md — Add --type help text, zero-results guidance with live doc types, and distance warning to CLI search output
+- [ ] 29-02-PLAN.md — Add OSC8 TTY-gated clickable links to search results and QA timing/token stats
+- [ ] 29-03-PLAN.md — Enrich MCP semantic_search response with content (top 3) and docType fields
 
 ### Phase 30: Documentation & Onboarding
 **Goal**: Users can find search/reindex/incremental-regen guidance in the docs, contributors can navigate the test patterns, and broken doc links are caught in CI
