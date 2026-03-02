@@ -24,6 +24,7 @@ import { computeTokenBudget } from '../context/token-counter.js';
 import { createProvider, validateProviderConfig } from '../providers/factory.js';
 import { PROVIDER_PRESETS } from '../providers/presets.js';
 import { RoundCache } from '../cache/round-cache.js';
+import { getGitChangedFiles } from '../cache/git-fingerprint.js';
 import { createRenderer } from '../ui/renderer.js';
 import { computeParallelSavings } from '../ui/components.js';
 import { ROUND_NAMES } from '../ai-rounds/types.js';
@@ -60,6 +61,13 @@ export interface GenerateOptions {
   verbose?: boolean;
   cache?: boolean;
   stream?: boolean;
+  since?: string;
+}
+
+class EarlyExitNoChangesError extends Error {
+  constructor() {
+    super('No files changed for --since run');
+  }
 }
 
 /**
@@ -499,12 +507,46 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             }
           }
 
-          const changedFiles = analysisCache.getChangedFiles(currentHashes);
-          const isIncremental = analysisCache.size > 0 && changedFiles.size < currentHashes.size;
+          // ─── Git-aware incremental mode (--since) ──────────────────────────
+          let gitChangedFiles: Set<string> | undefined;
+          let isGitIncremental = false;
+
+          if (options.since) {
+            const gitResult = await getGitChangedFiles(rootDir, options.since);
+
+            if (gitResult.kind === 'fallback') {
+              process.stdout.write(`${gitResult.reason} — falling back to content-hash mode\n`);
+            } else {
+              if (gitResult.changedFiles.size === 0) {
+                process.stdout.write(
+                  `No files changed since ${options.since} — nothing to regenerate\n`,
+                );
+                throw new EarlyExitNoChangesError();
+              }
+
+              gitChangedFiles = gitResult.changedFiles;
+              isGitIncremental = true;
+            }
+          }
+
+          let changedFiles: Set<string>;
+          let isIncremental: boolean;
+
+          if (isGitIncremental && gitChangedFiles) {
+            changedFiles = gitChangedFiles;
+            isIncremental = true;
+          } else {
+            changedFiles = analysisCache.getChangedFiles(currentHashes);
+            isIncremental = analysisCache.size > 0 && changedFiles.size < currentHashes.size;
+          }
 
           if (options.verbose && isIncremental) {
+            const modeLabel =
+              isGitIncremental && options.since
+                ? `Incremental run (git --since ${options.since})`
+                : 'Incremental run';
             process.stderr.write(
-              `[verbose] Incremental run: ${changedFiles.size} changed, ${currentHashes.size - changedFiles.size} unchanged\n`,
+              `[verbose] ${modeLabel}: ${changedFiles.size} changed, ${Math.max(0, currentHashes.size - changedFiles.size)} unchanged\n`,
             );
             for (const path of changedFiles) {
               process.stderr.write(`[verbose]   changed: ${path}\n`);
@@ -543,7 +585,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           if (isIncremental) {
             displayState.isIncremental = true;
             displayState.changedFileCount = changedFiles.size;
-            displayState.unchangedFileCount = currentHashes.size - changedFiles.size;
+            displayState.unchangedFileCount = Math.max(0, currentHashes.size - changedFiles.size);
+          }
+          if (options.since && isGitIncremental) {
+            displayState.sinceRef = options.since;
           }
 
           // Transition to AI rounds phase
@@ -1019,6 +1064,9 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
     renderer.onComplete(displayState);
   } catch (err) {
+    if (err instanceof EarlyExitNoChangesError) {
+      return;
+    }
     handleCliError(err, 'An unexpected error occurred during handover generation');
   } finally {
     renderer.destroy();

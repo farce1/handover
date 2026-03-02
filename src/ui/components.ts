@@ -99,8 +99,15 @@ export function computeCumulativeTokens(rounds: Map<number, RoundDisplayState>):
  * Render the incremental/full run label shown before AI rounds.
  * Per locked decision: "Incremental run (3 files changed)" or "Full run".
  */
-export function renderRunLabel(isIncremental: boolean, changedFileCount?: number): string {
+export function renderRunLabel(
+  isIncremental: boolean,
+  changedFileCount?: number,
+  sinceRef?: string,
+): string {
   if (isIncremental && changedFileCount !== undefined) {
+    if (sinceRef) {
+      return `Incremental mode (since ${sinceRef}) · ${changedFileCount} file${changedFileCount !== 1 ? 's' : ''} changed`;
+    }
     return `Incremental run (${changedFileCount} file${changedFileCount !== 1 ? 's' : ''} changed)`;
   }
   return 'Full run';
@@ -138,6 +145,7 @@ export function renderFileCoverage(
     isIncremental: boolean;
     changedFileCount?: number;
     unchangedFileCount?: number;
+    sinceRef?: string;
   },
 ): string {
   const sep = pc.dim(' \u00B7 ');
@@ -147,7 +155,9 @@ export function renderFileCoverage(
 
   // Run label first (per locked decision)
   if (incremental) {
-    parts.push(renderRunLabel(incremental.isIncremental, incremental.changedFileCount));
+    parts.push(
+      renderRunLabel(incremental.isIncremental, incremental.changedFileCount, incremental.sinceRef),
+    );
   }
 
   parts.push(`${coverage.total} files`);

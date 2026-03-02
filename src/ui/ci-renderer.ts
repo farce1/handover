@@ -62,8 +62,9 @@ export class CIRenderer implements Renderer {
     if (state.fileCoverage) {
       const { total, analyzing, ignored } = state.fileCoverage;
       if (state.isIncremental) {
+        const refLabel = state.sinceRef ? ` (since ${state.sinceRef})` : '';
         console.log(
-          `${this.timestamp()} [files] Incremental run (${state.changedFileCount} files changed) · ${total} files: ${analyzing} analyzing, ${state.unchangedFileCount} unchanged, ${ignored} ignored`,
+          `${this.timestamp()} [files] Incremental mode${refLabel} · ${state.changedFileCount} files changed · ${total} files: ${analyzing} analyzing, ${state.unchangedFileCount} unchanged, ${ignored} ignored`,
         );
       } else {
         console.log(

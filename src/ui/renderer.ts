@@ -215,6 +215,7 @@ export class TerminalRenderer implements Renderer {
           isIncremental: state.isIncremental ?? false,
           changedFileCount: state.changedFileCount,
           unchangedFileCount: state.unchangedFileCount,
+          sinceRef: state.sinceRef,
         }),
       ]);
       this.append(['']); // blank line after file coverage
