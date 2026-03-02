@@ -59,11 +59,11 @@ Plans:
   2. Running `handover generate --since <ref>` in a non-git directory, detached HEAD, or shallow clone prints an explicit warning and falls back to full content-hash mode without crashing
   3. `src/cache/git-fingerprint.ts` exists with unit tests that cover the untracked-file detection path (`git.status()` paired with `git.diff()`)
   4. Existing `.handover.yml` files without a `cache.mode` key continue to work (defaults to `content-hash`)
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 28-01: Implement `src/cache/git-fingerprint.ts` with `simple-git` diff+status detection and unit tests
-- [ ] 28-02: Wire `--since <ref>` CLI flag into `generate.ts` and integrate `git-fingerprint.ts` at the `analysisFingerprint` construction site
+- [ ] 28-01-PLAN.md — Implement and test `src/cache/git-fingerprint.ts` with TDD (simple-git diff+status detection, fallback paths, invalid ref error)
+- [ ] 28-02-PLAN.md — Wire `--since <ref>` CLI flag into generate.ts, integrate git-fingerprint at analysisFingerprint site, update display layer
 
 ### Phase 29: Search & QA UX Polish
 **Goal**: Search output communicates result quality, guides users when results are absent, and MCP clients receive enriched structured responses
