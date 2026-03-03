@@ -13,6 +13,7 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   release:
@@ -41,5 +42,3 @@ jobs:
 
       - name: Publish package
         run: npm run release:publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

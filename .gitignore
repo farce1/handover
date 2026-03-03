@@ -18,4 +18,5 @@ coverage/
 .claude/
 .planning
 .opencode
+.codex
 PRD.md
