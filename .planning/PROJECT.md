@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An open source TypeScript CLI that generates comprehensive, AI-powered codebase documentation and serves it as a queryable knowledge base for AI coding tools. Handover now ships semantic vector search, MCP resources/tools/prompts, and grounded Q&A on top of its multi-round LLM analysis pipeline, with content-hash caching, incremental context packing, prompt caching, and parallel rendering. Backed by 254 tests with 92%+ coverage enforced in CI.
+An open source TypeScript CLI that generates comprehensive, AI-powered codebase documentation and serves it as a queryable knowledge base for AI coding tools. Handover ships semantic vector search, MCP resources/tools/prompts, grounded Q&A, git-aware incremental regeneration, and multi-provider auth (API key + Codex subscription) on top of its multi-round LLM analysis pipeline, with content-hash caching, incremental context packing, prompt caching, and parallel rendering. Backed by 96%+ coverage enforced at 90/90/90/85 thresholds in CI, with Starlight-based user and contributor documentation.
 
 ## Core Value
 
@@ -10,25 +10,15 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ## Current State
 
-**Latest shipped milestone:** v6.0 Codex Auth & Validation (2026-02-28)
+**Latest shipped milestone:** v7.0 Quality, Performance & Polish (2026-03-02)
 
 What shipped:
-- OpenAI Codex subscription auth support (PKCE login, token refresh, provider integration)
-- Gemini provider support across generation and embeddings
-- First-run onboarding and auth-mode-aware runtime UX for generate/search/reindex flows
-- Security hardening guardrails for publish artifacts and auth log redaction
-- Runtime validation matrix completion for deferred v4.0/v5.0 behaviors (`VAL-01` through `VAL-06`)
-
-## Current Milestone: v7.0 Quality, Performance & Polish
-
-**Goal:** Raise test coverage to 90%+, add git-aware incremental regeneration, polish search/QA UX, and close documentation gaps with smarter onboarding.
-
-**Target features:**
-- 90%+ test coverage with integration tests for CLI, auth, vector/search modules
-- Git-aware incremental regeneration — only re-analyze changed files + affected rounds
-- Search & QA polish — index stats, result-to-source linking, confidence threshold filtering
-- User documentation — troubleshooting guide, search walkthrough, embedding mode docs, performance tuning
-- Smarter `handover init` — interactive wizard for audience, exclusions, cost settings, embedding locality
+- CI coverage gate raised to 90/90/90/85 (actual: 96.47/97.03/96.34/86.14) with frozen exclusion list
+- Git-aware incremental regeneration via `--since <ref>` with graceful non-git/detached/shallow fallback
+- Search UX polish: zero-results guidance, distance warnings, OSC8 TTY links, QA timing/token stats
+- MCP `semantic_search` enriched with `docType` and top-3 `content` fields
+- User docs (search, reindex, regeneration) and contributor docs (testing patterns, coverage policy)
+- `handover init --yes` non-interactive guard; `starlight-links-validator` enforces broken links in CI
 
 <details>
 <summary>v6.0 Milestone Snapshot</summary>
@@ -39,6 +29,19 @@ Primary outcomes:
 - Codex OAuth via PKCE browser flow
 - Auth infrastructure and generate/onboarding integration
 - Runtime validation runbooks for CLI and MCP paths
+
+</details>
+
+<details>
+<summary>v7.0 Milestone Snapshot</summary>
+
+Goal: Raise test coverage to 90%+, add git-aware incremental regeneration, polish search/QA UX, and close documentation gaps with smarter onboarding.
+
+Primary outcomes:
+- 96%+ coverage with 90/90/90/85 enforced thresholds
+- `handover generate --since <ref>` with fallback matrix
+- Search quality signals, OSC8 links, MCP enrichment
+- Starlight docs with link validation in CI
 
 </details>
 
@@ -103,16 +106,16 @@ Primary outcomes:
 - ✓ Streaming QA timing and reconnect/resume behavior validation — v6.0
 - ✓ Local embedding runtime fallback verification — v6.0
 - ✓ End-to-end remote regeneration lifecycle validation — v6.0
+- ✓ 90%+ coverage gate (90/90/90/85 thresholds) with frozen exclusion list — v7.0
+- ✓ Git-aware incremental regeneration via `--since <ref>` with non-git graceful fallback — v7.0
+- ✓ Search UX: zero-results guidance, distance warnings, OSC8 TTY links — v7.0
+- ✓ QA timing/token stats footer and MCP `semantic_search` enrichment (docType + content) — v7.0
+- ✓ User docs for search/reindex/regeneration and contributor testing guide — v7.0
+- ✓ `handover init --yes` non-interactive guard and `starlight-links-validator` CI gate — v7.0
 
 ### Active
 
-- [ ] 90%+ test coverage with integration tests for CLI, auth, vector/search modules
-- [ ] Git-aware incremental regeneration (dirty-check, changed-file-only re-analysis)
-- [ ] Search index stats command, result-to-source linking, confidence threshold filtering
-- [ ] QA session UX polish (token consumption visibility, batch/export)
-- [ ] Troubleshooting guide, search/reindex walkthrough, embedding mode trade-off docs
-- [ ] Performance tuning guide (concurrency, caching, embedding locality recommendations)
-- [ ] Interactive `handover init` wizard (audience, exclusions, cost settings, embedding locality)
+(No active requirements — planning next milestone)
 
 ### Deferred
 
@@ -120,16 +123,21 @@ Primary outcomes:
 - [ ] Headless device-code auth flow (`AUTH-06`)
 - [ ] `handover auth token` support for CI/CD injection (`AUTH-07`)
 - [ ] `handover auth logout` command and full credential clearing (`AUTH-08`)
+- [ ] Source-to-document dependency graph for surgical per-renderer regeneration (`REGEN-03`)
+- [ ] Integration test suite (`test:integration`) requiring real API keys (`TEST-04`)
+- [ ] `--format json` flag for machine-readable search output (`SRCH-07`)
 
 ### Out of Scope
 
-- Dedicated docs site (Docusaurus, etc.) — in-repo markdown works well for LLMs; revisit when user base demands it
+- Dedicated docs site (Docusaurus, etc.) — Starlight docs site ships with the repo; separate hosted site not needed yet
 - Discord server — GitHub Discussions sufficient for current scale
 - Project showcase/gallery — future effort
 - Multi-threaded analyzer execution — analyzers already run concurrently via Promise.allSettled; I/O-bound, not CPU-bound
 - Persistent background daemon — disk cache provides fast re-runs; daemon adds battery drain, race conditions, IPC complexity
 - Streaming output to markdown files — rendering requires complete, Zod-validated JSON; streaming creates partial documents
 - Provider-level request batching — rounds are sequentially dependent by design
+- `vitest thresholds.autoUpdate` — blocked by upstream vitest#9227 (config rewrite bug); enable when fixed
+- Per-file 100% coverage requirements — brittle; global 90% gate is sufficient
 
 ## Context
 
@@ -139,20 +147,21 @@ Primary outcomes:
 - v3.0 Robustness milestone shipped: 4 phases, 10 plans, CI fix, scorecard hardening, 254 unit tests, 80% coverage gate
 - v4.0 MCP Server & Semantic Search: shipped 2026-02-22 (4 phases, 11 plans)
 - v5.0 Remote & Advanced MCP: shipped 2026-02-26 (5 phases, 12 plans, 28 tasks)
-- v5.0 audit status: tech_debt (17/17 requirements satisfied; deferred human runtime validation follow-ups)
 - v6.0 Codex Auth & Validation: shipped 2026-02-28 (6 phases, 13 plans, 27 tasks)
-- v7.0 Quality, Performance & Polish: in progress — test coverage, incremental regen, search polish, docs
+- v7.0 Quality, Performance & Polish: shipped 2026-03-02 (4 phases, 14 plans, 25 tasks)
 - Architecture: DAG orchestrator, 8 static analyzers, 6 AI rounds, 14 document renderers, Zod-first domain model
 - CI runs on every PR; release-please automates versioning; OIDC publishes to npm with provenance
-- Codebase: ~31.7K LOC TypeScript across 151 source/test files, 254 tests, 92%+ coverage
+- Codebase: ~37.8K LOC TypeScript, 96%+ coverage enforced at 90/90/90/85 thresholds
+- Starlight docs site with user guides (search, regeneration, configuration) and contributor guides (testing, architecture)
 - External setup still needed: CODECOV_TOKEN, RELEASE_PLEASE_TOKEN (PAT), npm trusted publishing OIDC config, GitHub Sponsors enrollment
 
 ## Constraints
 
-- **In-repo docs**: All documentation lives in the repo as markdown — no external docs site yet
+- **In-repo docs**: All documentation lives in the repo as Starlight site + markdown — no external hosted docs site yet
 - **No breaking changes**: README structure preserved, additive changes only
 - **LLM-first**: All docs structured for both human and machine readability
 - **Streaming gate**: onToken callback presence gates streaming path; absent means non-streaming unchanged
+- **Coverage gate**: 90/90/90/85 enforced; exclusions frozen with written justification
 
 ## Key Decisions
 
@@ -182,7 +191,6 @@ Primary outcomes:
 | Mock at LLMProvider interface, not SDK level     | MSW/nock cannot intercept undici transport used by Anthropic/OpenAI    | ✓ Good  |
 | memfs over mock-fs                               | mock-fs unmaintained, breaks WASM loading; memfs actively maintained   | ✓ Good  |
 | Tests colocated with source (src/\*_/_.test.ts)  | Discoverable, no separate tests/ directory to maintain                 | ✓ Good  |
-| 80% coverage gate after Phase 11 (not Phase 8)   | Gate only meaningful with real test suite; early enforcement fails CI  | ✓ Good  |
 | Coverage exclusions for integration-only modules | factory.ts, logger.ts excluded — unit-testable surface only            | ✓ Good  |
 | vi.hoisted() pattern as test convention          | Clean mock setup, avoids temporal dead zone issues                     | ✓ Good  |
 | SQLite + sqlite-vec for semantic retrieval       | Zero-config local vector search in CLI runtime                         | ✓ Good  |
@@ -195,7 +203,14 @@ Primary outcomes:
 | Use single-flight regeneration by target key     | Prevent duplicate concurrent runs and ensure deterministic job references | ✓ Good  |
 | Add Streamable HTTP as optional transport        | Preserve stdio backward compatibility while enabling remote deployment  | ✓ Good  |
 | Deny cross-origin by default in HTTP mode        | Secure baseline for browser-origin access unless explicitly allowlisted | ✓ Good  |
+| Freeze coverage exclusion list before new tests  | Prevent exclusion-creep fake coverage; justify each entry              | ✓ Good  |
+| Raise thresholds in batches (80→85→88→90)        | Gate on confirmed passage; never raise speculatively                   | ✓ Good  |
+| Pair git.diff() with git.status() for incremental | Catch untracked new files that diff alone misses                      | ✓ Good  |
+| content-hash as default, git-aware opt-in        | Non-git environments work unchanged; --since is additive              | ✓ Good  |
+| OSC8 links TTY-gated with plain text fallback    | Rich terminal UX without breaking piped/CI output                     | ✓ Good  |
+| MCP semantic_search content limited to top 3     | Prevent 25KB+ payloads; balance richness with transport efficiency     | ✓ Good  |
+| starlight-links-validator before writing new docs | Catch broken links in CI; enforce before adding pages, not after      | ✓ Good  |
 
 ---
 
-_Last updated: 2026-03-01 after v7.0 milestone start_
+_Last updated: 2026-03-02 after v7.0 milestone_

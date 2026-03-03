@@ -116,3 +116,24 @@
 - No standalone `v6.0-MILESTONE-AUDIT.md` file was present at completion time; milestone archived via proceed-anyway path.
 
 ---
+
+## v7.0 Quality, Performance & Polish (Shipped: 2026-03-02)
+
+**Phases completed:** 4 phases, 14 plans, 25 tasks
+**Timeline:** 2 days (2026-03-01 → 2026-03-02)
+**Git range:** chore(27-01) → docs(30-03)
+**Code delta:** 65 files changed, 6,672 insertions(+), 125 deletions(-)
+
+**Key accomplishments:**
+
+- Raised CI coverage gate to 90/90/90/85 with frozen exclusion list — actual coverage 96.47% lines, 97.03% functions, 96.34% statements, 86.14% branches
+- Git-aware incremental regeneration via `handover generate --since <ref>` with graceful fallback for non-git, detached HEAD, and shallow clone environments
+- Search UX polish: zero-results guidance with live index metadata, low-relevance distance warnings, OSC8 TTY-gated clickable source links
+- MCP `semantic_search` enriched with `docType` for all results and top-3 `content` fields; QA mode gains timing/token stats footer
+- User docs for search/reindex/regeneration workflows; contributor testing guide documenting mock patterns and coverage policy
+- `handover init --yes` non-interactive guard with overwrite protection; `starlight-links-validator` enforces broken-link checks in CI
+
+**Audit:** Passed — 16/16 requirements, 4/4 phases verified, 3/3 E2E flows (`.planning/v7.0-MILESTONE-AUDIT.md`)
+
+---
+
