@@ -46,9 +46,9 @@ const ServeConfigSchema = z
           })
           .optional(),
       })
-      .default({}),
+      .default({ port: 3000, host: '127.0.0.1', path: '/mcp' }),
   })
-  .default({});
+  .default({ transport: 'stdio', http: { port: 3000, host: '127.0.0.1', path: '/mcp' } });
 
 /**
  * Zod schema for .handover.yml configuration.
