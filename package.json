@@ -52,7 +52,7 @@
     "registry": "https://registry.npmjs.org"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.80.0",
+    "@anthropic-ai/sdk": "0.82.0",
     "@clack/prompts": "^1.0.1",
     "@google/genai": "^1.43.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
@@ -69,7 +69,7 @@
     "sisteransi": "^1.0.5",
     "smol-toml": "^1.6.0",
     "sqlite-vec": "^0.1.7-alpha.2",
-    "web-tree-sitter": "0.26.7",
+    "web-tree-sitter": "0.26.8",
     "yaml": "^2.7.0",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.24.0"
