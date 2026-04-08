@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { HandoverConfig } from '../config/schema.js';
 import { HandoverError } from '../utils/errors.js';
 import type { RegenerationTargetRef } from '../regeneration/schema.js';
@@ -22,8 +23,10 @@ export interface CreateRegenerationExecutorOptions {
   cwd?: string;
 }
 
-function resolveCliRunner(cwd: string): CliRunner {
-  const distEntrypoint = join(cwd, 'dist/index.js');
+function resolveCliRunner(): CliRunner {
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+
+  const distEntrypoint = join(moduleDir, '../cli/index.js');
   if (existsSync(distEntrypoint)) {
     return {
       command: process.execPath,
@@ -31,7 +34,7 @@ function resolveCliRunner(cwd: string): CliRunner {
     };
   }
 
-  const sourceEntrypoint = join(cwd, 'src/cli/index.ts');
+  const sourceEntrypoint = join(moduleDir, '../cli/index.ts');
   if (existsSync(sourceEntrypoint)) {
     return {
       command: process.execPath,
@@ -41,8 +44,8 @@ function resolveCliRunner(cwd: string): CliRunner {
 
   throw new HandoverError(
     'Unable to locate handover CLI entrypoint for regeneration',
-    `Expected dist/index.js or src/cli/index.ts in ${cwd}`,
-    'Build the project (`npm run build`) or run from repository root before retrying regenerate_docs.',
+    `Expected CLI entrypoint near ${moduleDir} (../cli/index.js or ../cli/index.ts).`,
+    'Build or install handover correctly before retrying regenerate_docs.',
     'REGENERATION_CLI_ENTRYPOINT_MISSING',
   );
 }
@@ -96,7 +99,7 @@ function resolvePlanForTarget(targetKey: RegenerationTargetRef['key']): string[]
 
 export function createRegenerationExecutor(options: CreateRegenerationExecutorOptions) {
   const cwd = options.cwd ?? process.cwd();
-  const runner = resolveCliRunner(cwd);
+  const runner = resolveCliRunner();
 
   return {
     async execute(input: RegenerationExecutorInput): Promise<RegenerationRunnerResult> {
