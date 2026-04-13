@@ -92,11 +92,11 @@
     "lint-staged": "^16.2.7",
     "memfs": "^4.56.10",
     "prettier": "^3.8.1",
-    "starlight-links-validator": "^0.22.0",
+    "starlight-links-validator": "^0.23.0",
     "tree-sitter-wasms": "0.1.13",
     "tsup": "^8.0.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.7.0",
+    "typescript": "^6.0.2",
     "typescript-eslint": "^8.56.0",
     "vitest": "^4.0.18",
     "vitest-mock-extended": "^4.0.0"
