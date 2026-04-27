@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
     groups:
       production-deps:
         dependency-type: production
