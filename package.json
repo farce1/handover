@@ -52,7 +52,7 @@
     "registry": "https://registry.npmjs.org"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.90.0",
+    "@anthropic-ai/sdk": "0.91.1",
     "@clack/prompts": "^1.0.1",
     "@google/genai": "^1.43.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
