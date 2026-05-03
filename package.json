@@ -92,7 +92,7 @@
     "lint-staged": "^16.2.7",
     "memfs": "^4.56.10",
     "prettier": "^3.8.1",
-    "starlight-links-validator": "^0.22.0",
+    "starlight-links-validator": "^0.24.0",
     "tree-sitter-wasms": "0.1.13",
     "tsup": "^8.0.0",
     "tsx": "^4.0.0",
