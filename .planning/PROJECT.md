@@ -45,6 +45,24 @@ Primary outcomes:
 
 </details>
 
+## Current Milestone: v8.0 Distribution & Smarter Regen
+
+**Goal:** Put `handover` where developers already work (GitHub CI + a real init wizard), and make regeneration surgical, cost-aware, and quality-tracked.
+
+**Target features:**
+
+*Distribution*
+- GitHub Action `handover/regenerate-docs@v1` shipping both PR-preview mode (comments docs diff on PRs) and scheduled-refresh mode (cron/manual trigger that opens a doc-refresh PR)
+- `handover init` wizard upgrade — provider detection, scope auto-detect, `.gitignore` patches, smart defaults
+
+*Smarter regen*
+- Source→doc dependency graph (REGEN-03) for surgical per-renderer regeneration
+- Per-renderer cost telemetry persisted for trend analysis
+- Config-driven per-renderer model routing (cheap model for trivial docs, expensive for synthesis-heavy)
+- Eval harness with golden set + scoring rubric, shipped in observability mode (surfaces in CI, never blocking)
+
+**Explicit non-goals for v8.0:** VS Code extension, Cursor/Claude Code rules pack, AUTH-05..AUTH-08, integration test suite (TEST-04), `--format json` search output (SRCH-07). Eval harness ships as observability only; promotion to a blocking CI gate is a future milestone after rubric stabilizes.
+
 ## Requirements
 
 ### Validated
@@ -115,7 +133,7 @@ Primary outcomes:
 
 ### Active
 
-(No active requirements — planning next milestone)
+(Defining v8.0 requirements — see REQUIREMENTS.md and ROADMAP.md once written)
 
 ### Deferred
 
@@ -211,6 +229,23 @@ Primary outcomes:
 | MCP semantic_search content limited to top 3     | Prevent 25KB+ payloads; balance richness with transport efficiency     | ✓ Good  |
 | starlight-links-validator before writing new docs | Catch broken links in CI; enforce before adding pages, not after      | ✓ Good  |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
 
-_Last updated: 2026-03-02 after v7.0 milestone_
+_Last updated: 2026-05-11 after v8.0 milestone start_

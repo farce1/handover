@@ -1,14 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v7.0
-milestone_name: Quality, Performance & Polish
-status: archived
-last_updated: "2026-03-02T20:30:00Z"
+milestone: v8.0
+milestone_name: Distribution & Smarter Regen
+status: planning
+last_updated: "2026-05-11T18:47:06.321Z"
+last_activity: 2026-05-11
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 14
-  completed_plans: 14
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -22,20 +24,21 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 
 ## Current Position
 
-Milestone: v7.0 Quality, Performance & Polish — SHIPPED 2026-03-02
-All 4 phases (27-30) complete, 14 plans executed, 16/16 requirements satisfied.
-Milestone archived to .planning/milestones/
-
-Progress: [██████████] 100% — ARCHIVED
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-11 — Milestone v8.0 started
 
 ## Performance Metrics
 
 **v6.0 Velocity:**
+
 - Total plans completed: 13
 - Average duration: ~8.5 min/plan (includes human validation checkpoints)
 - Total execution time: ~110 min
 
 **v7.0 Velocity:**
+
 - Total plans completed: 14
 - Average duration: ~8.5 min/plan
 - Total execution time: ~119 min
@@ -55,6 +58,7 @@ None.
 None.
 
 External setup still required (unchanged from v5.0):
+
 - GitHub Sponsors enrollment
 - npm trusted publishing OIDC config
 - RELEASE_PLEASE_TOKEN repo secret
