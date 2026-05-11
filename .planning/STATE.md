@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v8.0
 milestone_name: Distribution & Smarter Regen
 status: planning
-last_updated: "2026-05-11T20:00:00.000Z"
-last_activity: 2026-05-11
+last_updated: "2026-05-12T12:00:00.000Z"
+last_activity: 2026-05-12
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
+  total_plans: 5
   completed_plans: 0
   percent: 0
 ---
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v8.0 roadmap created — 6 phases (31-36), 37 requirements mapped
+**Current focus:** v8.0 roadmap created — 6 phases (31-36), 37 requirements mapped; Phase 31 fully planned (5 plans across 3 waves)
 
 ## Current Position
 
-Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (context gathered)
-Plan: —
-Status: CONTEXT.md written; ready for `/gsd-plan-phase 31`
-Last activity: 2026-05-11 — Phase 31 context gathered (4 gray areas resolved by Claude per user direction)
+Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (planned)
+Plan: 31-01 (Wave 0 — test scaffolding)
+Status: 5 PLAN.md files written; VALIDATION.md task-IDs reconciled; ready for `/gsd-execute-phase 31`
+Last activity: 2026-05-12 — Phase 31 plan-phase complete (5 plans, 3 waves, 12 tasks)
 
 ## Performance Metrics
 
@@ -57,12 +57,18 @@ Decisions from v7.0 are archived in .planning/milestones/v7.0-ROADMAP.md and .pl
 - Eval (Phase 35) is last among CLI features: benefits from telemetry and routing being stable; most design-heavy scope; uses telemetry to track eval run costs
 - Action (Phase 36) is last overall: wraps fully instrumented CLI; repo scaffold from Phase 31 means action development is not blocked on Phases 32-35
 
+**Phase 31 Planning Decisions (2026-05-12):**
+- 5-plan cut across 3 waves: Wave 0 (Plan 01 test scaffold) → Wave 1 (Plans 02 init-detectors module, 03 monorepo extension, 04 action repo scaffold — all parallel) → Wave 2 (Plan 05 wiring)
+- Codex subscription cost rank locked at `0.001` per RESEARCH.md Open Q1 — sits between Ollama (0) and metered providers (>= 0.28)
+- `monorepo.test.ts` lives in Plan 03 (paired with the source change) rather than Plan 01 Wave 0, because monorepo.ts is in the coverage exclude list and the test is regression-pair-style not RED-target-style
+- Plan 04 (action repo) has `files_modified: []` because it touches an external repo only — fully parallel-safe with Plans 02/03
+
 ### Pending Todos
 
 - Phase 35 (Eval Harness) should begin with a rubric design research task before writing `src/eval/rubric-v1.md` — completeness/navigability/code-accuracy criteria need explicit specification
 - Phase 34 first task: classify `modelHint` for all 14 renderers before implementing routing
-- Before Phase 36 Marketplace publish: verify `handover/regenerate-docs` name is not already listed via `gh api /marketplace/actions`
-- Clarify in Phase 31 implementation that `patchGitignore()` should add `.handover/telemetry.db` (not `.handover/telemetry.jsonl` or `.handover/telemetry/` — superseded paths from earlier research)
+- Before Phase 36 Marketplace publish: verify `handover/regenerate-docs` name is not already listed via `gh api /marketplace/actions` (Plan 31-04 Task 2 performs this check at scaffold time too)
+- Clarify in Phase 31 implementation that `patchGitignore()` should add `.handover/telemetry.db` (not `.handover/telemetry.jsonl` or `.handover/telemetry/` — superseded paths from earlier research) — RESOLVED in Plan 02 interfaces block
 
 ### Blockers/Concerns
 
@@ -75,9 +81,13 @@ External setup still required (unchanged from v5.0):
 - RELEASE_PLEASE_TOKEN repo secret
 - CODECOV_TOKEN repo secret
 
+Additional for Phase 31:
+- `handover` GitHub org membership (Plan 04 Task 1 decision checkpoint resolves this — fallback to personal namespace if org does not exist)
+- `gh` CLI authenticated with `repo` + `workflow` scopes (Plan 04 prerequisite)
+
 ## Session Continuity
 
-Last session: 2026-05-11
-Stopped at: Phase 31 context gathered
-Resume with: /gsd-plan-phase 31
-Resume file: .planning/phases/31-init-wizard-action-scaffold/31-CONTEXT.md
+Last session: 2026-05-12
+Stopped at: Phase 31 plan-phase complete
+Resume with: /gsd-execute-phase 31
+Resume file: .planning/phases/31-init-wizard-action-scaffold/31-01-PLAN.md (Wave 0 entry point)

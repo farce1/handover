@@ -44,7 +44,13 @@ See milestone archives in `.planning/milestones/`.
   4. User running `handover init --yes` in a CI environment (no TTY) receives a deterministic, prompt-free configuration using the cheapest detected provider and exits 0
   5. `.gitignore` is patched with `.handover/` entries exactly once — re-running init does not create duplicate entries and does not clobber existing negation rules
   6. The `handover/regenerate-docs` action repo scaffold exists with `action.yml` composite structure and the `token` input parameter documented, so action development can proceed independently in Phase 36
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 31-01-PLAN.md — Wave 0: Scaffold `src/cli/init-detectors.test.ts` with 12 failing tests (RED targets for Plan 02)
+- [ ] 31-02-PLAN.md — Wave 1: Implement `src/cli/init-detectors.ts` (detectProviders + patchGitignore + computeUpgradeDiff) — turns Plan 01's 11 unit tests GREEN
+- [ ] 31-03-PLAN.md — Wave 1 (parallel): Add nx.json + turbo.json detection to `src/cli/monorepo.ts` + colocated `monorepo.test.ts` (8 tests)
+- [ ] 31-04-PLAN.md — Wave 1 (parallel): Create external `handover/regenerate-docs` action repo with full composite `action.yml`, README, MIT LICENSE, CI workflow, and stubbed example workflows; tags v0.1.0 + floating v0
+- [ ] 31-05-PLAN.md — Wave 2: Wire detectors into `runInit` (`src/cli/init.ts`), register `--upgrade` flag in `src/cli/index.ts`, bump `@clack/prompts` to ^1.3.0, activate the runInit integration test
 **UI hint**: no
 
 ### Phase 32: Source→Doc Dependency Graph
@@ -120,7 +126,7 @@ See milestone archives in `.planning/milestones/`.
 | 16-20 | v5.0 | 12/12 | Complete | 2026-02-26 |
 | 21-26 | v6.0 | 13/13 | Complete | 2026-02-28 |
 | 27-30 | v7.0 | 14/14 | Complete | 2026-03-02 |
-| 31. Init Wizard + Action Scaffold | v8.0 | 0/? | Not started | - |
+| 31. Init Wizard + Action Scaffold | v8.0 | 0/5 | Planned | - |
 | 32. Source→Doc Dep Graph | v8.0 | 0/? | Not started | - |
 | 33. Cost Telemetry | v8.0 | 0/? | Not started | - |
 | 34. Config-Driven Model Routing | v8.0 | 0/? | Not started | - |
