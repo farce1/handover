@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v8.0
 milestone_name: Distribution & Smarter Regen
 status: planning
-last_updated: "2026-05-11T18:47:06.321Z"
+last_updated: "2026-05-11T20:00:00.000Z"
 last_activity: 2026-05-11
 progress:
   total_phases: 6
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 
 ## Current Position
 
-Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (not started)
+Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (context gathered)
 Plan: —
-Status: Roadmap created; ready for phase planning
-Last activity: 2026-05-11 — v8.0 roadmap created (6 phases, 37 reqs)
+Status: CONTEXT.md written; ready for `/gsd-plan-phase 31`
+Last activity: 2026-05-11 — Phase 31 context gathered (4 gray areas resolved by Claude per user direction)
 
 ## Performance Metrics
 
@@ -78,5 +78,6 @@ External setup still required (unchanged from v5.0):
 ## Session Continuity
 
 Last session: 2026-05-11
-Stopped at: v8.0 roadmap created
+Stopped at: Phase 31 context gathered
 Resume with: /gsd-plan-phase 31
+Resume file: .planning/phases/31-init-wizard-action-scaffold/31-CONTEXT.md
