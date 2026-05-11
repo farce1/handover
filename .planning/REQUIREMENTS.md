@@ -112,23 +112,57 @@ Explicitly excluded from v8.0. Documented to prevent scope creep mid-milestone.
 
 ## Traceability
 
-Empty initially — populated when ROADMAP.md is created. Each requirement will map to exactly one phase (31–36).
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INIT-01..05 | Phase 31 (planned) | Pending |
-| ACTN-01..07 | Phase 31 (scaffold) + Phase 36 (complete) | Pending |
-| REGEN-03..07 | Phase 32 (planned) | Pending |
-| TELEM-01..05 | Phase 33 (planned) | Pending |
-| ROUTE-01..07 | Phase 34 (planned) | Pending |
-| EVAL-01..08 | Phase 35 (planned) | Pending |
+| INIT-01 | Phase 31 | Pending |
+| INIT-02 | Phase 31 | Pending |
+| INIT-03 | Phase 31 | Pending |
+| INIT-04 | Phase 31 | Pending |
+| INIT-05 | Phase 31 | Pending |
+| ACTN-07 | Phase 31 | Pending |
+| REGEN-03 | Phase 32 | Pending |
+| REGEN-04 | Phase 32 | Pending |
+| REGEN-05 | Phase 32 | Pending |
+| REGEN-06 | Phase 32 | Pending |
+| REGEN-07 | Phase 32 | Pending |
+| TELEM-01 | Phase 33 | Pending |
+| TELEM-02 | Phase 33 | Pending |
+| TELEM-03 | Phase 33 | Pending |
+| TELEM-04 | Phase 33 | Pending |
+| TELEM-05 | Phase 33 | Pending |
+| ROUTE-01 | Phase 34 | Pending |
+| ROUTE-02 | Phase 34 | Pending |
+| ROUTE-03 | Phase 34 | Pending |
+| ROUTE-04 | Phase 34 | Pending |
+| ROUTE-05 | Phase 34 | Pending |
+| ROUTE-06 | Phase 34 | Pending |
+| ROUTE-07 | Phase 34 | Pending |
+| EVAL-01 | Phase 35 | Pending |
+| EVAL-02 | Phase 35 | Pending |
+| EVAL-03 | Phase 35 | Pending |
+| EVAL-04 | Phase 35 | Pending |
+| EVAL-05 | Phase 35 | Pending |
+| EVAL-06 | Phase 35 | Pending |
+| EVAL-07 | Phase 35 | Pending |
+| EVAL-08 | Phase 35 | Pending |
+| ACTN-01 | Phase 36 | Pending |
+| ACTN-02 | Phase 36 | Pending |
+| ACTN-03 | Phase 36 | Pending |
+| ACTN-04 | Phase 36 | Pending |
+| ACTN-05 | Phase 36 | Pending |
+| ACTN-06 | Phase 36 | Pending |
 
-**Coverage (preliminary, pending roadmap):**
+**Coverage:**
 - v8.0 requirements: 37 total (5 INIT + 7 ACTN + 5 REGEN + 5 TELEM + 7 ROUTE + 8 EVAL)
-- Mapped to phases: 0 (set by roadmapper)
-- Unmapped: 37 — pending roadmap creation
+- Mapped to phases: 37 / unmapped: 0 ✓
+- Phase 31: INIT-01..05, ACTN-07 (6 requirements)
+- Phase 32: REGEN-03..07 (5 requirements)
+- Phase 33: TELEM-01..05 (5 requirements)
+- Phase 34: ROUTE-01..07 (7 requirements)
+- Phase 35: EVAL-01..08 (8 requirements)
+- Phase 36: ACTN-01..06 (6 requirements)
 
 ---
 
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-11 after initial v8.0 definition*
+*Last updated: 2026-05-11 — traceability populated by roadmapper (v8.0 roadmap creation)*
