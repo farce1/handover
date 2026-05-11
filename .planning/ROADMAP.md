@@ -49,7 +49,7 @@ See milestone archives in `.planning/milestones/`.
 
 ### Phase 32: Source→Doc Dependency Graph
 **Goal**: Users running `handover generate --since <ref>` re-run only the renderers whose source dependencies changed, not all 14 renderers, and can preview the impact without spending LLM budget
-**Depends on**: Phase 31 (repo state stable; no hard code dependency)
+**Depends on**: Nothing (parallel-eligible with Phases 31 and 33; no hard code dependency on init wizard or telemetry)
 **Requirements**: REGEN-03, REGEN-04, REGEN-05, REGEN-06, REGEN-07
 **Success Criteria** (what must be TRUE):
   1. User changing a single non-infrastructure source file and running `handover generate --since HEAD~1` sees fewer than 14 renderers execute — only those whose documented dependency graph traces back to the changed file
@@ -61,7 +61,7 @@ See milestone archives in `.planning/milestones/`.
 
 ### Phase 33: Cost Telemetry
 **Goal**: Users can see exactly what each renderer costs per run and be alerted when a run exceeds their configured threshold, with data persisted for trend analysis
-**Depends on**: Phase 32 (routing in Phase 34 writes model-id to telemetry; telemetry schema must exist first)
+**Depends on**: Nothing (parallel-eligible with Phases 31 and 32; must PRECEDE Phase 34, which writes routing decisions to telemetry)
 **Requirements**: TELEM-01, TELEM-02, TELEM-03, TELEM-04, TELEM-05
 **Success Criteria** (what must be TRUE):
   1. After running `handover generate`, a user can run `handover cost` and see a per-renderer table of cost (USD), input/output tokens, wall time, and run timestamp for the last N runs
@@ -85,7 +85,7 @@ See milestone archives in `.planning/milestones/`.
 
 ### Phase 35: Eval Harness
 **Goal**: Users can run `handover eval` to score their generated docs against a golden set using LLM-as-judge, with results always visible in CI via `$GITHUB_STEP_SUMMARY` and a sticky PR comment — never blocking, always informative
-**Depends on**: Phase 34 (telemetry and routing stable; eval uses both for tracking eval run costs and testing routing configs in fixtures)
+**Depends on**: Phase 33 (hard — eval run costs tracked via telemetry). Typically follows Phase 34 by sequencing (eval fixtures may include routing-config variations), but Phase 35 and Phase 36 are parallel-eligible once Phase 34 lands
 **Requirements**: EVAL-01, EVAL-02, EVAL-03, EVAL-04, EVAL-05, EVAL-06, EVAL-07, EVAL-08
 **Success Criteria** (what must be TRUE):
   1. User running `handover eval` against their generated docs receives a score table per golden case covering completeness, navigability, and code-accuracy dimensions — and the command exits 0 regardless of scores
@@ -98,7 +98,7 @@ See milestone archives in `.planning/milestones/`.
 
 ### Phase 36: GitHub Action — PR-Preview + Scheduled-Refresh
 **Goal**: Teams can add `handover/regenerate-docs@v1` to their GitHub workflows and get a sticky PR comment showing which docs would change (PR mode) or an auto-opened doc-refresh PR (scheduled mode), with cost transparency and no comment spam
-**Depends on**: Phase 31 (action repo scaffold), Phase 33 (telemetry output for cost footer), Phase 35 (fully instrumented CLI with eval integration)
+**Depends on**: Phase 31 (action repo scaffold), Phase 33 (telemetry powers the cost footer in ACTN-04). Parallel-eligible with Phase 35 — the action wraps `handover generate`, not `handover eval`; the two sticky comments (doc-preview vs eval-score) are independent surfaces
 **Requirements**: ACTN-01, ACTN-02, ACTN-03, ACTN-04, ACTN-05, ACTN-06
 **Success Criteria** (what must be TRUE):
   1. A team adding the action to their PR workflow sees a single sticky comment (upserted, never duplicated) on each PR showing which docs would change, with the comment capped at 65,000 characters and a truncation indicator if exceeded
