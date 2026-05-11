@@ -1,139 +1,318 @@
 # Feature Research
 
-**Domain:** TypeScript CLI tool — test coverage uplift, git-aware incremental regeneration, search/QA UX polish, documentation/onboarding enhancements
-**Researched:** 2026-03-01
-**Confidence:** HIGH (vitest docs verified via official source; git patterns confirmed via simple-git already in codebase; CLI UX confirmed via clig.dev; all coverage numbers from live `vitest --coverage` run on actual codebase)
-
-## Context: What Already Exists
-
-The existing Handover CLI already has:
-- 254 tests in 21 `.test.ts` files across 145 source files
-- Coverage threshold at 80% (lines/functions/branches/statements), currently failing: 79% lines, 67% branches
-- `src/analyzers/git-history.ts` using `simple-git` for branch/commit analysis
-- `src/vector/reindex.ts` with content-hash change detection against stored SQLite fingerprints
-- `handover search` with fast mode (semantic retrieval) and qa mode (grounded Q&A)
-- `handover reindex` with `--force` flag to bypass change detection
-- `docs/src/content/docs/user/` with 5 Astro/Starlight guides
-- `docs/src/content/docs/reference/commands.mdx` auto-generated from CLI help output
-- `src/cli/onboarding.ts` and `src/cli/init.ts` for first-run experience
-
-Everything below describes only features for the NEW milestone.
+**Domain:** TypeScript CLI tool — GitHub Action distribution, init wizard upgrade, source-doc dependency graph, cost telemetry, model routing, eval harness
+**Researched:** 2026-05-11
+**Milestone:** v8.0 Distribution & Smarter Regen
+**Confidence:** HIGH (GitHub Actions official docs + toolkit versioning guide; Anthropic eval docs fetched directly; LLM routing patterns from LogRocket/AWS official blogs; existing codebase read directly)
 
 ---
 
-## Feature Landscape
+## Context: What Already Exists
 
-### Table Stakes (Users Expect These)
+The existing Handover CLI has (relevant to v8.0):
 
-Features that developers expect in a mature TypeScript CLI tool. Missing these makes the project feel incomplete or unreliable.
+- `handover init`: @clack/prompts wizard, provider select + apiKeyEnv text prompt, auto-detects project name/language from package.json/tsconfig/Cargo.toml/go.mod. Writes `.handover.yml`. `--yes` guard in CI. No scope auto-detect, no monorepo awareness, no .gitignore patching.
+- `handover generate`: `--since <ref>` incremental via git diff+status, content-hash cache, `--only` renderer filter. 14 document renderers, 6 AI rounds with known `requiredRounds[]` per renderer.
+- `TokenUsageTracker`: per-round token/cost/time, cache savings display, model cost table. In-memory only — reset each `generate` run. Not persisted, not per-renderer.
+- `DOCUMENT_REGISTRY`: each renderer declares `requiredRounds[]` (e.g. `03-architecture` needs rounds 1,2,3,4). `computeRequiredRounds()` expands transitive round deps. No source→renderer dependency tracking exists yet.
+- Config schema (`HandoverConfigSchema`): `provider`, `model`, `apiKeyEnv`, `output`, `include/exclude`, `costWarningThreshold` (threshold only, no persistence), no per-renderer model override.
+
+---
+
+## Feature 1: GitHub Action `handover/regenerate-docs@v1`
+
+### Table Stakes
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **90%+ test coverage gate** | Professional npm packages use 90%+ as the industry standard; 80% is widely considered the baseline minimum, not a target | MEDIUM | Current state: 21 test files for 145 source files; live run shows 67% branch coverage. Gap is concentrated in `renderers/utils.ts` (63%), `auth/resolve.ts` (72%), `context/packer.ts` (88%), `ai-rounds/validator.ts` (83%). Requires new tests for branch paths, not wholesale rewrites. |
-| **Branch coverage parity** | Statement/line coverage hitting 90% while branch coverage stays at 67% is a code quality smell; reviewers notice the gap | MEDIUM | V8 provider (in use) does not track implicit `if` branches without an `else`; Istanbul would catch more. Using `/* v8 ignore next */` for intentional omissions is the correct pattern; do not over-use. |
-| **`handover generate --since <ref>` or `--changed-only`** | Power users regenerating docs after small edits expect only touched documents to re-run; full regeneration on every save is prohibitive for large codebases | HIGH | Requires: (1) `git diff --name-only <ref>` via simple-git to get changed source files, (2) map source files to which of the 14 document renderers are affected, (3) pass filtered renderer list to DAG orchestrator. The `analyzeGitHistory` module already uses simple-git; the pattern is established. |
-| **`handover search` result count line** | "Showing 5 of 23 results" is the universal pattern for search results; the current output already includes this but should be consistent across all output paths | LOW | Already present in `runFastMode` — `Showing ${result.matches.length} of ${result.totalMatches} results`. Needs audit: is this present for empty results, QA mode, and piped output? |
-| **Search index status in `reindex` output** | Developers running `handover reindex` need to know what changed: X docs processed, Y skipped, Z chunks created | LOW | `ReindexResult` already returns all fields (`documentsProcessed`, `documentsSkipped`, `chunksCreated`, etc.); the CLI just needs to render them clearly as a summary table or stats block |
-| **`handover search` --type completions in --help** | Users don't know what type names are valid; the help text currently says only "Filter by document type (repeatable)" with no list of valid values | LOW | Valid types derive from document filenames (`architecture`, `modules`, `dependencies`, etc.); hard-code or derive them and show in help text |
-| **User guide for `handover search`** | Existing docs cover `getting-started`, `configuration`, `providers`, `output-documents`, `mcp-setup` — but there is no guide explaining search, QA mode, and reindex | MEDIUM | Missing guide is the most obvious gap in docs; users must discover search by trial and error |
-| **User guide for `handover init` behavior** | The `init` command creates `.handover.yml` with interactive prompts but this is not explained in any doc page | LOW | Can be folded into `getting-started.md` or a new `init.md` |
+| PR-preview mode on `pull_request` trigger | Any doc-gen CI tool posts results as PR comments — developers expect to see output without leaving GitHub | MEDIUM | Trigger on `pull_request: [opened, synchronize]`; post/update comment on the PR |
+| Sticky (upsert) comment — find-and-update on re-runs | Spamming new comments on every push is anti-UX; teams expect one authoritative comment per PR | LOW | Use `<!-- handover-docs-preview -->` HTML sentinel in comment body to identify and update; peter-evans/find-comment + create-or-update-comment is the established pattern |
+| Structured summary table in comment body | Terraform/Atlantis/Infracost established that PR comment = header + summary table + collapsible detail | LOW | Table: document name, status (unchanged/updated/new), token cost; `<details>/<summary>` for full diff |
+| Scheduled-refresh mode (cron + manual `workflow_dispatch`) | Doc staleness is a known pain; teams want automated refresh without manual triggering | MEDIUM | `on: schedule` + `workflow_dispatch`; use peter-evans/create-pull-request for idempotent PR creation |
+| Idempotent scheduled PR: update existing, skip if no diff | Without idempotency, cron creates duplicate PRs on every run — users lose trust immediately | LOW | peter-evans/create-pull-request is idempotent by design: fixed branch name, updates existing PR, closes automatically if diff disappears |
+| Action inputs: `token`, `anthropic-key` (or provider variants), `base-branch` | Users must be able to configure secrets and target branch without forking the action | LOW | Standard `inputs:` block in action.yml |
+| `@v1` major-version tag with force-update on releases | GitHub's own toolkit docs prescribe moving `v1` tag to current stable minor; `@v1` is the user-facing stable reference | LOW | `git tag -fa v1 -m "..."` + `git push origin v1 --force` in release workflow |
+| Concurrency control to cancel stale PR runs | Without concurrency groups, slow doc-gen runs accumulate on rapid pushes | LOW | `concurrency: group: handover-${{ github.head_ref }} cancel-in-progress: true` |
 
-### Differentiators (Competitive Advantage)
-
-Features that make this CLI stand out beyond baseline correctness.
+### Differentiators
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Git-aware regeneration using file-to-document mapping** | No other documentation CLI regenerates only the documents affected by recent git changes; typical tools either regenerate everything or nothing | HIGH | The core insight: each of the 14 renderers depends on specific analysis results (e.g., renderer 3 reads `ast` and `gitHistory`; renderer 7 reads `dependencies`). A static mapping from `AnalysisContext` fields to document IDs enables a precise "which docs need updating" calculation. |
-| **Diff-to-renderer dependency graph** | When `src/analyzers/dependency-graph.ts` changes, only the dependencies document needs regeneration; this kind of surgical precision is novel in the space | HIGH | Requires building a `source-file-pattern → analyzer → document` dependency map. The `analyzeGitHistory` module already identifies `mostChangedFiles` — the new work is using this in the generate pipeline. |
-| **`handover search` result file links (OSC8 clickable terminal paths)** | Modern terminals (iTerm2, Ghostty, Warp) support OSC8 hyperlinks; clicking a search result and jumping to the file is a markedly better experience than copy-pasting paths | MEDIUM | OSC8 escape sequence: `\x1b]8;;file:///absolute/path\x1b\\link text\x1b]8;;\x1b\\`. Detect via `TERM_PROGRAM`, `TERM`, and fall back to plain text. Only a TTY enhancement; piped output stays plain. |
-| **QA session timing and token stats** | Showing "Answer generated in 2.3s using 1,240 tokens from 4 sources" gives users cost and latency awareness; no other CLI in this space shows this | LOW | `answerQuestion` in `src/qa/answerer.ts` returns `citations`; timing can be added at the `runQaMode` wrapper level; token counts are available from the provider call |
-| **Vitest `autoUpdate` threshold** | Setting `coverage.thresholds.autoUpdate: true` ratchets the threshold upward automatically when coverage improves, preventing regression without manual config updates | LOW | This is a Vitest v2.x feature. Set it once; it self-maintains. Combined with raising the threshold to 90% in this milestone, it permanently locks in higher standards. |
-| **New contributor setup guide** | Documenting the test architecture, coverage exclusion rationale, and "how to add a test for module X" pattern removes friction for contributors | MEDIUM | Currently `docs/src/content/docs/contributor/development.md` exists but does not explain the coverage exclusion list in `vitest.config.ts` or how to write tests for the integration-excluded modules |
+| Doc diff in PR comment (added/removed sections) | Shows what actually changed in docs, not just that docs ran — actionable for reviewers | HIGH | Need to compare new output against committed docs; git diff on generated files; truncate at ~40KB to stay under GitHub's 65,536-char comment limit |
+| Comment includes per-run cost line | Transparency about LLM spend reassures cost-conscious teams; no other doc-gen action does this | LOW | Append `> Cost: $0.023 · 14 docs · claude-opus-4-5` to comment footer; uses existing TokenUsageTracker output |
+| `workflow_dispatch` with `--only` renderer input | Ad-hoc regeneration of a single document (e.g. only `arch`) without full run | LOW | Pass `only: architecture` input to the CLI invocation |
+| Step summary (`$GITHUB_STEP_SUMMARY`) output | Visible in Actions run detail without needing to read the PR comment | LOW | Write markdown table to `$GITHUB_STEP_SUMMARY`; independent of PR comment |
+| `pull_request_target` support for fork PRs | Fork contributors can trigger doc preview on their PRs without exposing secrets | HIGH | `pull_request_target` runs in base repo context; requires careful secret scoping to avoid secret exfiltration |
 
-### Anti-Features (Commonly Requested, Often Problematic)
-
-Features that seem like good ideas but create problems in this specific codebase context.
+### Anti-Features
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| **Remove all coverage exclusions and test integration modules** | "Real" 90% coverage should include the CLI commands and providers | CLI commands (generate, search, reindex) require a live LLM API key and a filesystem; running them in CI would mean real API spend and environment setup that defeats unit test isolation | Keep the exclusion list but document the rationale explicitly; add integration test suite as a separate `npm run test:integration` target with a clear "requires real API key" guard |
-| **Git-dirty check (refuse to run if working tree is dirty)** | "Safer" to only generate docs from clean commits | Developers almost always run handover on a dirty working tree while iterating; blocking this causes constant friction | Only warn (not block) when git status is dirty; make the warning informational |
-| **Interactive `handover search` REPL mode** | "Better UX" to stay in a search loop rather than re-invoking the CLI | The streaming QA sessions already exist; a full REPL adds readline complexity that conflicts with TTY detection and piped-output compatibility | The existing `--mode qa` with streaming handles the multi-turn pattern; document it well |
-| **Coverage badge in README from external service** | Visual credibility signal | External badge services add flakiness; Codecov is already integrated via CI and lcov; a badge that diverges from CI gate creates confusion | Show the Codecov badge (already wired) and let the CI gate enforce the threshold; the badge will auto-update |
-| **Per-file 100% coverage requirements** | "High confidence" in individual critical modules | Per-file 100% thresholds are brittle; adding any new uncovered line in a hot module breaks CI; the cognitive overhead of maintaining is high | Use global 90% threshold with `autoUpdate`; only use `/* v8 ignore */` annotations on provably untestable branches (e.g., defensive error catches) |
+| Committing docs back to the PR branch in PR-preview mode | Seems convenient — docs always up to date in the branch | Creates commit loops (action triggers itself), pollutes PR history with automated commits, breaks squash-merge workflows | Post comment with diff only; scheduled-refresh mode handles commits via separate PR |
+| Failing the PR if docs are out of date | CI "enforces" documentation | Blocks PRs over subjective doc quality; devs disable or ignore the check immediately — destroys trust | Non-blocking comment; scheduled refresh as separate concern |
+| Multiple comment threads per renderer | Granular feedback | Notification spam; GitHub PR comment volume becomes noise | Single upserted comment with collapsible sections per renderer |
+| Automatic merge of the doc-refresh PR | Reduces friction | Bypasses required review; violates branch protection for main; token needs `repo` scope which is excessive | Create PR and leave it for human merge; label it `automated` for filtering |
+
+### Complexity: MEDIUM overall. Largest unknown: `pull_request_target` for fork safety (can defer to v2).
+
+### Dependencies on Existing Capabilities
+- Requires `handover generate` to run headlessly (already works via `--yes` equivalent in non-interactive CI)
+- Requires `ANTHROPIC_API_KEY` (or provider key) as secret input — no new auth work needed
+- Per-run cost line requires `TokenUsageTracker.getTotalCost()` output piped to action step output — new plumbing, small
+
+---
+
+## Feature 2: `handover init` Wizard Upgrade
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Detect existing `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` env vars and pre-select provider | `gh auth login` checks for existing tokens; `vercel link` detects `.vercel/` config; users expect the wizard to not ask what it can detect | LOW | `process.env` check before prompt; if `ANTHROPIC_API_KEY` set, default to anthropic without asking |
+| Scope auto-detect for monorepos (`packages/`, `apps/`, workspace roots) | Nx, Turborepo, pnpm workspaces all produce multi-package repos; init should detect and offer per-package config or root config | MEDIUM | Check `pnpm-workspace.yaml`, `nx.json`, `turbo.json`, `packages/*/package.json` glob; if found, ask "Configure for root or specific package?" |
+| `.gitignore` patching to add `.handover/cache/` | Every new tool that writes to the repo must patch `.gitignore` — npm, supabase init, create-next-app all do this; missing it means cache artifacts get committed | LOW | `existsSync('.gitignore')` then append if pattern not present; show diff in wizard confirmation |
+| Smart defaults: pre-fill model from detected provider's best option | Today wizard shows provider but not model; users don't know claude model names | LOW | Add model select step after provider; pre-populate with current recommended model per provider |
+| Idempotency: re-run safe, no silent overwrite | `supabase init` fails if `supabase/` exists; `npm init` prompts before overwriting; must not clobber an existing `.handover.yml` without confirmation | LOW | Already handled for interactive mode; `--yes` guard already in place — no change needed here |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| `--ci` flag that outputs `HANDOVER_PROVIDER` and `HANDOVER_API_KEY_ENV` as step outputs | CI setup wizards (Vercel, Netlify) emit env var names to parent processes; enables programmatic consumption by the GitHub Action setup step | LOW | Print `echo "provider=anthropic" >> $GITHUB_OUTPUT` style; only active when `isCI()` |
+| Detect Azure OpenAI via `AZURE_OPENAI_ENDPOINT` env var | Azure OpenAI is common in enterprise; auto-select `azure-openai` provider and pre-fill `baseUrl` | LOW | Check `process.env.AZURE_OPENAI_ENDPOINT`; map to config |
+| Post-init validation: call provider with a 1-token ping to confirm key works | `supabase login` validates credentials; `vercel link` verifies project access; wizard should confirm key works before ending | MEDIUM | Optional step after config write; spinner + "Verifying API key..." + check result; skip if `--yes` |
+| Suggest `handover generate --only overview` as first run hint | First-run UX that teaches incremental usage from the start | LOW | Change outro message; no code change to generate |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Auto-commit `.handover.yml` after init | One less step for user | Commits on behalf of user without review; unexpected git state change | Show `git add .handover.yml && git commit -m "chore: add handover config"` hint in outro |
+| Provider auto-selection without confirmation | "Zero config" appeal | Silent selection hides the decision; user doesn't learn what was chosen; debugging auth failures is harder | Pre-select in prompt but show selection; one-key confirm |
+| Wizard that asks > 5 questions | Thorough setup | Research (nodejs-cli-apps-best-practices) shows wizard abandonment rises sharply after 4-5 prompts | Keep to: provider (with env-var hint), API key env var, scope (root/package), model — 4 steps max |
+
+### Complexity: LOW-MEDIUM overall. Provider detection and .gitignore patching are LOW; monorepo scope detection is MEDIUM.
+
+### Dependencies on Existing Capabilities
+- Extends existing `src/cli/init.ts` — additive changes only
+- Monorepo scope detection requires checking for `pnpm-workspace.yaml`, `nx.json`, `turbo.json` — no new deps
+- `.gitignore` patching is pure Node.js fs — no new deps
+
+---
+
+## Feature 3: Source→Doc Dependency Graph (REGEN-03)
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Map source file change → affected renderers only | Core REGEN-03 requirement; Nx `affected` is the canonical mental model — "only run what changed" | HIGH | Build a static map: source file glob pattern → renderer IDs; on `--since <ref>` incremental run, intersect changed files with map to get affected renderer set |
+| Skip unaffected renderers entirely (not just cache-hit) | Cache-hit still charges for round tokens when round is shared; skipping at the renderer selection level is the true saving | MEDIUM | Integrate with existing `resolveSelectedDocs()` + `computeRequiredRounds()`; filter before round execution |
+| `handover generate --dry-run` shows which docs would regenerate | Nx shows `nx affected --dry-run`; users need to trust the graph before relying on it | LOW | Print "Would regenerate: [03-arch, 05-features]" and exit; reuse resolver output |
+| Persist the source→renderer mapping in `.handover/dep-graph.json` | Graph must survive between runs; computed once, updated on config change | LOW | Write after first analysis; invalidate on config change (include/exclude) or missing file |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| `handover graph` subcommand for interactive inspection | esbuild metafile + `esbuild-dependency-graph` library show "what depends on what"; surfacing this for docs is novel | MEDIUM | Print table: source glob → renderer IDs; useful for debugging unexpected rebuilds |
+| Heuristic category mapping (e.g. `src/**` → all, `*.test.ts` → testing, `*.md` → overview/getting-started) | Most changes are localized; 80% case is test changes only regenerating testing doc | MEDIUM | Define a default category map in config; allow override via `.handover.yml` `depGraph:` key |
+| Round-level skipping: if no affected renderer needs round N, skip that round's LLM call | 6 rounds × $cost each; architecture round is expensive; if only test files changed, skip rounds 3,4 | HIGH | Requires `computeRequiredRounds()` on the filtered renderer set; already architected in registry.ts — needs wiring |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| AST-level source import tracing (like Nx project graph) | Maximum precision — only rebuild docs that reference changed modules | AST parsing at scale adds significant startup time; TypeDoc/sphinx-js experience shows incremental AST dependency tracking is fragile and often more expensive than heuristic approaches | File-glob-to-renderer heuristic map is 90% accurate at 10% the complexity; full AST tracing is v9+ work |
+| Real-time file watcher mode for auto-regen | Developer ergonomics | Conflicts with `Persistent background daemon` out-of-scope decision; disk cache already makes reruns fast | `--watch` flag can be explored separately; not v8.0 |
+
+### Complexity: HIGH for round-level skipping; MEDIUM for renderer-level skipping; LOW for dry-run.
+
+### Dependencies on Existing Capabilities
+- Requires `resolveSelectedDocs()` from `src/renderers/registry.ts` — already exists
+- Requires `computeRequiredRounds()` from `src/renderers/registry.ts` — already exists
+- Requires `--since <ref>` git diff output — already exists via `src/cache/git-fingerprint.ts`
+- New: dep-graph.json persistence in `.handover/`
+
+---
+
+## Feature 4: Per-Renderer Cost Telemetry (Persisted, Trend-Friendly)
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Persist cost/tokens/time per run to `.handover/telemetry.jsonl` (append-only) | In-memory-only cost display (current state) is ephemeral; mature CLI tools (liteLLM, Langfuse) persist per-operation cost as first-class data | LOW | JSONL append: `{timestamp, runId, renderer, model, inputTokens, outputTokens, cost, durationMs}`; one line per renderer per run |
+| Per-renderer cost breakdown in generate output | `liteLLM` shows per-request cost; developers need to know which renderer is expensive to route it to a cheap model | LOW | Extend existing `ci-renderer.ts` / `renderer.ts` end-of-run display; already have `TokenUsageTracker.getRoundCost()` — need to attribute rounds to renderers |
+| `handover cost` subcommand: shows last-N runs summary | Cost trend visibility is table stakes for any tool that bills per-use; Langfuse, LangSmith both surface this as a primary UI element | MEDIUM | Read from `.handover/telemetry.jsonl`; compute per-renderer averages, trend (up/down), total per run |
+| Cost per run stored as machine-readable JSON (not just terminal display) | Enables CI budget checks, custom dashboards, scripting | LOW | Already captured in JSONL — machine-readable by design |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Trend detection: flag if a renderer's cost increased >20% vs 30-run rolling average | Regression detection (liteLLM/Cribl pattern) catches prompt changes that accidentally bloat cost | MEDIUM | Read last 30 runs from JSONL; compute rolling average per renderer; warn if current > 1.2× average |
+| `handover cost --since <date>` budget report | Teams need monthly spend visibility; AWS/GCP both surface this as standard cost tooling | MEDIUM | Filter JSONL by timestamp; group by date; sum costs; print table |
+| Budget alert threshold in config (`costWarningThreshold` already in schema) | `costWarningThreshold` exists but is not wired to telemetry — connect it | LOW | Compare run total against threshold; warn in terminal and write to step summary in CI |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Remote telemetry / phone-home to a hosted dashboard | SaaS cost analytics appeal | Privacy red line for open source CLI tool; users have confidential codebases; any remote telemetry requires explicit opt-in with clear disclosure and would need auth infrastructure | Local JSONL only; users can build their own dashboards on top |
+| SQLite for telemetry storage | Structured queries, richer analytics | JSONL append is sufficient for trend analysis; SQLite adds schema migration complexity; telemetry data is time-series append — JSONL is the right primitive | Stay with JSONL; use `readline` streaming for large files |
+
+### Complexity: LOW for persistence + display; MEDIUM for trend detection + `handover cost` subcommand.
+
+### Dependencies on Existing Capabilities
+- `TokenUsageTracker` already computes per-round cost — need to attribute rounds to renderers
+- `TokenUsageTracker.estimateCost()` already exists — reuse
+- `HandoverConfigSchema.costWarningThreshold` already exists — wire to telemetry check
+- New: `.handover/telemetry.jsonl` file; `handover cost` CLI command
+
+---
+
+## Feature 5: Config-Driven Per-Renderer Model Routing
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| `renderers:` key in `.handover.yml` that maps renderer ID to model override | Config-driven routing is the dominant production pattern (RouteLLM, LiteLLM, Gemini semantic router all use YAML config); users expect to express routing as config, not code | LOW | Add `renderers: { "03-architecture": { model: "claude-opus-4-6" }, "07-dependencies": { model: "claude-haiku-4-5" } }` to `HandoverConfigSchema` |
+| Global `model:` as default, per-renderer override wins | LiteLLM pattern: global default + per-route override; simple precedence rule, no surprises | LOW | Resolver: `rendererConfig.model ?? globalConfig.model ?? providerDefault` |
+| Validate that per-renderer model is from same provider | Prevent cross-provider model routing (different API keys, different token counting) without explicit base URL config | LOW | Zod refine: if `renderers.X.model` is set, it must be compatible with `provider`; or accept any string and fail at runtime with clear error |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Preset named tiers: `tier: cheap | standard | best` as shorthand | Users don't know model names across providers; tier aliases map to current recommended model per provider per tier | MEDIUM | `cheap` → haiku/gpt-4o-mini/gemini-flash; `standard` → sonnet/gpt-4o/gemini-pro; `best` → opus/gpt-4.1 |
+| Document complexity classification as auto-routing hint | LogRocket + AWS routing guides both identify "task complexity" as the primary routing signal; synthesis-heavy renderers (architecture, edge-cases) should default to best tier | MEDIUM | Annotate each renderer in DOCUMENT_REGISTRY with `complexity: 'synthesis' | 'extraction' | 'structural'`; use as default routing hint when no explicit config |
+| Per-renderer model shown in generate output and telemetry | Transparency: user should see "arch using claude-opus-4-6, deps using claude-haiku-4-5" | LOW | Add model column to per-renderer summary; already have model in TokenUsageTracker |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Router LLM (a model that decides which model to use) | Dynamic routing appeal | Adds a meta-LLM call before every renderer run — doubles latency for low-value routing decisions; overkill for 14 known renderers with stable complexity profiles | Config-driven static routing; complexity annotation on renderers is sufficient |
+| Cross-provider routing (e.g. some renderers use OpenAI, others Anthropic) | Cost optimization | Requires multiple API keys, multiple auth flows, different token counting; complexity multiplies; current architecture assumes single-provider per run | Single-provider model selection within same provider's model family; cross-provider is v9+ |
+| Confidence-based cascading (try cheap model, escalate if confidence low) | Adaptive cost optimization | Generated docs don't have a "confidence score" — Zod validation catches structural failures but not quality; retry logic creates non-deterministic cost and latency | Static routing with explicit quality gate via eval harness (Feature 6) |
+
+### Complexity: LOW for YAML config + resolver; MEDIUM for tier aliases and complexity annotations.
+
+### Dependencies on Existing Capabilities
+- `HandoverConfigSchema` Zod schema — additive new key
+- `src/providers/` factory must respect per-renderer model override — new `modelForRenderer()` resolver
+- `TokenUsageTracker` model-based pricing table already exists — ensure all tier models are in table
+
+---
+
+## Feature 6: Eval Harness — Golden Set + Scoring Rubric (Observability Mode)
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Golden set: a versioned set of 20-50 test cases (source snapshot → expected doc properties) | Anthropic, Inspect-AI, DeepEval all converge on: golden set = curated cases + rubric + versioned together; 50 cases catch shocking amounts of regression | MEDIUM | Store in `.handover/eval/golden/` as JSONL; each case: `{id, sourceSnapshot, rendererIds, assertions[]}` |
+| Rubric assertions: string-contains, section-present, min-word-count, no-hallucination markers | Code-based grading is "fastest, most reliable, most scalable" (Anthropic docs); LLM-judge is for nuanced quality only | LOW | `type: contains | not-contains | min-length | section-present | regex`; evaluated without LLM calls |
+| LLM-as-judge for quality dimensions: completeness, accuracy, clarity | Rubric-based evals using LLM-as-judge achieve 80-90% agreement with human evaluators; use a different (cheaper) model as judge | MEDIUM | Judge prompt: structured rubric with scoring 1-5 per dimension; encourage `<thinking>` before score; discard thinking, keep score |
+| `handover eval` subcommand: runs golden set, reports pass/fail per case | Standard eval harness UX (Inspect-AI, promptfoo) — subcommand that runs the full eval suite | MEDIUM | Exit 0 regardless of score (observability mode, not blocking); print scorecard to stdout; write JSON results to `.handover/eval/results/` |
+| Observability mode: surfaces in CI via `$GITHUB_STEP_SUMMARY`, never fails the build | v8.0 explicit decision: "Eval harness ships as observability only; promotion to a blocking CI gate is a future milestone after rubric stabilizes" | LOW | Exit code always 0; write summary table to step summary; print scores in terminal |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Baseline comparison: compare current run against last stored baseline | Production eval pattern (Anthropic, vadim.blog): "compare against previous baseline — decide: ship, hold, or investigate" | MEDIUM | Store last-run scores in `.handover/eval/baseline.json`; print delta (↑0.3 / ↓0.1) per dimension |
+| Golden set generation helper: `handover eval --seed <N>` creates N cases from current output | "Writing hundreds of test cases is hard — get Claude to help generate more" (Anthropic docs); bootstraps eval for new projects | HIGH | Use current `handover generate` output + source snapshot as seed; LLM generates assertions; human reviews before committing |
+| Score dimensions matched to handover's value prop: completeness, navigability, code-accuracy | Generic rubrics (tone, privacy) don't apply; doc-specific dimensions should be: does it cover all modules? are code examples accurate? can an AI agent navigate the index? | MEDIUM | Three custom dimensions replacing generic ones; define explicit scoring criteria per dimension in rubric prompt |
+| Per-renderer score in telemetry JSONL | Connects eval scores to cost telemetry — see cost vs quality tradeoff per renderer per model | LOW | Append eval scores to `.handover/telemetry.jsonl` on eval runs that include cost data |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Blocking CI gate in v8.0 | Rigorous quality enforcement | Rubric is new and will have false positives in v8.0; blocking on an unvalidated rubric destroys developer trust immediately; Anthropic docs: "judge reliability must be validated against golden dataset before scaling" | Ship as observability; promote to gate in v9.0 after rubric calibration against human labels |
+| BLEU/ROUGE scores for doc quality | Familiar NLP metrics | BLEU/ROUGE measure n-gram overlap against reference text — meaningless for handover docs which are generated from scratch (no single "reference" exists); misleading low scores create false alarm | Rubric-based LLM-as-judge + structural assertions are more relevant for free-form generated docs |
+| Real-time eval on every `generate` run | Catch regressions immediately | LLM-as-judge eval costs tokens; running on every generate doubles cost; defeats cost-efficiency purpose | Run eval on-demand (`handover eval`) or in nightly CI job |
+
+### Complexity: MEDIUM for golden set + rubric + subcommand; HIGH for baseline comparison + seeding.
+
+### Dependencies on Existing Capabilities
+- Requires `handover generate` output as test fixture — exists
+- Requires a configured LLM provider for LLM-as-judge — reuses existing provider infrastructure
+- New: `src/eval/` module, `handover eval` CLI command, `.handover/eval/` directory structure
 
 ---
 
 ## Feature Dependencies
 
 ```
-[90%+ coverage gate]
-    └──requires──> [New test suites for uncovered modules]
-                       └──targets──> [renderers/utils.ts] (63% → 90%)
-                       └──targets──> [auth/resolve.ts] (72% → 90%)
-                       └──targets──> [context/packer.ts] (88% → 90%)
-                       └──targets──> [ai-rounds/validator.ts] (83% → 90%)
-    └──requires──> [Branch coverage improvement in validator.ts, packer.ts]
-    └──enhances──> [vitest autoUpdate threshold config]
+GitHub Action (Feature 1)
+    └──requires──> handover generate (headless, already works)
+    └──enhances──> Cost Telemetry (Feature 4) [action posts cost in comment]
+    └──enhances──> Eval Harness (Feature 6) [action can run handover eval in CI]
 
-[git-aware incremental regeneration]
-    └──requires──> [source-file → analyzer → document mapping]
-    └──requires──> [simple-git diff integration] (simple-git already in use)
-    └──requires──> [--since <ref> flag in handover generate]
-    └──integrates-with──> [existing DAG orchestrator] (src/orchestrator/)
-    └──integrates-with──> [existing AnalysisCache] (src/analyzers/cache.ts)
+Init Wizard Upgrade (Feature 2)
+    └──independent of all other v8.0 features
 
-[search UX improvements]
-    └──requires──> [OSC8 terminal link detection] (TTY-only)
-    └──requires──> [QA mode timing wrapper]
-    └──enhances──> [existing runFastMode output] (result stats already present)
-    └──enhances──> [existing runQaMode output] (add elapsed time, token count)
+Source→Doc Dep Graph (Feature 3)
+    └──requires──> --since <ref> git fingerprint (already exists)
+    └──requires──> DOCUMENT_REGISTRY.requiredRounds (already exists)
+    └──enhances──> Cost Telemetry (Feature 4) [skipped renderers = $0 cost logged]
+    └──enhances──> Model Routing (Feature 5) [graph determines which renderers run]
 
-[search user documentation]
-    └──requires──> [search UX improvements] (doc should reflect final output format)
-    └──extends──> [existing docs/user/ Astro/Starlight site]
+Cost Telemetry (Feature 4)
+    └──requires──> TokenUsageTracker (already exists, in-memory)
+    └──enhances──> Model Routing (Feature 5) [cost data validates routing decisions]
+    └──enhances──> Eval Harness (Feature 6) [cost+quality correlation per renderer]
 
-[contributor guide expansion]
-    └──requires──> [90%+ coverage gate] (guide documents the new threshold)
-    └──extends──> [existing contributor/development.md]
+Model Routing (Feature 5)
+    └──requires──> HandoverConfigSchema (additive extension)
+    └──requires──> Cost Telemetry (Feature 4) [telemetry validates routing effectiveness]
+
+Eval Harness (Feature 6)
+    └──requires──> handover generate output (always exists after generate)
+    └──enhances──> Cost Telemetry (Feature 4) [eval scores in telemetry JSONL]
 ```
 
 ### Dependency Notes
 
-- **Coverage work is prerequisite to documentation:** The contributor guide section on testing should describe the final coverage setup, so the tests must be written before the guide is finalized.
-- **Git-aware regeneration is independent of search/docs work:** Can be phased separately; shares no code with the search UX or documentation changes.
-- **OSC8 links require TTY detection already present:** `src/cli/search.ts` already uses `process.stdout.isTTY` to conditionally apply bold styling; OSC8 detection follows the same pattern.
-- **simple-git is already a production dependency** (used in `src/analyzers/git-history.ts`); no new dependency for git-aware regeneration.
+- **Features 3+4+5 form a coherent group**: dep graph determines WHAT runs, telemetry tracks COST of what ran, routing controls MODEL used per renderer. Build in this order within phases.
+- **Feature 6 (eval) is independent of 3/4/5**: can be built in parallel or after; only needs `generate` output.
+- **Feature 1 (action) can ship with just `handover generate`**: the smarter-regen features (3/4/5) are progressive enhancements to the action, not prerequisites.
+- **Feature 2 (init) is fully independent**: no shared state with other v8.0 features.
 
 ---
 
-## MVP Definition
+## MVP Definition (v8.0 Scope)
 
-### Launch With (this milestone)
+### Launch With (v8.0 core — all features are in scope)
 
-Minimum scope that delivers the milestone value.
+- [x] GitHub Action PR-preview mode (sticky comment, no commits to PR branch) — Feature 1
+- [x] GitHub Action scheduled-refresh mode (idempotent PR creation via peter-evans/create-pull-request) — Feature 1
+- [x] `@v1` versioning with force-updated major tag — Feature 1
+- [x] Init wizard: provider env-var detection, scope auto-detect, .gitignore patching — Feature 2
+- [x] Source→renderer dep graph with `--dry-run` — Feature 3 (renderer-level only)
+- [x] Per-renderer cost telemetry persisted to `.handover/telemetry.jsonl` — Feature 4
+- [x] `handover cost` summary subcommand — Feature 4
+- [x] Per-renderer model config in `.handover.yml` — Feature 5
+- [x] Eval harness with golden set + rubric assertions + `handover eval` subcommand (observability mode) — Feature 6
 
-- [ ] **Raise coverage threshold to 90%** — vitest.config.ts thresholds: lines/functions/branches/statements: 90; add `autoUpdate: true`
-- [ ] **New test suites for the five coverage gaps** — `renderers/utils.test.ts`, `auth/resolve.test.ts` expansion, `context/packer.test.ts` expansion, `ai-rounds/validator.test.ts` expansion, `ai-rounds/quality.test.ts` expansion
-- [ ] **`handover generate --since <ref>`** — git diff + source-to-document map; only reruns affected documents
-- [ ] **Reindex summary output** — structured stats block: docs processed/skipped/failed, chunks created, model used
-- [ ] **`handover search` --type help text** — list valid type names in `--help` output
-- [ ] **New `docs/user/search.md`** — covers fast mode, QA mode, `--type` filters, `--top-k`, examples
-- [ ] **OSC8 clickable file links in search output** — TTY-gated; falls back to plain path
+### Add After Validation (v8.x or v9.0)
 
-### Add After Validation (v1.x)
+- [ ] Round-level skipping in dep graph (Feature 3 differentiator) — trigger: telemetry shows rounds dominate cost
+- [ ] Trend detection + budget regression alerts (Feature 4 differentiator) — trigger: telemetry data accumulates over 30 runs
+- [ ] Tier aliases (`cheap/standard/best`) for model routing (Feature 5 differentiator) — trigger: user feedback on model name confusion
+- [ ] Eval baseline comparison (Feature 6 differentiator) — trigger: rubric stabilizes with <10% false positive rate
+- [ ] Eval-to-blocking-gate promotion (Feature 6 anti-anti-feature) — trigger: 30+ run baseline established, rubric validated against human labels
+- [ ] `pull_request_target` for fork PR support (Feature 1 differentiator) — trigger: community contributors report missing preview
 
-- [ ] **QA mode timing and token stats** — trigger: user feedback requesting cost/latency awareness
-- [ ] **Contributor guide: testing section** — trigger: first external PR that breaks coverage threshold
-- [ ] **Diff-to-renderer dependency graph (precise)** — trigger: users with large codebases report full regeneration is too slow
-- [ ] **`handover init` guide** — trigger: user confusion reports about what `init` does vs `generate`
+### Future Consideration (v9+)
 
-### Future Consideration (v2+)
-
-- [ ] **Integration test suite (`test:integration`)** — deferred: requires real API key, env setup, and isolated test fixtures; high setup cost
-- [ ] **REPL-mode search** — deferred: the streaming QA session already handles the primary use case
-- [ ] **Coverage per-subsystem breakdown in CI output** — deferred: Codecov already provides this; duplication
+- [ ] `handover eval --seed` golden set auto-generation — requires rubric stability first
+- [ ] Cross-provider model routing — requires multi-provider auth per run
+- [ ] AST-level source→renderer dependency tracing — requires dedicated performance profiling
 
 ---
 
@@ -141,121 +320,52 @@ Minimum scope that delivers the milestone value.
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| 90%+ coverage gate + new tests | HIGH | MEDIUM | P1 |
-| git-aware incremental regeneration | HIGH | HIGH | P1 |
-| `handover search` documentation page | HIGH | LOW | P1 |
-| Reindex summary output | MEDIUM | LOW | P1 |
-| `--type` valid values in --help | MEDIUM | LOW | P1 |
-| OSC8 clickable file links | MEDIUM | MEDIUM | P2 |
-| vitest `autoUpdate` threshold | LOW | LOW | P1 |
-| QA mode timing + token stats | MEDIUM | LOW | P2 |
-| Contributor testing guide | LOW | LOW | P2 |
-| `handover init` guide | LOW | LOW | P2 |
-| Precise diff-to-renderer dependency graph | HIGH | HIGH | P3 |
-| Integration test suite | HIGH | HIGH | P3 |
+| GitHub Action (PR-preview + scheduled) | HIGH | MEDIUM | P1 |
+| Init wizard upgrade | MEDIUM | LOW | P1 |
+| Source→doc dep graph (renderer-level) | HIGH | MEDIUM | P1 |
+| Per-renderer cost telemetry + `handover cost` | MEDIUM | LOW | P1 |
+| Per-renderer model routing (config key + resolver) | HIGH | LOW | P1 |
+| Eval harness (golden set + observability mode) | HIGH | MEDIUM | P1 |
+| Round-level skipping in dep graph | HIGH | HIGH | P2 |
+| Trend detection in telemetry | MEDIUM | MEDIUM | P2 |
+| Eval baseline comparison | HIGH | MEDIUM | P2 |
+| Model tier aliases | LOW | MEDIUM | P3 |
+| Eval blocking gate | HIGH | LOW (logic) / HIGH (trust) | P3 |
 
-**Priority key:**
-- P1: Required for milestone acceptance
-- P2: Should have; add within milestone if scope allows
-- P3: Defer to next milestone
+**Priority key:** P1 = v8.0 core · P2 = v8.x after validation · P3 = v9.0+
 
 ---
 
-## Coverage Gap Analysis (Current State)
+## Real-World Tool Reference
 
-From live `vitest --coverage` run against the codebase:
-
-| Module | Lines | Branches | Functions | Gap Type |
-|--------|-------|----------|-----------|----------|
-| `renderers/utils.ts` | 63% | 58% | 67% | Missing tests entirely |
-| `auth/resolve.ts` | 78% | 73% | 71% | Token refresh and OAuth paths |
-| `auth/pkce-login.ts` | 75% | 50% | 75% | PKCE exchange branches |
-| `context/packer.ts` | 88% | 78% | 88% | Oversized file two-pass path |
-| `ai-rounds/validator.ts` | 83% | 59% | 100% | Branch paths in import/claim validation |
-| `auth/token-store.ts` | 90% | 88% | 100% | Edge cases in serialization |
-| `vector/chunker.ts` | 99% | 85% | 100% | Fine-grained header parsing edge |
-
-**Global gap:** Branch coverage is 67.77% vs the new 90% target. The largest contributor is `auth/resolve.ts` and `ai-rounds/validator.ts`. These modules have clear pure-function logic that is testable with mocked inputs; the low coverage is a gap in test authorship, not architectural constraint.
-
-**Exclusion list health:** The existing exclusion list in `vitest.config.ts` is well-justified. CLI commands, providers, vector store, and MCP runtime all require live external dependencies. Do not remove exclusions — document them.
-
----
-
-## Git-Aware Regeneration: Source-to-Document Mapping
-
-The core data structure needed for `--since`:
-
-```
-Source file pattern → Analyzer → Documents affected
-─────────────────────────────────────────────────────
-src/analyzers/**    → ast          → modules (06), architecture (03), features (05)
-package.json        → dependencies → dependencies (07)
-*.ts                → ast, git     → overview (01), edge-cases (09), conventions (11)
-*.md, docs/**       → doc-analysis → getting-started (02), deployment (13)
-src/**              → git-history  → all 14 (git metadata appears in many docs)
-.env*, Dockerfile   → env-scanner  → environment (08)
-*test*, *.test.ts   → test-analyzer → testing-strategy (12)
-```
-
-This mapping is static and can be hardcoded as a lookup table in the generate pipeline. The git diff provides changed source files; the table maps those to affected document IDs; the DAG orchestrator receives only those IDs via `--only`.
-
-**Integration point:** `src/cli/generate.ts` already supports `--only <docs>` (comma-separated aliases). The `--since <ref>` flag would compute the `--only` list automatically using simple-git + the mapping table.
-
----
-
-## Search UX: Current Output vs Target Output
-
-**Current fast mode output:**
-```
-Mode: fast (retrieval-only semantic search)
-Embedding route: mode local-first, provider local (preferred)
-
-Result 1
-rank: 1
-relevance: 92.00%
-source: 03-ARCHITECTURE.md
-section: # Architecture > ## DAG Orchestrator
-snippet: The DAG orchestrator manages concurrent...
-
-Showing 3 of 3 results (top-k requested: 10).
-```
-
-**Target fast mode output (this milestone):**
-```
-Mode: fast (retrieval-only semantic search)
-
-Result 1                                                    [92%]
-source: 03-ARCHITECTURE.md (clickable OSC8 link in TTY)
-section: # Architecture > ## DAG Orchestrator
-snippet: The DAG orchestrator manages concurrent...
-
-Result 2                                                    [87%]
-...
-
-─────────────────────────────────────────────────────────────
-3 results  (top-k: 10)  embedding: local/nomic-embed-text
-Valid --type values: architecture, modules, dependencies, overview, ...
-```
-
-Key changes:
-1. Relevance score on same line as result header (scannable at a glance)
-2. OSC8 hyperlink on source file (TTY-only)
-3. Stats line moved to footer and condensed
-4. Valid `--type` values shown when no `--type` was used (discoverability)
+| Handover Feature | Reference Tool | What We Adopt | What We Skip |
+|-----------------|----------------|---------------|--------------|
+| GitHub Action versioning | actions/toolkit versioning.md | `@v1` force-updated tag, `@v1.0.0` pinned variant | SHA-pinning (user's choice, not action's job) |
+| PR comment idempotency | peter-evans/find-comment + create-or-update-comment | HTML sentinel `<!-- handover-preview -->` for upsert | Multiple comment threads per renderer |
+| Scheduled PR creation | peter-evans/create-pull-request | Fixed branch name, idempotent update, auto-close if no diff | Auto-merge (branch protection violation) |
+| PR comment format | Atlantis/Infracost/Terraform-commenter | Summary table + collapsible `<details>` for full output, 65K char limit awareness | Per-line diff annotations (Reviewdog pattern — too granular for docs) |
+| Concurrency control | GitHub Actions `concurrency:` key | `group: handover-${{ github.head_ref }} cancel-in-progress: true` | Queue-based concurrency (incompatible with cancel-in-progress) |
+| Init wizard UX | nodejs-cli-apps-best-practices + create-next-app | ≤4 prompts, env-var pre-detection, `--yes` for CI | Auto-commit, >5 questions |
+| Dependency graph | Nx `affected` | Renderer-level "what would rebuild?" dry-run | AST import tracing (Bazel-style full graph) |
+| Cost telemetry | LiteLLM / Langfuse / Cribl | JSONL append, per-operation granularity, trend detection | Remote telemetry, SQLite schema |
+| Model routing | RouteLLM / LiteLLM YAML config | Config-driven static routing, global default + per-renderer override | Router LLM, cross-provider cascading |
+| Eval harness | Anthropic develop-tests docs + Inspect-AI | Code-based assertions first, LLM-as-judge for nuanced dims, observability mode, rubric versioned with golden set | BLEU/ROUGE, blocking gate before rubric stabilizes |
 
 ---
 
 ## Sources
 
-- [Vitest Coverage Guide — vitest.dev](https://vitest.dev/guide/coverage.html) — thresholds, autoUpdate, per-file config, V8 vs Istanbul
-- [Vitest Coverage Config Reference — vitest.dev](https://vitest.dev/config/coverage) — all coverage config options
-- [Command Line Interface Guidelines — clig.dev](https://clig.dev/) — output design, help text, error messaging, onboarding patterns
-- [CLI UX Best Practices — Evil Martians blog](https://evilmartians.com/chronicles/cli-ux-best-practices-3-patterns-for-improving-progress-displays) — progress display patterns
-- [OSC8 Terminal Hyperlinks — Hyperlinks in Terminal Emulators gist](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda) — OSC8 escape sequence specification and terminal support matrix
-- [Node.js CLI Apps Best Practices — lirantal/nodejs-cli-apps-best-practices](https://github.com/lirantal/nodejs-cli-apps-best-practices) — npm CLI best practices
-- Live `vitest --coverage` run on handover codebase (2026-03-01) — all coverage numbers are direct measurements
-- `src/cli/search.ts`, `src/vector/reindex.ts`, `src/analyzers/git-history.ts` — current implementation reviewed directly
+- [GitHub Actions Toolkit — action-versioning.md](https://github.com/actions/toolkit/blob/main/docs/action-versioning.md) — `@v1` pattern, force-updated major tag (HIGH confidence — official)
+- [peter-evans/create-pull-request](https://github.com/peter-evans/create-pull-request) — idempotent PR creation, fixed branch, auto-close on no diff (HIGH confidence — official)
+- [GitHub Docs — Concurrency control](https://docs.github.com/actions/writing-workflows/choosing-what-your-workflow-does/control-the-concurrency-of-workflows-and-jobs) — `cancel-in-progress` with `head_ref` group key (HIGH confidence — official)
+- [GitHub community discussion — 65536 char comment limit](https://github.com/orgs/community/discussions/41331) — 65,536 unicode char hard limit on PR/issue comment bodies (HIGH confidence — GitHub Community official)
+- [Anthropic — Define success criteria and build evaluations](https://platform.claude.com/docs/en/docs/test-and-evaluate/develop-tests) — code-based grading hierarchy, LLM-as-judge patterns, rubric design (HIGH confidence — official Anthropic docs, fetched directly)
+- [LogRocket — LLM routing in production](https://blog.logrocket.com/llm-routing-right-model-for-requests/) — config-driven rule-based routing, anti-patterns, fallback requirements (MEDIUM confidence — verified against multiple routing guides)
+- [Vadim's Blog — Production evals for LLM systems](https://vadim.blog/2026/02/03/building-production-evals-for-llm-systems) — three-layer scoring (hard gates, soft composite, diagnostics), observability vs blocking gates (MEDIUM confidence — practitioner blog, consistent with Anthropic official patterns)
+- [nodejs-cli-apps-best-practices](https://github.com/lirantal/nodejs-cli-apps-best-practices) — zero-config auto-detection, `--yes` flag conventions, ≤5 prompt guidance (MEDIUM confidence — widely cited community resource)
+- [Nx — Run Only Tasks Affected by a PR](https://nx.dev/docs/features/ci-features/affected) — mental model for "what would rebuild" dry-run, `nx show --dry-run` pattern (HIGH confidence — official Nx docs)
+- [RouteLLM](https://github.com/lm-sys/routellm) — YAML config-driven routing, cost vs quality tradeoffs (MEDIUM confidence — official repo + LMSYS blog)
 
 ---
-*Feature research for: test coverage uplift, git-aware incremental regeneration, search/QA UX polish, documentation/onboarding*
-*Researched: 2026-03-01*
+*Feature research for: v8.0 Distribution & Smarter Regen*
+*Researched: 2026-05-11*

@@ -1,17 +1,20 @@
-# Project Research Summary
+# Research Summary — v8.0 Distribution & Smarter Regen
 
-**Project:** Handover CLI — v7.0 Milestone
-**Domain:** TypeScript CLI tool — test coverage uplift, git-aware incremental regeneration, search/QA UX polish, documentation
-**Researched:** 2026-03-01
-**Confidence:** HIGH
+**Project:** handover-cli
+**Milestone:** v8.0 Distribution & Smarter Regen
+**Domain:** TypeScript CLI — GitHub Action distribution, init wizard upgrade, source→doc dependency graph, cost telemetry, config-driven model routing, eval harness
+**Researched:** 2026-05-11
+**Confidence:** HIGH (all four researchers cited official docs and direct codebase reads)
+
+---
 
 ## Executive Summary
 
-This milestone extends an already-mature TypeScript CLI (Handover) with four coordinated improvements: raising test coverage from a failing 80% gate to a verified 90%+ threshold, introducing git-aware incremental cache invalidation for the document-generation pipeline, polishing the `handover search` UX (result quality signals, OSC8 terminal links, zero-results guidance), and adding documentation pages for search, regeneration, and contributor onboarding. No new runtime dependencies are required. The entire stack is extensions of what is already installed and validated. The one new devDependency (`strip-ansi`) is optional and only needed for color-deterministic snapshot tests.
+v8.0 adds two distribution capabilities and four smart-regen capabilities to an existing, well-architected TypeScript CLI. The existing codebase already provides most of the infrastructure needed: `better-sqlite3` is installed, `@clack/prompts` is installed, `zod@^4.3.6` is in use, the DAGOrchestrator exists, round-level cost tracking exists in `TokenUsageTracker`, and incremental regen via `--since <ref>` already works. The new milestone is a set of targeted extensions, not a rewrite or a new subsystem.
 
-The recommended execution order is: coverage first (pure additions, zero regression risk, builds the test harness), then git-aware caching (self-contained change at a single construction site in `generate.ts`), then search UX (additive changes to `VectorStore`, `query-engine`, and `mcp/tools`), and finally documentation (depends on all prior phases being complete so docs reflect final behavior). This ordering is not arbitrary — Phase 3 modifies `src/mcp/tools.ts` and the test harness built in Phase 1 must exist before that production code is touched. Phases 2 and 3 can be parallelized by different contributors once Phase 1 is complete.
+The recommended implementation strategy is additive: extend existing modules in-place (init wizard, config schema, cost tracker, generate pipeline) rather than building new parallel systems. The only genuinely new modules are `src/cache/dep-graph.ts`, `src/telemetry/telemetry-writer.ts`, `src/renderers/routing.ts`, and `src/eval/*`. The GitHub Action lives in a separate repository and calls the CLI as a subprocess, keeping the CLI transport-agnostic. Four features (dep-graph, telemetry, routing, eval) form a coherent dependency chain; the init wizard and the action are both fully independent and can be started in parallel.
 
-The primary risks are (a) coverage exclusion creep — reaching 90% by shrinking the denominator rather than adding real tests — and (b) git-aware incremental detection silently missing untracked new files if `git.diff()` is used without pairing it with `git.status()`. Both risks are well-understood and have specific, low-effort mitigations. The codebase is structured cleanly enough that all four workstreams can proceed without blocking each other provided the Phase 1 test harness is delivered before Phase 3 begins.
+The three highest risks for v8.0 are: (1) the GitHub Action triggering full LLM regeneration on `on: push` and causing surprise billing, (2) the source→doc dependency graph over-approximating dependencies so that every change triggers all 14 renderers and the surgical-regen feature provides zero benefit, and (3) the eval harness running silently in CI with no visible output, making the observability feature invisible to the team. All three risks have concrete, documented mitigations in the research.
 
 ---
 
@@ -19,132 +22,228 @@ The primary risks are (a) coverage exclusion creep — reaching 90% by shrinking
 
 ### Recommended Stack
 
-The stack is entirely existing. No new runtime dependencies are introduced. The only tool-level change is raising vitest thresholds in `vitest.config.ts` and adding `json-summary` to the coverage reporters list (required by the GitHub Actions coverage comment action). The `autoUpdate` option in vitest is desirable as a ratchet mechanism but must NOT be enabled yet due to upstream bug vitest#9227 which strips newlines from the config file on rewrite; use manual threshold bumps until that bug is resolved.
+No new production runtime dependencies are needed for dep-graph, cost telemetry, or model routing. All three use infrastructure already in the bundle: `Map<string, Set<string>>` for the graph, `better-sqlite3` for telemetry (see telemetry format decision below), and Zod for routing config. The only additions are `@clack/prompts@^1.3.0` (bump from `^1.0.1` to get `multiselect`, `autocompleteMultiselect`, and `path` prompt types) and two devDependencies for the eval harness: `vitest-evals@^0.8.0` (Sentry-maintained) and `autoevals@^0.0.132` (Braintrust-maintained). The GitHub Action is a composite action wrapping `npx handover-cli` — not a JavaScript action — which sidesteps the `@vercel/ncc` Node.js 24 compatibility gap and eliminates the need to commit a bundled `dist/` to the action repo.
 
-**Core technologies:**
-- `vitest@^4.0.18` + `@vitest/coverage-v8@^4.0.18`: test runner and V8 coverage — already installed, already integrated with CI; V8 AST-based remapping since v3.2 gives Istanbul-level branch accuracy
-- `simple-git@^3.32.2`: git-aware change detection — already installed and used in `src/analyzers/git-history.ts`; `diff(['--name-only', fromHash, 'HEAD'])` and `status()` are the two calls needed; `vi.mock('simple-git')` pattern is established
-- `memfs@^4.56.10`: in-memory filesystem for unit tests — already a devDependency; the correct tool for testing `round-cache.ts`, `analyzers/cache.ts`, and `config/loader.ts` without real disk I/O
-- `@astrojs/starlight@^0.37.6`: documentation site with Pagefind full-text search built in — zero-config; new pages require only new `.md` files and sidebar entries in `docs/astro.config.mjs`
-- `strip-ansi@^7.1.2` (new devDep, optional): makes snapshot tests for CLI color output deterministic; ESM-only, compatible with project's `"type": "module"` setting
-
-**Critical version constraint:** `vitest` and `@vitest/coverage-v8` must remain on the same major version. Both are at `^4.0.18` and in sync. Do not upgrade one without the other.
-
-**What NOT to use:** Do not add `chalk`, `kleur`, `cli-table3`, or `ink` — `picocolors` (already installed) handles all search output coloring. Do not use `thresholds.autoUpdate: true` until vitest#9227 is resolved.
+**Core technologies (new or changed):**
+- `@clack/prompts@^1.3.0` (bump): adds `multiselect`, `autocompleteMultiselect`, `path` prompts for wizard upgrade — no API breaks from `^1.0.1`
+- Composite action (`runs.using: composite`): wraps `npx handover-cli`; avoids ncc/Node24 gap; no dist/ commit needed
+- `peter-evans/create-pull-request@v8.1.1`: idempotent scheduled-refresh PR creation
+- `peter-evans/find-comment@v4` + `peter-evans/create-or-update-comment@v5.0.0`: sticky PR comment upsert pattern
+- Native `Map<string, Set<string>>` + JSON: dep-graph in-memory and persisted — 30 LoC, zero new deps
+- `better-sqlite3@^12.6.2` (already installed): telemetry persistence in `.handover/telemetry.db`
+- `vitest-evals@^0.8.0` + `autoevals@^0.0.132` (devDeps): LLM-as-judge eval harness running inside existing vitest infra
+- `zod@^4.3.6` (already installed): schema extension for per-renderer routing config; use `.extend()` not `.merge()` (v4 deprecation)
 
 ### Expected Features
 
-The feature research confirms a clear P1/P2/P3 prioritization backed by a live `vitest --coverage` run on 2026-03-01 and direct source inspection.
+All six feature areas are P1 (v8.0 core) based on the user's explicit scope choices. Round-level dep-graph skipping, trend detection in telemetry, eval baseline comparison, model tier aliases, and the eval blocking gate are explicitly deferred to v8.x/v9.0.
 
-**Must have (table stakes — P1, required for milestone acceptance):**
-- 90%+ coverage gate (lines/functions/statements) with 85%+ branches — currently all four metrics are BELOW the existing 80% gate; the 80% gate must be passed before it can be raised
-- New test suites targeting the highest-ROI coverage gaps: `renderers/utils.ts` (63% — pure functions, zero I/O), `auth/resolve.ts` (78%), `auth/pkce-login.ts` (75% branches), `config/schema.ts` (75%), `context/packer.ts` (88%)
-- `handover generate --since <ref>` or `--changed-only` — git diff + source-to-document map; only reruns affected documents
-- `handover search` documentation page — the most obvious gap in existing user-facing docs
-- Reindex summary output — structured stats block (docs processed/skipped/failed, chunks created)
-- `--type` valid values shown in `--help` output
+**Must have (table stakes for v8.0):**
+- GitHub Action: PR-preview mode (sticky comment, no commits to PR branch) + scheduled-refresh mode (idempotent PR via peter-evans)
+- GitHub Action: `@v1` force-updated major-version tag, concurrency control, cost line in comment footer
+- Init wizard: provider env-var detection, scope auto-detect (monorepo awareness), `.gitignore` patching, smart model defaults
+- Source→renderer dep graph: persisted to `.handover/cache/dep-graph.json`, `--dry-run` shows what would regenerate, renderer-level skipping only (not round-level)
+- Per-renderer cost telemetry: persisted to `.handover/telemetry.db` (SQLite), `handover cost` subcommand for last-N summary
+- Per-renderer model routing: `renderers:` key in `.handover.yml`, global default + per-renderer override, resolver at round creation time
+- Eval harness: golden set, rubric assertions, `handover eval` subcommand, observability mode (exits 0, posts to `$GITHUB_STEP_SUMMARY`)
 
-**Should have (P2 — add within milestone if scope allows):**
-- OSC8 clickable terminal file links in search output (TTY-gated, fallback to plain path)
-- QA mode timing and token stats ("Answer generated in 2.3s using 1,240 tokens from 4 sources")
-- Contributor guide: testing section documenting `createMockProvider()`, `memfs` setup, coverage exclusion rationale
+**Defer to v8.x after validation:**
+- Round-level skipping in dep graph (HIGH complexity; trigger: telemetry shows rounds dominate cost)
+- Trend detection + budget regression alerts (trigger: 30+ run baseline accumulates)
+- Eval baseline comparison (trigger: rubric stabilizes with <10% false positive rate)
+- Eval promotion to blocking CI gate (trigger: 30-run baseline + human label validation)
+- `pull_request_target` for fork PRs (trigger: community contributor requests)
+- `vitest-evals` `describeEval()` CI integration (defer until scorer validated via CLI path)
 
-**Defer (P3 — next milestone):**
-- Precise diff-to-renderer dependency graph (fine-grained source-to-document mapping beyond the static lookup table)
-- Integration test suite (`test:integration`) requiring real API keys and filesystem fixtures
-- REPL-mode search (streaming QA via `--mode qa` already handles the primary use case)
-
-**Anti-features confirmed by research:**
-- Removing all coverage exclusions to hit 90% — CLI commands and providers require live APIs; keep exclusions, document them
-- Git-dirty check that blocks generation on a dirty working tree — warn only, never block
-- Per-file 100% coverage requirements — brittle; use global 90% threshold
+**Defer to v9+:**
+- `handover eval --seed` golden set auto-generation
+- Cross-provider model routing (requires multi-provider auth per run)
+- AST-level source→renderer dependency tracing (Bazel-style)
 
 ### Architecture Approach
 
-The codebase has a clean layered architecture: CLI layer → DAG orchestrator → static analyzers + AI rounds + document renderers → vector search + QA + regeneration job manager. Every integration point for this milestone is additive or involves enriching a single construction site (the `analysisFingerprint` string in `generate.ts`) without modifying any downstream API. The `RoundCache`, `AnalysisCache`, and `VectorStore` APIs remain unchanged. MCP tool handlers already accept injected dependencies, making them unit-testable without a real MCP server.
+All new code is additive to the existing pipeline. The render step in `src/cli/generate.ts` is the integration nexus: it gains two new callsites for the dep-graph (load before DAG, save after render) and one for telemetry (write after render step). Routing is wired into the `wrapWithCache` closure's model resolution, replacing the flat `config.model ?? preset.defaultModel` expression. Renderers remain pure functions — they do not call LLMs and therefore routing cannot and should not be applied at the renderer level. PR-comment logic lives entirely in the action repo's `github-client.ts`; the CLI gains no GitHub API dependency.
 
-**Major components involved in this milestone:**
-1. `src/cache/git-fingerprint.ts` (NEW) — computes git-HEAD-aware SHA-256 fingerprint; called at one callsite in `generate.ts` before `RoundCache.computeHash()`, no downstream API changes
-2. `src/vector/vector-store.ts` (MODIFY) — adds `getDocTypeSummary()` method for zero-results guidance; pure SQL addition, no schema migration
-3. `src/vector/query-engine.ts` (MODIFY) — zero-results path populates optional `availableDocTypes` in `SearchDocumentsResult`; additive field, no breaking change
-4. `src/mcp/tools.ts` (MODIFY) — exposes `content` (top 3 results only) and `docType` in `semantic_search` response; additive fields, full content limited to top 3 to avoid 25KB+ payloads
-5. Test files (NEW, ~10-15 files) — colocated at `src/module/file.test.ts` following existing convention; use `memfs`, `vi.mock('simple-git')`, and `createMockProvider()`
+**New files and modified files:**
+1. `src/cli/init-detectors.ts` (NEW) — `detectProvider()`, `detectScope()`, `patchGitignore()`
+2. `src/cli/init.ts` (MODIFIED) — extend `runInit()` and `detectProject()`
+3. `src/cache/dep-graph.ts` (NEW) — `SourceDocGraph` class: `build()`, `save()`, `load()`, `affectedDocs()`
+4. `src/telemetry/telemetry-writer.ts` + `src/telemetry/types.ts` (NEW) — `TelemetryWriter` + `TelemetryRecord` Zod schema + SQLite writer
+5. `src/renderers/routing.ts` (NEW) — `resolveRoundModel()`
+6. `src/renderers/registry.ts` (MODIFIED) — add `modelHint: 'cheap' | 'standard' | 'synthesis'` to `DocumentSpec`
+7. `src/config/schema.ts` (MODIFIED) — add `renderers.routing` key
+8. `src/context/tracker.ts` (MODIFIED) — add `getRoundBreakdown()`
+9. `src/cli/generate.ts` (MODIFIED) — dep-graph callsites, telemetry callsite, routing in `wrapWithCache`
+10. `src/cli/eval.ts` (NEW) + `src/eval/*` (NEW) — eval runner, scorer, rubric, types
+11. `src/cli/index.ts` (MODIFIED) — register `eval` subcommand
+12. `handover/regenerate-docs` repo (NEW, separate) — composite action, `pr-preview.ts`, `scheduled-refresh.ts`, `github-client.ts`
 
-**Key architectural constraints:**
-- All new test files MUST be at `src/**/*.test.ts` — files in `tests/integration/` are excluded from coverage measurement by the vitest `include` pattern
-- The `cache.mode` config key in `src/config/schema.ts` must be optional with a `content-hash` default so existing `.handover.yml` files work without modification
-- MCP tool modifications must have test coverage before production code changes (Phase 1 creates `mcp/tools.test.ts`; Phase 3 modifies `mcp/tools.ts`)
+### Critical Pitfalls (top five for v8.0)
 
-### Critical Pitfalls
+The following five pitfalls would most damage v8.0 if ignored, ranked by damage potential:
 
-1. **Coverage exclusion creep produces a fake 90%** — the exclusion list is already large (40+ paths); adding more during the coverage phase raises the percentage on a shrinking denominator. Mitigation: freeze the exclusion list before writing any new tests; require explicit written justification for any new exclusion; track eligible LOC alongside the percentage. The single zero-effort improvement: add `src/providers/gemini.ts` to exclusions (currently 0% coverage, should be excluded like `anthropic.ts` and `openai-compat.ts`).
+1. **LLM cost explosion from `on: push` trigger** — Action example workflow must use `on: pull_request` or `on: schedule`, never bare `on: push`. Include a `paths:` filter. Log estimated cost at run start. Add a `dry-run` input. A team pushing 20 times/day hits ~$240/month with no warning.
 
-2. **Mock-only tests that count coverage but test nothing** — replacing every dependency with `vi.mock()` and asserting only `toHaveBeenCalledWith()` raises line counts but has near-zero regression value. Mitigation: use `memfs` (already installed) for filesystem logic; require output assertions in every new test, not only mock call assertions; the project's `createMockProvider()` factory is the established model.
+2. **Dep-graph over-approximation defeats surgical regen** — If infrastructure files (logger, config loader, types) are included in graph source nodes, every file change triggers all 14 renderers. Track dependencies at the analyzer→renderer level, not raw source file level. Exclude infrastructure files explicitly. Add a test: single leaf-file change triggers fewer than 14 renderers.
 
-3. **git-aware incremental detection silently misses untracked new files** — `git diff --name-only HEAD` is blind to untracked files. A user creates new source files without staging them; the incremental check concludes nothing changed. Mitigation: always pair `git.diff()` with `git.status()` and inspect the `not_added` (untracked) field; alternatively fall back to content-hash comparison when diff returns empty.
+3. **Eval harness is silent in observability mode** — "Non-blocking" must not mean "no output." Eval job must post a score table to `$GITHUB_STEP_SUMMARY` and as a sticky PR comment (with delta from baseline). Use `::notice::` for improvements, `::warning::` for regressions. Without visibility, the feature provides zero value.
 
-4. **Detached HEAD and shallow CI clones break incremental mode silently** — `git rev-parse HEAD` and branch-relative diffs fail or return unexpected results in detached HEAD state (common in GitHub Actions with `fetch-depth: 1`). Mitigation: check `StatusResult.detached` before any branch-relative operations; fall back gracefully to full content-hash mode with an explicit warning message; require `fetch-depth: 0` in CI checkout step when using incremental mode.
+4. **Cache key missing renderer-level model override** — `RoundCache.computeHash()` includes `model` but uses the global config model. With per-renderer routing, two renderers using different models for the same round would incorrectly share cached results. Extend `computeHash` to accept an optional `rendererModel` parameter; ship with a `CACHE_VERSION` bump.
 
-5. **sqlite-vec KNN always returns K results even when all are irrelevant** — the vec0 implementation has no distance threshold enforcement (open issue #165). Searching for a nonsense string returns `--top-k` results that look legitimate. Mitigation: surface raw distance scores alongside each result; emit a low-quality warning when the best-match cosine distance exceeds a configurable threshold; do not implement hard cutoffs as they silently return zero results for legitimate niche queries.
+5. **PR comment spam — new comment on every push** — Use the `<!-- handover-docs-preview -->` HTML sentinel + `peter-evans/find-comment` + `peter-evans/create-or-update-comment` to upsert the comment. Cap comment body at 65,000 characters (GitHub hard limit is 65,536). No sticky comment = unreadable PR threads after 10 pushes.
+
+---
+
+## Conflicts Resolved
+
+### Conflict 1: Dependency Graph Implementation Strategy
+
+**Position: `src/cache/dep-graph.ts` is a new, focused module that orchestrates existing DOCUMENT_REGISTRY infrastructure.**
+
+The FEATURES researcher correctly identified that `DOCUMENT_REGISTRY.requiredRounds[]`, `computeRequiredRounds()`, and `resolveSelectedDocs()` cover ~90% of the needed logic. The STACK researcher correctly noted that the in-memory representation is a trivial `Map<string, Set<string>>` needing ~30 LoC. The ARCHITECTURE researcher correctly identified the new module location and the `SourceDocGraph` class. These are complementary layers, not contradictions:
+
+- The in-memory data structure is `Map<sourcePath, Set<rendererName>>` (Stack)
+- The graph is built by reading `DocumentSpec.requiredRounds` from DOCUMENT_REGISTRY and correlating with changed source paths from `git-fingerprint.ts` (Features — existing infra reused)
+- The new module `src/cache/dep-graph.ts` contains the `SourceDocGraph` class with `build()`, `save()`, `load()`, `affectedDocs()` (Architecture — new module, but thin)
+- The persisted artifact is `.handover/cache/dep-graph.json` with a `graphVersion` field (belongs in the existing cache directory, not the root `.handover/`)
+
+The `SourceDocGraph.build()` method reads from `DOCUMENT_REGISTRY` (existing) and the static analysis file tree (existing), producing the `Map` which is immediately serialized. The class is a namespace for the operations, not a stateful object. Approximately 60–80 LoC total.
+
+### Conflict 2: Cost Telemetry Persistence Format
+
+**Position: SQLite via `better-sqlite3` in a separate `.handover/telemetry.db` file.**
+
+The FEATURES researcher argued for JSONL. The ARCHITECTURE researcher specified NDJSON at `.handover/telemetry/runs.ndjson`. The STACK researcher argued for SQLite. SQLite wins on the actual query pattern: the `handover cost` subcommand needs "last N runs per renderer" and "cost trend over time" — range scans that require filtering records. JSONL requires loading the entire file into memory. With SQLite's `idx_renderer_runs_renderer ON renderer_runs(renderer, ran_at)` index, these queries execute in microseconds regardless of file size. JSONL's only advantage is external tooling compatibility, which is explicitly out of scope.
+
+Use a separate `.handover/telemetry.db` (not co-located in `search.db`) to allow independent deletion and schema evolution. The `renderer_runs` schema from STACK.md is adopted verbatim. Rotation is via `DELETE FROM renderer_runs WHERE ran_at < ?` keeping last 90 days or 100 runs — cleaner than JSONL ring-buffer logic. The `src/telemetry/types.ts` module still defines `TelemetryRecord` as a Zod schema for validation on write; the writer uses `better-sqlite3` INSERT rather than `appendFile`.
+
+### Conflict 3: Eval Harness Shape
+
+**Position: BOTH — a `handover eval` CLI subcommand that wraps the same scorer invoked by `vitest-evals` in CI. The minimum coherent v8.0 ship is the CLI subcommand only; vitest-evals CI integration is a v8.1 addition.**
+
+The `scorer.ts` module contains the LLM-as-judge logic (using `autoevals` scorers). `vitest-evals`'s `describeEval()` calls `scorer.ts` in CI. The `handover eval` subcommand calls the same `scorer.ts` directly. The scorer is the shared unit; the two runners are thin wrappers around it. For v8.0: implement `src/eval/scorer.ts`, `src/eval/runner.ts`, `src/cli/eval.ts`, and the golden YAML cases. The `vitest.config.eval.ts` and `describeEval()` integration lands as v8.1 once the scorer is validated.
+
+Golden cases live in `.handover/evals/golden/` as committed YAML (Architecture), not in `src/eval/golden/` as JSON (Stack). YAML is more human-readable in PR diffs, which matters for rubric review.
+
+---
+
+## Other Open Questions Resolved
+
+### Per-Renderer Cost Attribution (TokenUsageTracker is per-round, not per-renderer)
+
+`TokenUsageTracker` currently tracks at the round level. The attribution strategy: apportion round costs to renderers by `DocumentSpec.requiredRounds`. If renderer A requires rounds [1,2,3] and renderer B requires rounds [1,2], round 3 cost ($0.10) is attributed to renderer A only. Rounds shared by multiple renderers are attributed to all of them (no proration — the cost was incurred regardless). Add `getRoundBreakdown(): Map<number, { inputTokens, outputTokens, estimatedCostUsd }>` to `TokenUsageTracker`. The telemetry writer assembles per-renderer records by joining `DocumentSpec.requiredRounds` against this breakdown.
+
+### GitHub Action Repository Location
+
+**Position: Separate repository `handover/regenerate-docs`.**
+
+Required for GitHub Marketplace listing (one action per repo for top-level listing). Placing it in `.github/actions/` inside this repo would prevent marketplace listing and conflate CLI codebase concerns with action-specific dependencies. The composite action calls `npx handover-cli@<version>` — the action repo has no Node.js build step.
+
+### Per-Renderer Routing: Round Level vs Renderer Level
+
+**Position: Routing applies at the round level, not the renderer level.**
+
+Renderers are pure functions `(ctx: RenderContext) => string` that transform already-computed round outputs. They do not call LLMs. The user-facing config (`renderers: { "03-architecture": { model: "claude-opus-4-6" } }`) is renderer-keyed for UX clarity. The implementation resolves this to a round-level model decision: given a round number, look up all renderers that require this round, find the most expensive model hint among them (safe over-provision), and use that model for the round. `resolveRoundModel()` in `src/renderers/routing.ts` encapsulates this translation.
 
 ---
 
 ## Implications for Roadmap
 
-Based on research, the four workstreams map cleanly to four sequential phases. The ordering is determined by dependency direction, not arbitrary preference.
+Phase numbering continues from v7.0's Phase 30. The next phase is Phase 31.
 
-### Phase 1: Test Infrastructure and Coverage Uplift
+### Phase 31: Init Wizard Upgrade + Action Scaffolding
 
-**Rationale:** Pure addition with zero regression risk. Builds the test harness that Phase 3 depends on. The existing 80% gate is currently failing; this must be fixed before the threshold can be raised. Starting here also establishes a test quality policy before it can be violated.
-**Delivers:** All four coverage metrics at 90%+ (85%+ branches); `vitest.config.ts` thresholds raised incrementally (80 → 85 → 88 → 90); `json-summary` reporter added for GitHub Actions coverage comments; `gemini.ts` exclusion added immediately (zero-effort baseline improvement); new test files for `renderers/utils.ts`, `auth/resolve.ts`, `auth/pkce-login.ts`, `config/schema.ts`, `context/packer.ts`, `cache/round-cache.ts`, `analyzers/cache.ts`, `config/loader.ts`, `mcp/tools.ts`, `regeneration/job-manager.ts`
-**Addresses:** 90%+ coverage gate (P1), branch coverage parity (P1), vitest reporter config
-**Avoids:** Coverage exclusion creep (Pitfall 1) — freeze exclusion list at phase start; mock-only tests (Pitfall 2) — establish output-assertion policy before writing tests
-**Constraint:** Raise thresholds in batches AFTER the corresponding tests pass, not before. Do not enable `autoUpdate` until vitest#9227 is resolved.
+**Rationale:** The init wizard is fully independent and LOW complexity — fastest win and unblocks onboarding for action users. The action repo scaffold can be started in parallel since it does not depend on any other v8.0 CLI feature.
 
-### Phase 2: Git-Aware Incremental Cache Invalidation
+**Delivers:** Upgraded `handover init` with provider detection, scope auto-detect, `.gitignore` patching; `handover/regenerate-docs` repo with `action.yml`, composite action structure, placeholder mode implementations.
 
-**Rationale:** Self-contained change at a single construction site (`analysisFingerprint` in `generate.ts`). No downstream API changes to `RoundCache`, `AnalysisCache`, or any MCP/vector code. The test harness from Phase 1 means `git-fingerprint.ts` gets immediate test coverage. Parallelizable with Phase 3 once Phase 1 is complete.
-**Delivers:** `src/cache/git-fingerprint.ts` + unit tests; optional `cache.mode: git-aware` config key; git HEAD SHA mixed into round cache fingerprint; graceful degradation in non-git and detached HEAD environments with explicit fallback warnings
-**Addresses:** `handover generate --since <ref>` / `--changed-only` (P1); incremental regeneration for power users with large codebases
-**Uses:** `simple-git@^3.32.2` (already installed); `vi.mock('simple-git')` pattern established in `git-history.ts`
-**Avoids:** Silent failure on untracked files (Pitfall 3) — pair `git.diff()` with `git.status()`; detached HEAD crash (Pitfall 4) — check `StatusResult.detached` before branch-relative operations; `src/regeneration/` wired without a contract (Pitfall 5) — define the shared runner interface before CLI integration
-**Constraint:** `cache.mode` must default to `content-hash` for backward compatibility. Git-aware mode is opt-in. Non-git-repo fallback is silent, same pattern as `emptyGitResult()` in `analyzeGitHistory`.
+**Features addressed:** Feature 2 (init wizard upgrade), Feature 1 scaffolding.
 
-### Phase 3: Search UX Polish
+**Pitfalls to avoid:** Init re-run clobbering scope config (define `--upgrade` contract first); `.gitignore` patch conflicts (idempotent append, negation rule detection); provider detection picks expensive model with multiple keys (cheapest-detected policy in `--yes` mode).
 
-**Rationale:** Depends on Phase 1 test harness being in place before modifying `src/mcp/tools.ts`. VectorStore and query-engine changes are purely additive (new method, new optional response field). The zero-results experience requires `getDocTypeSummary()` before the CLI display can reference available types. Parallelizable with Phase 2 once Phase 1 is complete.
-**Delivers:** `VectorStore.getDocTypeSummary()`; zero-results guidance with available doc types; color-coded relevance scores in search output; OSC8 clickable terminal links (TTY-gated, fallback to plain path); `content` + `docType` in MCP `semantic_search` response (full content for top 3 only); `--format json` flag; relevance distance warning when best match quality is poor; `--type` valid values shown in `--help`
-**Addresses:** Search result quality signals (P1/P2), zero-results messaging (P1), OSC8 links (P2), MCP response enrichment, `--type` help text (P1)
-**Implements:** Modified `vector-store.ts`, `query-engine.ts`, `mcp/tools.ts`, `cli/search.ts`
-**Avoids:** KNN returning K irrelevant results without quality signals (Pitfall 6); filters against absent doc types producing silent zero results (Pitfall 7); full content for all MCP results (Anti-Pattern — limit to top 3 to stay under ~25KB)
+**Research flag:** Standard patterns — skip phase research.
 
-### Phase 4: Documentation and Onboarding
+---
 
-**Rationale:** Documentation must be written last because it describes the final behavior of Phases 1–3. The auto-generation script (`generate-docs-command-reference.mjs`) picks up all new CLI flags from commander.js definitions automatically, so running `npm run docs:generate` at Phase 4 start gives a current command reference without manual updates.
-**Delivers:** `docs/src/content/user/search.md`; `docs/src/content/user/regeneration.md`; `docs/src/content/contributor/testing.md`; `llms.txt` and `README.md` content updates; `docs/astro.config.mjs` sidebar additions; `handover init` TTY guard + `--yes` flag + existing-config detection; `starlight-links-validator` added to CI build
-**Addresses:** Search user guide (P1), regeneration user guide, contributor testing guide (P2), `handover init` behavior documentation (P2)
-**Avoids:** `handover init` hanging in non-TTY/CI environments (Pitfall 8); init overwriting existing config silently (Pitfall 9); broken Starlight doc links going undetected (Pitfall 10)
-**Constraint:** `npm run docs:build` must be added as a required CI check so broken links block merge. Add `starlight-links-validator` before writing any new pages, not after.
+### Phase 32: Source→Doc Dependency Graph (REGEN-03)
+
+**Rationale:** Must be stable before action PR-preview integrates `--since` + graph for minimal re-render scope. No other v8.0 CLI feature depends on it, so no blocking.
+
+**Delivers:** `src/cache/dep-graph.ts` with `SourceDocGraph` class; `.handover/cache/dep-graph.json` persisted artifact (with `graphVersion` field); `generate --dry-run`; `generate --since` consulting graph for renderer-level skipping.
+
+**Features addressed:** Feature 3 (renderer-level dep graph).
+
+**Pitfalls to avoid:** Graph not versioned (include `graphVersion` field on day one); over-approximation defeats surgical regen (track at analyzer→renderer level, exclude infrastructure files, add test asserting <14 renderers triggered on single leaf-file change).
+
+**Research flag:** Standard patterns — skip phase research.
+
+---
+
+### Phase 33: Cost Telemetry
+
+**Rationale:** Must be built before model routing because routing decisions must record which model was actually used per renderer in the telemetry record.
+
+**Delivers:** `src/telemetry/telemetry-writer.ts` + `src/telemetry/types.ts`; `.handover/telemetry.db` (SQLite, `renderer_runs` table with `idx_renderer_runs_renderer` index); `handover cost` subcommand; `TokenUsageTracker.getRoundBreakdown()` accessor; per-renderer cost line in generate output; `costWarningThreshold` wired to actual persisted data.
+
+**Features addressed:** Feature 4 (cost telemetry persistence and `handover cost` subcommand).
+
+**Pitfalls to avoid:** Prompt content leaks into telemetry records (Zod schema enforces metadata-only fields); telemetry file grows without bound (SQLite rotation keeping last 90 days or 100 runs).
+
+**Research flag:** Standard patterns — skip phase research.
+
+---
+
+### Phase 34: Config-Driven Model Routing
+
+**Rationale:** Depends on telemetry being in place so routing decisions are recorded. The cache key extension must land in this phase alongside routing logic — shipping routing without the cache key fix silently serves stale results.
+
+**Delivers:** `src/renderers/routing.ts` with `resolveRoundModel()`; `modelHint` field on `DocumentSpec` (classified for all 14 renderers); `renderers:` key in `HandoverConfigSchema`; `CACHE_VERSION` bump; per-renderer model shown in generate output.
+
+**Features addressed:** Feature 5 (per-renderer model routing).
+
+**Pitfalls to avoid:** Cache key missing renderer model override (extend `computeHash` with optional `rendererModel`; add test: same fingerprint + different models = different cache keys); cheap model fallback to global expensive model (per-renderer fallback field; retry uses same cheap model, not global provider).
+
+**Research flag:** Standard patterns — skip phase research.
+
+---
+
+### Phase 35: Eval Harness
+
+**Rationale:** Eval depends on telemetry (cost of eval runs tracked) and benefits from routing (eval can test routing configs in fixtures). Most design-heavy new module; building it last lets the team use telemetry + routing data to inform which renderers to prioritize for golden cases.
+
+**Delivers:** `src/eval/scorer.ts`, `src/eval/runner.ts`, `src/eval/rubric-v1.md` (versioned rubric file), `src/eval/types.ts`; `src/cli/eval.ts`; `.handover/evals/golden/` with 5–10 initial YAML cases (not all 14 renderers); `handover eval` subcommand (exits 0 always); eval scores posted to `$GITHUB_STEP_SUMMARY` and sticky PR comment.
+
+For v8.0: CLI subcommand only. `vitest.config.eval.ts` + `describeEval()` CI integration deferred to v8.1.
+
+**Features addressed:** Feature 6 (eval harness, observability mode).
+
+**Pitfalls to avoid:** Eval judge same model family as generator (add `eval.judge.provider` config defaulting to different provider family); rubric not versioned (store as `src/eval/rubric-v1.md`, include `rubricVersion` in eval records); golden set rot (fixtures include input source hash and expiry date; keep to 5–10 cases); eval adds minutes to CI (separate async job, `continue-on-error: true`, schedule-gated full run); eval silent in observability mode (score table + delta to `$GITHUB_STEP_SUMMARY` and sticky PR comment).
+
+**Research flag:** Needs phase research for rubric design — scoring criteria for completeness, navigability, and code-accuracy dimensions need explicit specification before writing `rubric-v1.md`. Judge model selection also needs a brief research task to confirm cross-family options.
+
+---
+
+### Phase 36: GitHub Action — PR-Preview + Scheduled-Refresh
+
+**Rationale:** Lives in a separate repo and wraps the fully instrumented CLI. Core invocation works from Phase 31 scaffolding. Building last lets the team include telemetry output (cost line) in the PR comment.
+
+**Delivers:** Complete composite `action.yml`; `pr-preview.ts` (sticky comment, cost line, truncated diff, 65K char cap); `scheduled-refresh.ts` (idempotent PR via peter-evans); `@v1` major-version tag + release workflow automation; action README with cost warning section, `permissions:` block, concurrency block, and example workflows.
+
+**Features addressed:** Feature 1 (GitHub Action, both modes).
+
+**Pitfalls to avoid:** LLM cost explosion (example workflow uses `on: pull_request` + `on: schedule` only with `paths:` filter); GITHUB_TOKEN scope mistakes (README copy-paste `permissions:` block; PAT `token` input for protected branches; preflight scope check); concurrency footgun (`concurrency:` block differentiated by mode); PR comment spam (HTML sentinel + peter-evans find-and-update; 65,000 char cap); `@v1` tag drift (input renames = v2, not minor bump; release workflow automation); Marketplace listing rejection (Feather `refresh-cw` icon, `blue` color, branding block from day one).
+
+**Research flag:** Standard patterns (composite action, peter-evans actions are well-documented) — skip phase research.
+
+---
 
 ### Phase Ordering Rationale
 
-- Phase 1 must precede Phase 3: `src/mcp/tools.test.ts` created in Phase 1 must exist before `src/mcp/tools.ts` is modified in Phase 3
-- Phases 2 and 3 are independent: git fingerprinting touches `generate.ts` and `config/schema.ts`; search UX touches `vector-store.ts`, `query-engine.ts`, `mcp/tools.ts`, and `cli/search.ts` — no shared files, safe to parallelize
-- Phase 4 must come last: documents behaviors delivered by Phases 2 and 3; auto-generated command reference requires all CLI flags to be finalized
-- Threshold increments in Phase 1 must be gated on test completion: raise only after the corresponding tests pass and coverage is confirmed above the new bar — never raise speculatively
-
-### Research Flags
-
-Phases likely needing verification during planning:
-
-- **Phase 2 — source-to-document mapping:** The mapping table in FEATURES.md (source-file → analyzer → affected documents) is a design proposal, not verified against the current `DOCUMENT_REGISTRY` in `src/renderers/registry.ts`. A 30-minute audit of `registry.ts` and `src/orchestrator/dag.ts` is needed before implementing `--since` to confirm the `--only` integration point and which analyzers each renderer's `requiredRounds` depends on.
-- **Phase 2 — regeneration module interface:** `src/regeneration/` was built for MCP and is not wired into the CLI. Pitfall 5 warns against ad-hoc wiring. A brief design spike to define the shared runner function (used by both CLI and MCP) should precede Phase 2 implementation — this is a design decision, not a research question, but it must happen before coding starts.
-- **Phase 3 — OSC8 terminal detection:** Confirm the `TERM_PROGRAM` and `TERM` environment variable heuristics for OSC8 support are correct for the target terminal set (iTerm2, Ghostty, Warp, Windows Terminal). The OSC8 spec gist is the reference; validate the detection logic against it before shipping.
-
-Phases with standard, well-documented patterns (lighter research needed):
-
-- **Phase 1:** Coverage threshold configuration, `memfs` mocking, `vi.mock('simple-git')` — all established patterns with official Vitest docs and existing codebase precedents. No novel decisions required.
-- **Phase 4:** Starlight page addition, sidebar config, and Pagefind indexing — fully documented in official Starlight guides. New pages require only `.md` files and sidebar entries; Pagefind indexes automatically on next `astro build`.
+- Init wizard (31) first: independent, fast, confidence-builder before heavier pipeline changes.
+- Dep-graph (32) second: independent of telemetry/routing, enables action's incremental mode, can run in parallel with Phase 31.
+- Telemetry (33) before routing (34): routing records must flow into telemetry; telemetry provides the stable write target.
+- Eval (35) last among CLI features: benefits from both telemetry and routing being stable; most design-heavy scope.
+- Action (36) last: wraps fully instrumented CLI; action repo scaffolding started in Phase 31 means action development is not fully blocked on Phases 32–35.
 
 ---
 
@@ -152,46 +251,51 @@ Phases with standard, well-documented patterns (lighter research needed):
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All technologies already installed and validated in the codebase; coverage baseline from live `vitest --coverage` run on 2026-03-01; only new devDep (`strip-ansi`) is low-risk and optional |
-| Features | HIGH | Coverage numbers from live run against actual codebase; feature list confirmed against actual source files; prioritization from direct code review of 145 source files and 21 test files |
-| Architecture | HIGH | All findings from direct codebase inspection; integration points identified at specific file + line number precision; data flows traced through actual code, not inferred |
-| Pitfalls | HIGH | Coverage anti-patterns from official Vitest docs + community post-mortems; git edge cases from git-scm docs and simple-git changelog; sqlite-vec pitfalls from upstream issue tracker and primary author blog |
+| Stack | HIGH | All package versions verified against npm registry on 2026-05-11; composite action pattern confirmed from official docs; `@clack/prompts@1.3.0` API confirmed via Context7; `better-sqlite3` API confirmed via Context7 |
+| Features | HIGH | Feature scope confirmed from PROJECT.md; user decisions documented (Action + wizard + all four smart-regen pieces; no VS Code extension, no auth); table-stakes features cross-checked against comparable tools (Nx, LiteLLM, Atlantis) |
+| Architecture | HIGH | All integration points confirmed via direct source reads of `generate.ts`, `round-cache.ts`, `tracker.ts`, `registry.ts`, `schema.ts`, `factory.ts` |
+| Pitfalls | HIGH | GitHub Actions pitfalls from official docs + toolkit action-versioning.md; LLM-as-judge pitfalls from EvidentlyAI + Cameron Wolfe; codebase inspection confirmed specific risk points (round-cache hash includes model; init.ts guard exists; tracker.ts has no per-renderer telemetry yet) |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Source-to-document dependency mapping (Phase 2):** The static lookup table in FEATURES.md is a design proposal. Verify the exact `analyzer → document` relationships against `src/renderers/registry.ts` before implementing `--since`. This is a 30-minute audit.
-- **`autoUpdate` timeline:** vitest#9227 blocks enabling `thresholds.autoUpdate`. Monitor vitest 4.x release notes; enable it the moment the fix ships to permanently lock in the 90% floor without manual threshold bumps.
-- **Shallow clone CI behavior (Phase 2):** The pitfalls research recommends `fetch-depth: 0` in GitHub Actions for incremental mode. Verify the current `.github/workflows/ci.yml` checkout step depth before Phase 2 ships, and document the requirement explicitly.
-- **`src/regeneration/` CLI integration design (Phase 2):** The module has no CLI integration today. Define the shared runner function interface (used by both CLI and MCP) as a design decision at the start of Phase 2, before any implementation code is written.
+- **Rubric scoring criteria:** The three eval dimensions (completeness, navigability, code-accuracy) are named but not yet specified as explicit scoring criteria. Phase 35 should begin with a rubric design research task before writing `src/eval/rubric-v1.md`.
+- **`modelHint` classification per renderer:** `DocumentSpec` needs `modelHint: 'cheap' | 'standard' | 'synthesis'` for all 14 renderers. This classification is not yet done; should be a first task in Phase 34 (review each renderer's `requiredRounds[]` and assign hint accordingly).
+- **Action Marketplace name collision check:** `handover/regenerate-docs` as the action name has not been verified against existing Marketplace listings. Run `gh api /marketplace/actions` before publishing.
+- **`.gitignore` patch entries for SQLite telemetry:** The init wizard's `patchGitignore()` should add `.handover/telemetry.db` (the SQLite file), not `.handover/telemetry.jsonl` or `.handover/telemetry/` (the superseded NDJSON paths from ARCHITECTURE.md). Clarify this in Phase 31 implementation.
 
 ---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Live `vitest --coverage` run on handover codebase (2026-03-01) — all coverage baseline numbers; confirms the 80% gate is currently failing on all four metrics
-- Direct codebase inspection: `src/cli/generate.ts`, `src/cache/round-cache.ts`, `src/analyzers/cache.ts`, `vitest.config.ts`, `src/mcp/tools.ts`, `src/vector/query-engine.ts`, `src/vector/vector-store.ts`, `src/analyzers/git-history.ts`, `src/providers/__mocks__/index.ts`, `.github/workflows/ci.yml`, `package.json`
-- https://vitest.dev/guide/coverage — V8 vs Istanbul, AST-based remapping since v3.2.0 (official Vitest docs)
-- https://vitest.dev/config/coverage — `thresholds`, `autoUpdate`, `perFile`, `reporter` config reference (official Vitest docs)
-- https://github.com/vitest-dev/vitest/issues/9227 — `autoUpdate` bug that strips newlines on config rewrite (upstream issue, open as of 2026-03-01)
-- https://git-scm.com/docs/git-diff — untracked file limitations in git diff (official git-scm docs)
-- https://github.com/steveukx/git-js — simple-git API, changelog, TypeScript signatures (official repository)
-- https://starlight.astro.build/guides/site-search/ — Pagefind built-in, zero-config (official Starlight docs)
-- https://vitest.dev/guide/mocking/file-system — `memfs` + `vi.mock('node:fs')` recommended pattern (official Vitest docs)
+- `src/cli/generate.ts` — pipeline integration nexus, render step structure, `wrapWithCache` closure
+- `src/cache/round-cache.ts` — `computeHash()` signature, `CACHE_VERSION` pattern, `ensureGitignored()` reference pattern
+- `src/context/tracker.ts` — `TokenUsageTracker` API surface, `estimateCost()`, `getRoundUsage()`
+- `src/renderers/registry.ts` — `DocumentSpec` interface, `DOCUMENT_REGISTRY`, `requiredRounds`, `computeRequiredRounds()`
+- `src/config/schema.ts` — `HandoverConfigSchema` current Zod definition
+- `src/providers/factory.ts` — `createProvider()` signature, model resolution
+- `.planning/PROJECT.md` — milestone scope, explicit non-goals, confirmed user decisions
+- GitHub Actions metadata syntax (official docs): `runs.using` composite, permissions model
+- GitHub Actions Toolkit action-versioning.md: `@v1` force-update pattern, breaking change contract
+- `peter-evans/create-pull-request@v8.1.1`, `peter-evans/find-comment@v4`, `peter-evans/create-or-update-comment@v5.0.0`: verified 2026-05-11
+- `@clack/prompts@1.3.0`: `multiselect`, `autocompleteMultiselect`, `path` confirmed via Context7
+- `vitest-evals@0.8.0`: getsentry/vitest-evals GitHub, Apache-2.0, Sentry-maintained
+- `autoevals@0.0.132`: npm registry, Braintrust-maintained, `Factuality` + `ClosedQA` scorers confirmed
+- `better-sqlite3@12.9.0`: synchronous INSERT/SELECT API confirmed via Context7
+- Zod v4 `.extend()` vs deprecated `.merge()`: zod.dev/v4 release notes
 
 ### Secondary (MEDIUM confidence)
-- https://clig.dev/ — Command Line Interface Guidelines; UX patterns for search output, help text, non-TTY handling (authoritative community reference)
-- https://github.com/asg017/sqlite-vec/issues/165 — sqlite-vec distance threshold constraint tracking issue (upstream issue tracker, open)
-- https://alexgarcia.xyz/blog/2024/sqlite-vec-hybrid-search/index.html — authoritative sqlite-vec pitfalls (written by the sqlite-vec author)
-- https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda — OSC8 escape sequence specification and terminal support matrix
-- https://www.npmjs.com/package/strip-ansi — v7.1.2, ESM-only (npm registry)
-
-### Tertiary (LOW confidence)
-- https://evilmartians.com/chronicles/cli-ux-best-practices-3-patterns-for-improving-progress-displays — CLI UX progress display patterns; useful for search output design but needs validation against the project's specific piped-output requirements
-- https://github.com/withastro/starlight/discussions/946 — Starlight broken link validator community discussion; the validator exists and is recommended, but the integration steps need verification against the current Starlight version
+- GitHub Actions node24 deprecation: GitHub Changelog Sep 2025 — confirms composite action is the right path
+- `@vercel/ncc` Node24 issue #1297: closed "not planned" — confirms JS action path is risky
+- EvidentlyAI + Cameron Wolfe: LLM-as-judge narcissistic bias (5–25% self-enhancement) — informs judge/generator separation requirement
+- Statsig golden dataset guide: fixture expiry and quarterly refresh cadence
+- Nx `affected` docs: mental model for dep-graph dry-run UX
+- LogRocket + AWS LLM routing guides: config-driven static routing patterns
+- Anthropic platform docs — define success criteria and build evaluations: code-based grading hierarchy, LLM-as-judge patterns
 
 ---
-*Research completed: 2026-03-01*
+
+*Research completed: 2026-05-11*
 *Ready for roadmap: yes*
