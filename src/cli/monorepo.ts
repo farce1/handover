@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 export interface MonorepoDetection {
   isMonorepo: boolean;
-  tool: string | null; // 'npm' | 'pnpm' | 'lerna' | 'cargo' | 'go' | null
+  tool: string | null; // 'npm' | 'pnpm' | 'lerna' | 'cargo' | 'go' | 'nx' | 'turbo' | null
   workspaceRoot: string | null;
 }
 
@@ -40,7 +40,17 @@ export function detectMonorepo(rootDir: string): MonorepoDetection {
     return { isMonorepo: true, tool: 'lerna', workspaceRoot: rootDir };
   }
 
-  // 4. Cargo workspace: Cargo.toml with [workspace] section
+  // 4. Nx: nx.json
+  if (existsSync(join(rootDir, 'nx.json'))) {
+    return { isMonorepo: true, tool: 'nx', workspaceRoot: rootDir };
+  }
+
+  // 5. Turborepo: turbo.json
+  if (existsSync(join(rootDir, 'turbo.json'))) {
+    return { isMonorepo: true, tool: 'turbo', workspaceRoot: rootDir };
+  }
+
+  // 6. Cargo workspace: Cargo.toml with [workspace] section
   try {
     const cargoPath = join(rootDir, 'Cargo.toml');
     if (existsSync(cargoPath)) {
@@ -53,7 +63,7 @@ export function detectMonorepo(rootDir: string): MonorepoDetection {
     // Read error -- treat as not-monorepo
   }
 
-  // 5. Go workspace: go.work
+  // 7. Go workspace: go.work
   if (existsSync(join(rootDir, 'go.work'))) {
     return { isMonorepo: true, tool: 'go', workspaceRoot: rootDir };
   }
