@@ -24,7 +24,7 @@ See milestone archives in `.planning/milestones/`.
 
 **Milestone Goal:** Put `handover` where developers already work (GitHub CI + a real init wizard) and make regeneration surgical, cost-aware, and quality-tracked.
 
-- [ ] **Phase 31: Init Wizard Upgrade + Action Scaffolding** — Provider detection, scope auto-detect, `.gitignore` patching, `--upgrade` / `--yes` modes; `handover/regenerate-docs` repo created as a composite action with `token` input defined
+- [x] **Phase 31: Init Wizard Upgrade + Action Scaffolding** — Provider detection, scope auto-detect, `.gitignore` patching, `--upgrade` / `--yes` modes; `handover/regenerate-docs` repo created as a composite action with `token` input defined  (code complete; Plan 04 + Plan 05 manual checkpoints pending)
 - [ ] **Phase 32: Source→Doc Dependency Graph** — `SourceDocGraph` class, persisted `dep-graph.json`, `--dry-run` mode, renderer-level surgical skipping for `--since` runs
 - [ ] **Phase 33: Cost Telemetry** — Per-renderer cost/token/time persisted to `.handover/telemetry.db`, `handover cost` subcommand, rotation, and `costWarningThreshold` wiring
 - [ ] **Phase 34: Config-Driven Model Routing** — `renderers:` config key, `resolveRoundModel()`, `modelHint` classification for all 14 renderers, `CACHE_VERSION` bump, per-renderer fallback
@@ -53,7 +53,7 @@ Plans:
 - [x] 31-04-PLAN.md — Wave 1 (parallel): Create external `handover/regenerate-docs` action repo with full composite `action.yml`, README, MIT LICENSE, CI workflow, and stubbed example workflows; tags v0.1.0 + floating v0  (created as farce1/regenerate-docs fallback — see SUMMARY)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 31-05-PLAN.md — Wave 2: Wire detectors into `runInit` (`src/cli/init.ts`), register `--upgrade` flag in `src/cli/index.ts`, bump `@clack/prompts` to ^1.3.0, activate the runInit integration test
+- [x] 31-05-PLAN.md — Wave 2: Wire detectors into `runInit` (`src/cli/init.ts`), register `--upgrade` flag in `src/cli/index.ts`, bump `@clack/prompts` to ^1.3.0, activate the runInit integration test  (code complete — Task 3 6-scenario human-verify still open)
 **UI hint**: no
 
 ### Phase 32: Source→Doc Dependency Graph

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v8.0
 milestone_name: Distribution & Smarter Regen
-status: executing
-stopped_at: Phase 31 Wave 1 complete — Plan 04 external repo scaffold landed (farce1/regenerate-docs), Wave 2 next
-last_updated: "2026-05-12T07:35:30Z"
-last_activity: 2026-05-12 -- Phase 31 Plan 04 complete (external repo + v0.1.0 + v0 tags)
+status: awaiting-user-verify
+stopped_at: Phase 31 code-complete (5/5 plans landed); Plan 04 + Plan 05 manual checkpoints pending
+last_updated: "2026-05-12T09:56:00Z"
+last_activity: 2026-05-12 -- Phase 31 Plan 05 complete — runInit wired, 443/443 tests GREEN, integration test active
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 
 ## Current Position
 
-Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (executing)
-Plan: 31-05 (Wave 2 — wire runInit + register --upgrade + bump @clack/prompts)
-Status: Wave 1 complete (Plans 02 + 03 + 04 all done); Wave 2 ready
-Last activity: 2026-05-12 -- Phase 31 Plan 04 complete (external repo farce1/regenerate-docs scaffolded, v0.1.0 + v0 tags published)
+Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (code complete; awaiting manual verification)
+Plan: 31-05 (Wave 2 — done; Task 3 6-scenario human-verify pending)
+Status: All 5 plans landed; full test suite 443/443 GREEN; phase-level verifier (gsd-verifier) not run yet (gsd-sdk unavailable — surfaced as a known follow-up)
+Last activity: 2026-05-12 -- Phase 31 Plan 05 complete (init.ts rewritten, @clack ^1.3.0, --upgrade flag, integration test active)
 
 ## Performance Metrics
 
@@ -92,9 +92,10 @@ Additional for Phase 31:
 ## Session Continuity
 
 Last session: 2026-05-12
-Stopped at: Phase 31 Wave 1 complete — Wave 2 next
-Resume with: /gsd-execute-phase 31
-Resume file: .planning/phases/31-init-wizard-action-scaffold/31-05-PLAN.md
+Stopped at: Phase 31 code-complete; manual verification checkpoints open
+Resume with: /gsd-verify-work 31  (after manual scenarios pass) — or /gsd-discuss-phase 32 to start next phase
 Open checkpoints:
 - Plan 04 Task 4 (human-verify) — user to run 5 browser checks against https://github.com/farce1/regenerate-docs (see 31-04-SUMMARY.md)
+- Plan 05 Task 3 (human-verify) — user to run 6 CLI scenarios documented in 31-05-PLAN.md lines 802-874 / 31-05-SUMMARY.md "User Setup Required" section
 - Phase 36 prerequisite: transfer farce1/regenerate-docs → handover/ org before Marketplace publish
+- gsd-sdk follow-up: phase-level gsd-verifier agent was not run (gsd-sdk binary unavailable in this environment); structural verification was done manually via grep/tsc/vitest gates
