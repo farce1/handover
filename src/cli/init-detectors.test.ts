@@ -22,7 +22,14 @@ vi.mock('../auth/token-store.js', () => ({
   })),
 }));
 
-import { detectProviders, cheapestDetected } from './init-detectors.js';
+import {
+  detectProviders,
+  cheapestDetected,
+  patchGitignore,
+  computeUpgradeDiff,
+} from './init-detectors.js';
+import { readFileSync } from 'node:fs';
+import { stringify as stringifyYaml } from 'yaml';
 
 describe('detectProviders', () => {
   beforeEach(() => {
@@ -73,4 +80,85 @@ describe('detectProviders', () => {
   });
 });
 
-// Test blocks for patchGitignore and computeUpgradeDiff are added by Plan 01 Task 2.
+describe('patchGitignore', () => {
+  beforeEach(() => {
+    vol.reset();
+    vi.restoreAllMocks();
+  });
+
+  it('creates a new .gitignore with the # handover block when none exists', () => {
+    patchGitignore('/proj', ['.handover/cache', '.handover/telemetry.db']);
+    const written = readFileSync('/proj/.gitignore', 'utf-8');
+    expect(written).toContain('# handover');
+    expect(written).toContain('.handover/cache');
+    expect(written).toContain('.handover/telemetry.db');
+    expect(written).toContain('# end handover');
+  });
+
+  it('is idempotent on second call (no diff)', () => {
+    patchGitignore('/proj', ['.handover/cache', '.handover/telemetry.db']);
+    const first = readFileSync('/proj/.gitignore', 'utf-8');
+    patchGitignore('/proj', ['.handover/cache', '.handover/telemetry.db']);
+    const second = readFileSync('/proj/.gitignore', 'utf-8');
+    expect(second).toBe(first);
+  });
+
+  it('does not write when a negation rule for .handover exists', () => {
+    vol.fromJSON({ '/proj/.gitignore': '!.handover/docs/\n' });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    patchGitignore('/proj', ['.handover/cache', '.handover/telemetry.db']);
+    const after = readFileSync('/proj/.gitignore', 'utf-8');
+    expect(after).toBe('!.handover/docs/\n');
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it('skips entries already covered (literal match)', () => {
+    vol.fromJSON({ '/proj/.gitignore': '.handover/cache\n' });
+    patchGitignore('/proj', ['.handover/cache', '.handover/telemetry.db']);
+    const after = readFileSync('/proj/.gitignore', 'utf-8');
+    // .handover/cache should appear only once (the pre-existing one)
+    const cacheCount = (after.match(/^\.handover\/cache$/gm) ?? []).length;
+    expect(cacheCount).toBe(1);
+    expect(after).toContain('.handover/telemetry.db');
+  });
+});
+
+describe('computeUpgradeDiff', () => {
+  it('marks a field that differs from schema default as customized', () => {
+    // 'output' default is './handover'; user picked './my-docs'
+    const yaml = stringifyYaml({ provider: 'anthropic', output: './my-docs' });
+    const diffs = computeUpgradeDiff(yaml);
+    const outputDiff = diffs.find((d) => d.key === 'output');
+    expect(outputDiff?.action).toBe('customized');
+    expect(outputDiff?.currentValue).toBe('./my-docs');
+  });
+
+  it('marks an absent key as missing', () => {
+    const yaml = stringifyYaml({ provider: 'anthropic' });
+    const diffs = computeUpgradeDiff(yaml);
+    // 'audience' is a default-bearing key in HandoverConfigSchema
+    const audienceDiff = diffs.find((d) => d.key === 'audience');
+    expect(audienceDiff?.action).toBe('missing');
+  });
+
+  it('preserves unknown keys with action="unknown"', () => {
+    const yaml = stringifyYaml({ provider: 'anthropic', myCustomKey: true });
+    const diffs = computeUpgradeDiff(yaml);
+    const unknownDiff = diffs.find((d) => d.key === 'myCustomKey');
+    expect(unknownDiff?.action).toBe('unknown');
+    expect(unknownDiff?.currentValue).toBe(true);
+  });
+});
+
+describe('runInit --yes integration (skeleton — Plan 05 turns this on)', () => {
+  it.skip('writes provider=cheapest-detected when ANTHROPIC_API_KEY set and exits 0', async () => {
+    // Plan 05 will:
+    //   1. stub ANTHROPIC_API_KEY
+    //   2. set cwd to a memfs tmpdir
+    //   3. await runInit({ yes: true })
+    //   4. assert .handover.yml exists, parses, has provider: 'anthropic'
+    //   5. assert process.exitCode is 0 (or undefined)
+    //   6. assert .gitignore has the # handover block
+    expect(true).toBe(true);
+  });
+});
