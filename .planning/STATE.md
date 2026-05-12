@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v8.0
 milestone_name: Distribution & Smarter Regen
-status: planning
-last_updated: "2026-05-12T12:00:00.000Z"
-last_activity: 2026-05-12
+status: executing
+stopped_at: Phase 31 Wave 0 complete — Plan 01 RED scaffold landed
+last_updated: "2026-05-12T06:48:50Z"
+last_activity: 2026-05-12 -- Phase 31 Plan 01 complete (TDD RED scaffold)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 5
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 20
 ---
 
 # Project State
@@ -24,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 
 ## Current Position
 
-Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (planned)
-Plan: 31-01 (Wave 0 — test scaffolding)
-Status: 5 PLAN.md files written; VALIDATION.md task-IDs reconciled; ready for `/gsd-execute-phase 31`
-Last activity: 2026-05-12 — Phase 31 plan-phase complete (5 plans, 3 waves, 12 tasks)
+Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (executing)
+Plan: 31-02 (Wave 1 — init-detectors GREEN target — next)
+Status: Wave 0 complete; Wave 1 ready to execute
+Last activity: 2026-05-12 -- Phase 31 Plan 01 complete (TDD RED scaffold, 12 it() blocks, 1 skipped)
 
 ## Performance Metrics
 
@@ -50,6 +51,7 @@ Last activity: 2026-05-12 — Phase 31 plan-phase complete (5 plans, 3 waves, 12
 Decisions from v7.0 are archived in .planning/milestones/v7.0-ROADMAP.md and .planning/PROJECT.md Key Decisions table.
 
 **v8.0 Roadmap Decisions:**
+
 - ACTN-07 (token input for protected branches) placed in Phase 31 (scaffold) because it is an input parameter definition that must be present in action.yml from day one, not runtime behavior
 - ACTN-01..06 (both operational modes, upsert pattern, cost footer, Marketplace publish, example workflows) placed in Phase 36 (complete) because they depend on the fully instrumented CLI
 - Phase 31 and Phase 32 are independent and may be executed in parallel (both start from stable v7.0 codebase)
@@ -58,6 +60,7 @@ Decisions from v7.0 are archived in .planning/milestones/v7.0-ROADMAP.md and .pl
 - Action (Phase 36) is last overall: wraps fully instrumented CLI; repo scaffold from Phase 31 means action development is not blocked on Phases 32-35
 
 **Phase 31 Planning Decisions (2026-05-12):**
+
 - 5-plan cut across 3 waves: Wave 0 (Plan 01 test scaffold) → Wave 1 (Plans 02 init-detectors module, 03 monorepo extension, 04 action repo scaffold — all parallel) → Wave 2 (Plan 05 wiring)
 - Codex subscription cost rank locked at `0.001` per RESEARCH.md Open Q1 — sits between Ollama (0) and metered providers (>= 0.28)
 - `monorepo.test.ts` lives in Plan 03 (paired with the source change) rather than Plan 01 Wave 0, because monorepo.ts is in the coverage exclude list and the test is regression-pair-style not RED-target-style
@@ -82,12 +85,13 @@ External setup still required (unchanged from v5.0):
 - CODECOV_TOKEN repo secret
 
 Additional for Phase 31:
+
 - `handover` GitHub org membership (Plan 04 Task 1 decision checkpoint resolves this — fallback to personal namespace if org does not exist)
 - `gh` CLI authenticated with `repo` + `workflow` scopes (Plan 04 prerequisite)
 
 ## Session Continuity
 
 Last session: 2026-05-12
-Stopped at: Phase 31 plan-phase complete
+Stopped at: Phase 31 Wave 0 complete (Plan 01) — Wave 1 next (Plans 02, 03, 04 parallel)
 Resume with: /gsd-execute-phase 31
-Resume file: .planning/phases/31-init-wizard-action-scaffold/31-01-PLAN.md (Wave 0 entry point)
+Resume file: .planning/phases/31-init-wizard-action-scaffold/31-02-PLAN.md (Wave 1 entry point)
