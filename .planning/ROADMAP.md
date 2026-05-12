@@ -50,7 +50,7 @@ Plans:
 - [x] 31-01-PLAN.md — Wave 0: Scaffold `src/cli/init-detectors.test.ts` with 12 failing tests (RED targets for Plan 02)
 - [x] 31-02-PLAN.md — Wave 1: Implement `src/cli/init-detectors.ts` (detectProviders + patchGitignore + computeUpgradeDiff) — turns Plan 01's 11 unit tests GREEN
 - [x] 31-03-PLAN.md — Wave 1 (parallel): Add nx.json + turbo.json detection to `src/cli/monorepo.ts` + colocated `monorepo.test.ts` (8 tests)
-- [ ] 31-04-PLAN.md — Wave 1 (parallel): Create external `handover/regenerate-docs` action repo with full composite `action.yml`, README, MIT LICENSE, CI workflow, and stubbed example workflows; tags v0.1.0 + floating v0
+- [x] 31-04-PLAN.md — Wave 1 (parallel): Create external `handover/regenerate-docs` action repo with full composite `action.yml`, README, MIT LICENSE, CI workflow, and stubbed example workflows; tags v0.1.0 + floating v0  (created as farce1/regenerate-docs fallback — see SUMMARY)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 31-05-PLAN.md — Wave 2: Wire detectors into `runInit` (`src/cli/init.ts`), register `--upgrade` flag in `src/cli/index.ts`, bump `@clack/prompts` to ^1.3.0, activate the runInit integration test

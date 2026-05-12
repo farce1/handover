@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v8.0
 milestone_name: Distribution & Smarter Regen
-status: awaiting-user
-stopped_at: Phase 31 Wave 1 — Plans 02 + 03 complete, Plan 04 needs user setup
-last_updated: "2026-05-12T06:55:30Z"
-last_activity: 2026-05-12 -- Phase 31 Plans 02 + 03 GREEN (init-detectors module + nx/turbo monorepo detection)
+status: executing
+stopped_at: Phase 31 Wave 1 complete — Plan 04 external repo scaffold landed (farce1/regenerate-docs), Wave 2 next
+last_updated: "2026-05-12T07:35:30Z"
+last_activity: 2026-05-12 -- Phase 31 Plan 04 complete (external repo + v0.1.0 + v0 tags)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
-  percent: 60
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 
 ## Current Position
 
-Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (awaiting user setup)
-Plan: 31-04 (Wave 1 — external action repo scaffold — needs gh CLI + org decision)
-Status: Wave 1 partially complete (Plans 02 + 03 GREEN); Plan 04 blocked on user setup checkpoint
-Last activity: 2026-05-12 -- Phase 31 Plans 02 + 03 GREEN; 442/443 tests pass repo-wide, 1 skipped (Plan 05 integration target)
+Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (executing)
+Plan: 31-05 (Wave 2 — wire runInit + register --upgrade + bump @clack/prompts)
+Status: Wave 1 complete (Plans 02 + 03 + 04 all done); Wave 2 ready
+Last activity: 2026-05-12 -- Phase 31 Plan 04 complete (external repo farce1/regenerate-docs scaffolded, v0.1.0 + v0 tags published)
 
 ## Performance Metrics
 
@@ -92,7 +92,9 @@ Additional for Phase 31:
 ## Session Continuity
 
 Last session: 2026-05-12
-Stopped at: Phase 31 Wave 1 — Plans 02 + 03 GREEN, Plan 04 paused on user-setup checkpoint
-Resume with: /gsd-execute-phase 31  (after gh auth status + org decision)
-Resume file: .planning/phases/31-init-wizard-action-scaffold/31-04-PLAN.md
-Open checkpoint: Plan 04 needs (1) `handover` GitHub org existence confirmation or fallback namespace, (2) `gh auth status` showing repo + workflow scopes
+Stopped at: Phase 31 Wave 1 complete — Wave 2 next
+Resume with: /gsd-execute-phase 31
+Resume file: .planning/phases/31-init-wizard-action-scaffold/31-05-PLAN.md
+Open checkpoints:
+- Plan 04 Task 4 (human-verify) — user to run 5 browser checks against https://github.com/farce1/regenerate-docs (see 31-04-SUMMARY.md)
+- Phase 36 prerequisite: transfer farce1/regenerate-docs → handover/ org before Marketplace publish
