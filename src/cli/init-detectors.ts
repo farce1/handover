@@ -11,9 +11,11 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 import { DEFAULT_API_KEY_ENV } from '../config/defaults.js';
 import { PROVIDER_PRESETS } from '../providers/presets.js';
 import { TokenStore } from '../auth/token-store.js';
+import { HandoverConfigSchema } from '../config/schema.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -186,4 +188,73 @@ export function patchGitignore(cwd: string, entries: string[]): void {
   }
 }
 
-// ─── computeUpgradeDiff added in Task 3 ─────────────────────────────────────
+// ─── computeUpgradeDiff ─────────────────────────────────────────────────────
+
+/**
+ * Compare a user's existing .handover.yml against the current schema defaults
+ * and produce a three-bucket diff (CONTEXT.md D-14 through D-19).
+ *
+ * Buckets:
+ *   - 'customized': key present and differs from schema default → PRESERVE on upgrade
+ *   - 'at-default': key present and matches schema default → no-op on upgrade
+ *   - 'missing':    key absent from raw → ADD with current default
+ *   - 'unknown':    key present in raw but not in schema → PRESERVE intact (D-19)
+ *
+ * Equality is JSON-string based (handles nested objects, arrays). The schema is
+ * intentionally NOT used for parsing the raw YAML — Zod's default behavior
+ * strips unknown keys, which would silently lose user customizations (Pitfall 4).
+ *
+ * Trust boundary T-31-02: yaml v2 `parse()` does not execute code or
+ * prototype-pollute. We additionally guard the post-parse object shape.
+ */
+export function computeUpgradeDiff(existingYaml: string): UpgradeDiff[] {
+  let raw: unknown;
+  try {
+    raw = parseYaml(existingYaml);
+  } catch {
+    return [];
+  }
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return [];
+  }
+  const rawObj = raw as Record<string, unknown>;
+
+  // HandoverConfigSchema.parse({}) yields all .default() values for known keys.
+  const schemaDefaults = HandoverConfigSchema.parse({}) as Record<string, unknown>;
+  const knownKeys = Object.keys(schemaDefaults);
+  const knownKeySet = new Set(knownKeys);
+
+  const diffs: UpgradeDiff[] = [];
+
+  for (const key of knownKeys) {
+    if (!(key in rawObj)) {
+      diffs.push({
+        key,
+        currentValue: undefined,
+        defaultValue: schemaDefaults[key],
+        action: 'missing',
+      });
+      continue;
+    }
+    const isCustomized = JSON.stringify(rawObj[key]) !== JSON.stringify(schemaDefaults[key]);
+    diffs.push({
+      key,
+      currentValue: rawObj[key],
+      defaultValue: schemaDefaults[key],
+      action: isCustomized ? 'customized' : 'at-default',
+    });
+  }
+
+  for (const key of Object.keys(rawObj)) {
+    if (!knownKeySet.has(key)) {
+      diffs.push({
+        key,
+        currentValue: rawObj[key],
+        defaultValue: undefined,
+        action: 'unknown',
+      });
+    }
+  }
+
+  return diffs;
+}
