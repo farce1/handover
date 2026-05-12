@@ -16,6 +16,10 @@ program
   .command('init')
   .description('Create .handover.yml configuration file')
   .option('--yes', 'Skip prompts and write a default config (for CI/non-interactive environments)')
+  .option(
+    '--upgrade',
+    'Re-run init to refresh missing/stale defaults without clobbering customized fields',
+  )
   .action(runInit);
 
 program
