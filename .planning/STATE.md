@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v8.0
 milestone_name: Distribution & Smarter Regen
-status: executing
-stopped_at: Phase 31 Wave 0 complete — Plan 01 RED scaffold landed
-last_updated: "2026-05-12T06:48:50Z"
-last_activity: 2026-05-12 -- Phase 31 Plan 01 complete (TDD RED scaffold)
+status: awaiting-user
+stopped_at: Phase 31 Wave 1 — Plans 02 + 03 complete, Plan 04 needs user setup
+last_updated: "2026-05-12T06:55:30Z"
+last_activity: 2026-05-12 -- Phase 31 Plans 02 + 03 GREEN (init-detectors module + nx/turbo monorepo detection)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
-  percent: 20
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 
 ## Current Position
 
-Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (executing)
-Plan: 31-02 (Wave 1 — init-detectors GREEN target — next)
-Status: Wave 0 complete; Wave 1 ready to execute
-Last activity: 2026-05-12 -- Phase 31 Plan 01 complete (TDD RED scaffold, 12 it() blocks, 1 skipped)
+Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (awaiting user setup)
+Plan: 31-04 (Wave 1 — external action repo scaffold — needs gh CLI + org decision)
+Status: Wave 1 partially complete (Plans 02 + 03 GREEN); Plan 04 blocked on user setup checkpoint
+Last activity: 2026-05-12 -- Phase 31 Plans 02 + 03 GREEN; 442/443 tests pass repo-wide, 1 skipped (Plan 05 integration target)
 
 ## Performance Metrics
 
@@ -92,6 +92,7 @@ Additional for Phase 31:
 ## Session Continuity
 
 Last session: 2026-05-12
-Stopped at: Phase 31 Wave 0 complete (Plan 01) — Wave 1 next (Plans 02, 03, 04 parallel)
-Resume with: /gsd-execute-phase 31
-Resume file: .planning/phases/31-init-wizard-action-scaffold/31-02-PLAN.md (Wave 1 entry point)
+Stopped at: Phase 31 Wave 1 — Plans 02 + 03 GREEN, Plan 04 paused on user-setup checkpoint
+Resume with: /gsd-execute-phase 31  (after gh auth status + org decision)
+Resume file: .planning/phases/31-init-wizard-action-scaffold/31-04-PLAN.md
+Open checkpoint: Plan 04 needs (1) `handover` GitHub org existence confirmation or fallback namespace, (2) `gh auth status` showing repo + workflow scopes
