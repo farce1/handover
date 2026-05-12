@@ -150,15 +150,34 @@ describe('computeUpgradeDiff', () => {
   });
 });
 
-describe('runInit --yes integration (skeleton — Plan 05 turns this on)', () => {
-  it.skip('writes provider=cheapest-detected when ANTHROPIC_API_KEY set and exits 0', async () => {
-    // Plan 05 will:
-    //   1. stub ANTHROPIC_API_KEY
-    //   2. set cwd to a memfs tmpdir
-    //   3. await runInit({ yes: true })
-    //   4. assert .handover.yml exists, parses, has provider: 'anthropic'
-    //   5. assert process.exitCode is 0 (or undefined)
-    //   6. assert .gitignore has the # handover block
-    expect(true).toBe(true);
+describe('runInit --yes integration', () => {
+  beforeEach(() => {
+    vol.reset();
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connection refused')));
+  });
+
+  it('writes provider=cheapest-detected when ANTHROPIC_API_KEY set and patches .gitignore', async () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test');
+    // memfs cwd is '/proj'. We spy on process.cwd() so init.ts (which uses
+    // path.join(process.cwd(), ...) for every fs op) resolves all reads/writes
+    // into the memfs virtual root.
+    vol.fromJSON({ '/proj/package.json': JSON.stringify({ name: 'demo' }) });
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/proj');
+
+    const { runInit } = await import('./init.js');
+    await runInit({ yes: true });
+
+    const written = readFileSync('/proj/.handover.yml', 'utf-8');
+    expect(written).toContain('provider: anthropic');
+    const gi = readFileSync('/proj/.gitignore', 'utf-8');
+    expect(gi).toContain('# handover');
+    expect(gi).toContain('.handover/cache');
+    expect(gi).toContain('.handover/telemetry.db');
+    expect(process.exitCode === 0 || process.exitCode === undefined).toBe(true);
+
+    cwdSpy.mockRestore();
   });
 });
