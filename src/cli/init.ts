@@ -19,11 +19,21 @@ import { detectMonorepo } from './monorepo.js';
 // Locked by CONTEXT.md D-10 + STATE.md pending todo. Do NOT use blanket '.handover/'.
 const GITIGNORE_ENTRIES = ['.handover/cache', '.handover/telemetry.db'];
 
+// Every provider in DEFAULT_API_KEY_ENV that has a PROVIDER_PRESETS entry must
+// appear here so detectProviders() results can render with the `(detected)`
+// suffix and be pre-selectable. Without this list covering all 8 cloud + local
+// providers, a user with e.g. GROQ_API_KEY set would see Groq detected by
+// detectProviders() but absent from the wizard's selectable options
+// (Plan 05 Scenario 1 exercises this exact case).
 const PROVIDER_OPTIONS = [
   { value: 'anthropic', label: 'Anthropic', hint: 'Claude Opus — recommended' },
   { value: 'openai', label: 'OpenAI', hint: 'GPT-4o' },
   { value: 'ollama', label: 'Ollama', hint: 'Local models — zero external data transfer' },
   { value: 'gemini', label: 'Google Gemini', hint: 'Gemini 2.5 Flash — generous free tier' },
+  { value: 'groq', label: 'Groq', hint: 'Llama 3.3 70B — fast inference, low cost' },
+  { value: 'together', label: 'Together AI', hint: 'Open models — Llama 3.1 70B Turbo' },
+  { value: 'deepseek', label: 'DeepSeek', hint: 'DeepSeek Chat — very low cost' },
+  { value: 'azure-openai', label: 'Azure OpenAI', hint: 'GPT-4o via Azure' },
 ] as const;
 
 interface RunInitOptions {
@@ -192,13 +202,12 @@ async function runInteractive(detected: DetectedProvider[]): Promise<void> {
   if (projectInfo.name) {
     config.project = { name: projectInfo.name };
   }
-  // D-05: Codex auto-detected in interactive mode too (only if user picked openai AND Codex was the top source)
-  const top = detected[0];
-  if (
-    answers.provider === 'openai' &&
-    top?.provider === 'openai' &&
-    top.source === 'codex-subscription'
-  ) {
+  // D-05: Codex auto-detected in interactive mode. Look up the openai-specific
+  // detected entry rather than `detected[0]` — when Ollama is reachable it
+  // becomes the cheapest, dropping openai-codex past index 0, and using `top`
+  // would miss the Codex flag even when the user manually overrides to openai.
+  const openaiEntry = detected.find((d) => d.provider === 'openai');
+  if (answers.provider === 'openai' && openaiEntry?.source === 'codex-subscription') {
     config.authMethod = 'subscription';
   }
 
