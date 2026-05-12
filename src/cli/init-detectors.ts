@@ -9,6 +9,8 @@
  * runInit() which gets them from process.cwd()). They are NOT user-attacker
  * controlled — see threat model T-31-03 in 31-02-PLAN.md.
  */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { DEFAULT_API_KEY_ENV } from '../config/defaults.js';
 import { PROVIDER_PRESETS } from '../providers/presets.js';
 import { TokenStore } from '../auth/token-store.js';
@@ -117,4 +119,71 @@ export function cheapestDetected(providers: DetectedProvider[]): string | null {
   return providers[0]?.provider ?? null;
 }
 
-// ─── patchGitignore / computeUpgradeDiff added in Task 2 + Task 3 ───────────
+// ─── patchGitignore ─────────────────────────────────────────────────────────
+
+const HANDOVER_MARKER = '# handover';
+const HANDOVER_END_MARKER = '# end handover';
+const NEGATION_WARNING =
+  'Found user negation rule for .handover/* — leaving .gitignore unchanged. Add cache/telemetry entries manually if needed.';
+
+/**
+ * Idempotently patch .gitignore with handover-owned entries.
+ *
+ * Per CONTEXT.md D-09 through D-13:
+ *  - Entries are written as a single marker-delimited block: `# handover` ... `# end handover`
+ *  - Idempotent: marker presence short-circuits the write
+ *  - Negation-safe: if any `!.handover*` line exists, do not modify the file
+ *  - Non-fatal: filesystem errors do not throw (init UX must remain smooth)
+ *  - Cross-platform: gitignore entries use forward-slash literals on all OSes
+ *
+ * Trust boundary: cwd is from process.cwd(), entries are internal constants.
+ * Never expose this function to user-supplied input (T-31-03).
+ */
+export function patchGitignore(cwd: string, entries: string[]): void {
+  const gitignorePath = join(cwd, '.gitignore');
+
+  let content = '';
+  try {
+    content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
+  } catch {
+    return; // Non-fatal: read failure → skip patching
+  }
+
+  const lines = content.split('\n').map((l) => l.trim());
+
+  // Negation bailout (D-12 + Pitfall 2: any prefix '!.handover' counts)
+  if (lines.some((l) => l.startsWith('!.handover'))) {
+    console.warn(NEGATION_WARNING);
+    return;
+  }
+
+  // Idempotent: marker present → already patched
+  if (lines.includes(HANDOVER_MARKER)) {
+    return;
+  }
+
+  // Filter entries already covered by a literal match (do NOT outsmart globs)
+  const toAdd = entries.filter((e) => !lines.includes(e));
+  if (toAdd.length === 0) {
+    return;
+  }
+
+  // Build the marker-delimited block (D-11)
+  const block = ['', HANDOVER_MARKER, ...toAdd, HANDOVER_END_MARKER, ''].join('\n');
+
+  const needsLeadingNewline = content.length > 0 && !content.endsWith('\n');
+  const newContent = content + (needsLeadingNewline ? '\n' : '') + block;
+
+  try {
+    // Ensure cwd exists — defensive for fresh memfs setups and rare
+    // race conditions where cwd was removed between process.cwd() and now.
+    if (!existsSync(cwd)) {
+      mkdirSync(cwd, { recursive: true });
+    }
+    writeFileSync(gitignorePath, newContent, 'utf-8');
+  } catch {
+    // Non-fatal: write failure → log nothing (avoids noisy init in restricted FS)
+  }
+}
+
+// ─── computeUpgradeDiff added in Task 3 ─────────────────────────────────────
