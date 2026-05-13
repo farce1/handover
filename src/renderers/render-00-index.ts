@@ -53,8 +53,8 @@ export function renderIndex(ctx: RenderContext, statuses: DocumentStatus[]): str
   lines.push('## Documents');
   lines.push('');
 
-  const statusLabel = (s: DocumentStatus['status']): string => {
-    switch (s) {
+  const statusLabel = (s: DocumentStatus): string => {
+    switch (s.status) {
       case 'complete':
         return 'Complete';
       case 'partial':
@@ -63,13 +63,17 @@ export function renderIndex(ctx: RenderContext, statuses: DocumentStatus[]): str
         return 'Static Only';
       case 'not-generated':
         return 'Not Generated';
+      case 'reused':
+        return s.lastRenderedAt
+          ? `Reused (last: ${s.lastRenderedAt})`
+          : 'Reused';
     }
   };
 
   const rows = statuses.map((s, i) => {
     const num = String(i).padStart(2, '0');
     const docLink = s.status !== 'not-generated' ? `[${s.title}](${s.filename})` : s.title;
-    return [num, docLink, statusLabel(s.status)];
+    return [num, docLink, statusLabel(s)];
   });
 
   lines.push(buildTable(['#', 'Document', 'Status'], rows));

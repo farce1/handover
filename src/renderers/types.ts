@@ -47,6 +47,7 @@ export interface DocumentSpec {
   category: string;
   aliases: string[];
   requiredRounds: number[];
+  requiredSources: string[];          // NEW (Phase 32 D-02): curated fast-glob patterns
   render: (ctx: RenderContext) => string;
 }
 
@@ -59,8 +60,9 @@ export interface DocumentStatus {
   id: string;
   filename: string;
   title: string;
-  status: 'complete' | 'partial' | 'static-only' | 'not-generated';
+  status: 'complete' | 'partial' | 'static-only' | 'not-generated' | 'reused';  // ADD 'reused' (Phase 32 D-09)
   reason?: string;
+  lastRenderedAt?: string;            // NEW (Phase 32): ISO-8601, set only when status === 'reused'
 }
 
 // ─── FrontMatterFields ──────────────────────────────────────────────────────

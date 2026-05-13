@@ -18,6 +18,16 @@ import { renderConventions } from './render-11-conventions.js';
 import { renderTesting } from './render-12-testing.js';
 import { renderDeployment } from './render-13-deployment.js';
 
+// ─── withSelfRef Helper (Phase 32 D-10) ─────────────────────────────────────
+
+/**
+ * Prepend a renderer's own source path to its source globs.
+ * Per D-10: a change to a renderer's source itself must re-trigger that renderer.
+ * Returns a NEW array; does not mutate `otherSources`.
+ */
+export const withSelfRef = (rendererPath: string, otherSources: string[]): string[] =>
+  [rendererPath, ...otherSources];
+
 // ─── Document Registry ──────────────────────────────────────────────────────
 
 /**
@@ -33,6 +43,7 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'index',
     aliases: ['index', 'idx'],
     requiredRounds: [],
+    requiredSources: [],          // INDEX always renders; value informational (D-09)
     // NOTE: renderIndex has a different signature (extra `statuses` param).
     // This shim satisfies the DocumentSpec render type; the actual statuses
     // are passed at render-time in generate.ts which calls renderIndex directly.
@@ -45,6 +56,13 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'overview',
     aliases: ['overview'],
     requiredRounds: [1],
+    requiredSources: withSelfRef('src/renderers/render-01-overview.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/analyzers/file-tree.ts',
+      'src/analyzers/dependency-graph.ts',
+      'src/analyzers/coordinator.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderOverview,
   },
   {
@@ -54,6 +72,15 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'guide',
     aliases: ['getting-started', 'start'],
     requiredRounds: [1, 6],
+    requiredSources: withSelfRef('src/renderers/render-02-getting-started.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-6-deployment.ts',
+      'src/analyzers/env-scanner.ts',
+      'src/analyzers/dependency-graph.ts',
+      'src/analyzers/file-tree.ts',
+      'src/analyzers/git-history.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderGettingStarted,
   },
   {
@@ -63,6 +90,14 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'architecture',
     aliases: ['arch', 'architecture'],
     requiredRounds: [1, 2, 3, 4],
+    requiredSources: withSelfRef('src/renderers/render-03-architecture.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-2-modules.ts',
+      'src/ai-rounds/round-3-features.ts',
+      'src/ai-rounds/round-4-architecture.ts',
+      'src/ai-rounds/runner.ts',
+      'src/orchestrator/dag.ts',
+    ]),
     render: renderArchitecture,
   },
   {
@@ -72,6 +107,12 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'structure',
     aliases: ['files', 'file-structure'],
     requiredRounds: [1, 2],
+    requiredSources: withSelfRef('src/renderers/render-04-file-structure.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-2-modules.ts',
+      'src/analyzers/file-tree.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderFileStructure,
   },
   {
@@ -81,6 +122,12 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'features',
     aliases: ['features'],
     requiredRounds: [1, 2, 3],
+    requiredSources: withSelfRef('src/renderers/render-05-features.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-2-modules.ts',
+      'src/ai-rounds/round-3-features.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderFeatures,
   },
   {
@@ -90,6 +137,12 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'modules',
     aliases: ['modules', 'mods'],
     requiredRounds: [1, 2],
+    requiredSources: withSelfRef('src/renderers/render-06-modules.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-2-modules.ts',
+      'src/analyzers/file-tree.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderModules,
   },
   {
@@ -99,6 +152,11 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'dependencies',
     aliases: ['deps', 'dependencies'],
     requiredRounds: [1],
+    requiredSources: withSelfRef('src/renderers/render-07-dependencies.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/analyzers/dependency-graph.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderDependencies,
   },
   {
@@ -108,6 +166,13 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'environment',
     aliases: ['env', 'environment'],
     requiredRounds: [1, 2, 6],
+    requiredSources: withSelfRef('src/renderers/render-08-environment.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-2-modules.ts',
+      'src/ai-rounds/round-6-deployment.ts',
+      'src/analyzers/env-scanner.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderEnvironment,
   },
   {
@@ -117,6 +182,13 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'edge-cases',
     aliases: ['edge-cases', 'gotchas'],
     requiredRounds: [1, 2, 5],
+    requiredSources: withSelfRef('src/renderers/render-09-edge-cases.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-2-modules.ts',
+      'src/ai-rounds/round-5-edge-cases.ts',
+      'src/analyzers/todo-scanner.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderEdgeCases,
   },
   {
@@ -126,6 +198,13 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'tech-debt',
     aliases: ['tech-debt', 'todos'],
     requiredRounds: [1, 2, 5],
+    requiredSources: withSelfRef('src/renderers/render-10-tech-debt.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-2-modules.ts',
+      'src/ai-rounds/round-5-edge-cases.ts',
+      'src/analyzers/todo-scanner.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderTechDebt,
   },
   {
@@ -135,6 +214,12 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'conventions',
     aliases: ['conventions'],
     requiredRounds: [1, 2, 5],
+    requiredSources: withSelfRef('src/renderers/render-11-conventions.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-2-modules.ts',
+      'src/ai-rounds/round-5-edge-cases.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderConventions,
   },
   {
@@ -144,6 +229,13 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'testing',
     aliases: ['testing', 'tests'],
     requiredRounds: [1, 2, 5],
+    requiredSources: withSelfRef('src/renderers/render-12-testing.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-2-modules.ts',
+      'src/ai-rounds/round-5-edge-cases.ts',
+      'src/analyzers/test-analyzer.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderTesting,
   },
   {
@@ -153,6 +245,14 @@ export const DOCUMENT_REGISTRY: DocumentSpec[] = [
     category: 'deployment',
     aliases: ['deploy', 'deployment'],
     requiredRounds: [1, 2, 6],
+    requiredSources: withSelfRef('src/renderers/render-13-deployment.ts', [
+      'src/ai-rounds/round-1-overview.ts',
+      'src/ai-rounds/round-2-modules.ts',
+      'src/ai-rounds/round-6-deployment.ts',
+      'src/analyzers/dependency-graph.ts',
+      'src/analyzers/file-tree.ts',
+      'src/ai-rounds/runner.ts',
+    ]),
     render: renderDeployment,
   },
 ];

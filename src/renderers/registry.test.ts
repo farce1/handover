@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   resolveSelectedDocs,
   computeRequiredRounds,
+  withSelfRef,
   DOCUMENT_REGISTRY,
   GROUP_ALIASES,
   ROUND_DEPS,
@@ -196,5 +197,39 @@ describe('computeRequiredRounds()', () => {
       expect(ROUND_DEPS[4]).toContain(2);
       expect(ROUND_DEPS[4]).toContain(3);
     });
+  });
+});
+
+describe('withSelfRef()', () => {
+  test('prepends renderer path to other sources', () => {
+    const result = withSelfRef('a.ts', ['b.ts', 'c.ts']);
+    expect(result).toEqual(['a.ts', 'b.ts', 'c.ts']);
+  });
+
+  test('handles empty other sources', () => {
+    expect(withSelfRef('a.ts', [])).toEqual(['a.ts']);
+  });
+
+  test('returns a new array (does not mutate input)', () => {
+    const other = ['b.ts', 'c.ts'];
+    const result = withSelfRef('a.ts', other);
+    expect(result).not.toBe(other);
+    expect(other).toEqual(['b.ts', 'c.ts']);
+  });
+});
+
+describe('DOCUMENT_REGISTRY shape — requiredSources invariants', () => {
+  test('every non-INDEX entry has requiredSources[0] pointing to its renderer source', () => {
+    for (const entry of DOCUMENT_REGISTRY) {
+      if (entry.id === '00-index') continue;
+      expect(entry.requiredSources.length).toBeGreaterThan(0);
+      expect(entry.requiredSources[0]).toMatch(/^src\/renderers\/render-\d{2}-.+\.ts$/);
+    }
+  });
+
+  test('00-index has requiredSources as an empty array (INDEX always renders)', () => {
+    const indexDoc = DOCUMENT_REGISTRY.find((d) => d.id === '00-index');
+    expect(indexDoc).toBeDefined();
+    expect(indexDoc!.requiredSources).toEqual([]);
   });
 });
