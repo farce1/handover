@@ -143,7 +143,7 @@ Plans:
 | 21-26 | v6.0 | 13/13 | Complete | 2026-02-28 |
 | 27-30 | v7.0 | 14/14 | Complete | 2026-03-02 |
 | 31. Init Wizard + Action Scaffold | v8.0 | 0/5 | Planned | - |
-| 32. Source→Doc Dep Graph | v8.0 | 4/4 | Complete   | 2026-05-13 |
+| 32. Source→Doc Dep Graph | v8.0 | 4/4 | Complete    | 2026-05-13 |
 | 33. Cost Telemetry | v8.0 | 0/? | Not started | - |
 | 34. Config-Driven Model Routing | v8.0 | 0/? | Not started | - |
 | 35. Eval Harness | v8.0 | 0/? | Not started | - |

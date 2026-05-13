@@ -27,11 +27,11 @@ Requirements for the v8.0 milestone. Each maps to a roadmap phase (31–36).
 
 ### Source→Doc Dependency Graph (REGEN)
 
-- [ ] **REGEN-03**: User running `handover generate --since <ref>` consults the persisted source→renderer dependency graph and re-runs only renderers whose source dependencies changed (replaces today's "regenerate all renderers" behavior on `--since`)
-- [ ] **REGEN-04**: User can run `handover generate --dry-run` to preview which renderers would execute without making any LLM calls
-- [ ] **REGEN-05**: Dependency graph is persisted to `.handover/cache/dep-graph.json` with a `graphVersion` field; stale-version graphs are discarded and rebuilt safely (no-graph degrades to full regen)
-- [ ] **REGEN-06**: Dependency graph excludes infrastructure files (logger, config loader, shared types) from source nodes to prevent over-approximation that would defeat surgical regen
-- [ ] **REGEN-07**: A single leaf-file change (one non-infrastructure source file) triggers fewer than 14 renderers — verifiable via test fixture
+- [x] **REGEN-03**: User running `handover generate --since <ref>` consults the persisted source→renderer dependency graph and re-runs only renderers whose source dependencies changed (replaces today's "regenerate all renderers" behavior on `--since`)
+- [x] **REGEN-04**: User can run `handover generate --dry-run` to preview which renderers would execute without making any LLM calls
+- [x] **REGEN-05**: Dependency graph is persisted to `.handover/cache/dep-graph.json` with a `graphVersion` field; stale-version graphs are discarded and rebuilt safely (no-graph degrades to full regen)
+- [x] **REGEN-06**: Dependency graph excludes infrastructure files (logger, config loader, shared types) from source nodes to prevent over-approximation that would defeat surgical regen
+- [x] **REGEN-07**: A single leaf-file change (one non-infrastructure source file) triggers fewer than 14 renderers — verifiable via test fixture
 
 ### Cost Telemetry (TELEM)
 
@@ -120,11 +120,11 @@ Explicitly excluded from v8.0. Documented to prevent scope creep mid-milestone.
 | INIT-04 | Phase 31 | Pending |
 | INIT-05 | Phase 31 | Pending |
 | ACTN-07 | Phase 31 | Pending |
-| REGEN-03 | Phase 32 | Pending |
-| REGEN-04 | Phase 32 | Pending |
-| REGEN-05 | Phase 32 | Pending |
-| REGEN-06 | Phase 32 | Pending |
-| REGEN-07 | Phase 32 | Pending |
+| REGEN-03 | Phase 32 | Complete |
+| REGEN-04 | Phase 32 | Complete |
+| REGEN-05 | Phase 32 | Complete |
+| REGEN-06 | Phase 32 | Complete |
+| REGEN-07 | Phase 32 | Complete |
 | TELEM-01 | Phase 33 | Pending |
 | TELEM-02 | Phase 33 | Pending |
 | TELEM-03 | Phase 33 | Pending |
