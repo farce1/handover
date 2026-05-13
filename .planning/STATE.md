@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v8.0
 milestone_name: Distribution & Smarter Regen
 status: awaiting-user-verify
-stopped_at: Phase 31 code-complete (5/5 plans landed); Plan 04 + Plan 05 manual checkpoints pending
-last_updated: "2026-05-12T09:56:00Z"
-last_activity: 2026-05-12 -- Phase 31 Plan 05 complete — runInit wired, 443/443 tests GREEN, integration test active
+stopped_at: Phase 31 manual verification checkpoints open; Phase 32 context gathered
+last_updated: "2026-05-13T09:44:27.362Z"
+last_activity: 2026-05-13 -- Phase 32 context gathered (32-CONTEXT.md written; 4 gray areas captured)
 progress:
   total_phases: 6
   completed_phases: 0
@@ -91,10 +91,11 @@ Additional for Phase 31:
 
 ## Session Continuity
 
-Last session: 2026-05-12
-Stopped at: Phase 31 code-complete; manual verification checkpoints open
-Resume with: /gsd-verify-work 31  (after manual scenarios pass) — or /gsd-discuss-phase 32 to start next phase
+Last session: 2026-05-13
+Stopped at: Phase 32 context gathered (.planning/phases/32-source-doc-dependency-graph/32-CONTEXT.md)
+Resume with: /gsd-plan-phase 32 to plan Phase 32 — or /gsd-verify-work 31 (after Phase 31 manual scenarios pass)
 Open checkpoints:
+
 - Plan 04 Task 4 (human-verify) — user to run 5 browser checks against https://github.com/farce1/regenerate-docs (see 31-04-SUMMARY.md)
 - Plan 05 Task 3 (human-verify) — user to run 6 CLI scenarios documented in 31-05-PLAN.md lines 802-874 / 31-05-SUMMARY.md "User Setup Required" section
 - Phase 36 prerequisite: transfer farce1/regenerate-docs → handover/ org before Marketplace publish
