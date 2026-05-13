@@ -10,6 +10,8 @@ Every person (or LLM) who encounters this repo should understand what handover d
 
 ## Current State
 
+**Active milestone:** v8.0 Distribution & Smarter Regen — Phase 32 (Source→Doc Dependency Graph) complete 2026-05-13; surgical `--since` regen + `--dry-run` preview shipped behind dep-graph at `.handover/cache/dep-graph.json`.
+
 **Latest shipped milestone:** v7.0 Quality, Performance & Polish (2026-03-02)
 
 What shipped:
@@ -130,10 +132,12 @@ Primary outcomes:
 - ✓ QA timing/token stats footer and MCP `semantic_search` enrichment (docType + content) — v7.0
 - ✓ User docs for search/reindex/regeneration and contributor testing guide — v7.0
 - ✓ `handover init --yes` non-interactive guard and `starlight-links-validator` CI gate — v7.0
+- ✓ Source→doc dependency graph for surgical per-renderer regeneration (`REGEN-03`) — v8.0 / Phase 32
+- ✓ `--dry-run` preview of which renderers would execute, with zero LLM calls (`REGEN-04`) — v8.0 / Phase 32
+- ✓ `requiredSources` declarations per renderer + `'reused'` document status (`REGEN-05`, `REGEN-06`) — v8.0 / Phase 32
+- ✓ Persisted dep-graph at `.handover/cache/dep-graph.json` with `graphVersion` invalidation (`REGEN-07`) — v8.0 / Phase 32
 
 ### Active
-
-(Defining v8.0 requirements — see REQUIREMENTS.md and ROADMAP.md once written)
 
 ### Deferred
 
@@ -141,7 +145,6 @@ Primary outcomes:
 - [ ] Headless device-code auth flow (`AUTH-06`)
 - [ ] `handover auth token` support for CI/CD injection (`AUTH-07`)
 - [ ] `handover auth logout` command and full credential clearing (`AUTH-08`)
-- [ ] Source-to-document dependency graph for surgical per-renderer regeneration (`REGEN-03`)
 - [ ] Integration test suite (`test:integration`) requiring real API keys (`TEST-04`)
 - [ ] `--format json` flag for machine-readable search output (`SRCH-07`)
 
@@ -248,4 +251,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-05-11 after v8.0 milestone start_
+_Last updated: 2026-05-13 after Phase 32 (Source→Doc Dependency Graph) completion_
