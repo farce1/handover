@@ -10,7 +10,7 @@
  *
  * NOTE: Tests require `npm run build` first -- the CLI runs from dist/.
  */
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -116,29 +116,26 @@ export function runCLI(
   const timeout = options?.timeout ?? 120_000;
   const env = { ...process.env, NO_COLOR: '1', ...options?.env };
 
-  try {
-    const stdout = execFileSync(process.execPath, [CLI_PATH, ...args], {
-      cwd,
-      timeout,
-      env,
-      encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+  // Use spawnSync (not execFileSync) so we can capture stderr on BOTH success
+  // (exit 0) and failure paths. execFileSync only surfaces stderr via thrown
+  // error.stderr — assertions about warnings on the happy path require this.
+  const result = spawnSync(process.execPath, [CLI_PATH, ...args], {
+    cwd,
+    timeout,
+    env,
+    encoding: 'utf-8',
+    maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
 
-    return { stdout: stdout ?? '', stderr: '', exitCode: 0 };
-  } catch (error: unknown) {
-    const err = error as {
-      stdout?: string | Buffer;
-      stderr?: string | Buffer;
-      status?: number | null;
-    };
-    return {
-      stdout: String(err.stdout ?? ''),
-      stderr: String(err.stderr ?? ''),
-      exitCode: err.status ?? 1,
-    };
-  }
+  // Preserve legacy contract: callers that previously relied on the catch
+  // branch still get exitCode and stderr; the success path now also exposes
+  // stderr (CR-01 / Phase 32-04 requirement).
+  return {
+    stdout: String(result.stdout ?? ''),
+    stderr: String(result.stderr ?? ''),
+    exitCode: result.status ?? (result.error ? 1 : 0),
+  };
 }
 
 /**

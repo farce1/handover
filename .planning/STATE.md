@@ -4,14 +4,14 @@ milestone: v8.0
 milestone_name: Distribution & Smarter Regen
 status: executing
 stopped_at: Phase 32 context gathered (.planning/phases/32-source-doc-dependency-graph/32-CONTEXT.md)
-last_updated: "2026-05-13T10:30:42.832Z"
+last_updated: "2026-05-13T11:27:15.582Z"
 last_activity: 2026-05-13 -- Phase 32 execution started
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 8
-  completed_plans: 5
-  percent: 63
+  total_plans: 9
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 ## Current Position
 
 Phase: 32 (source-doc-dependency-graph) — EXECUTING
-Plan: 1 of 3
+Plan: 1 of 4
 Status: Executing Phase 32
 Last activity: 2026-05-13 -- Phase 32 execution started
 

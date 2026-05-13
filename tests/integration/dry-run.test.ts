@@ -134,3 +134,46 @@ describe('handover generate --since <ref> with no dep-graph (SC-5)', () => {
     expect(parsed.graphVersion).toBeNull();
   });
 });
+
+describe('handover generate --dry-run --since <bad-ref> (CR-01 regression)', () => {
+  let fixtureDir: string;
+
+  beforeEach(() => {
+    fixtureDir = scope.createFixture(
+      `bad-ref-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      {
+        'src/main.ts': 'export function main() { return 42; }\n',
+        'package.json': JSON.stringify({ name: 'fixture-project', version: '0.1.0' }, null, 2),
+      },
+    );
+    // 2-commit fixture so --since has a valid revparse domain;
+    // the bad ref still triggers the throw inside getGitChangedFiles.
+    execSync('git init -q', { cwd: fixtureDir });
+    execSync('git config user.email "test@example.com"', { cwd: fixtureDir });
+    execSync('git config user.name "Test User"', { cwd: fixtureDir });
+    execSync('git add . && git commit -q -m "initial"', { cwd: fixtureDir, shell: '/bin/sh' });
+    execSync('echo "new" > new-file.ts', { cwd: fixtureDir, shell: '/bin/sh' });
+    execSync('git add new-file.ts && git commit -q -m "second"', {
+      cwd: fixtureDir,
+      shell: '/bin/sh',
+    });
+  });
+
+  it('--dry-run --since not-a-real-ref exits 0 with friendly preview and stderr warning (CR-01)', () => {
+    const result = runCLI(
+      fixtureDir,
+      ['generate', '--dry-run', '--since', 'not-a-real-ref'],
+      { env: { ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '', GEMINI_API_KEY: '' } },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('Would execute (');
+    expect(result.stdout).toContain('Would skip (');
+    expect(result.stdout).toContain('Zero LLM calls made.');
+    // stderr must name the bad ref so the user understands why preview is unfiltered
+    expect(result.stderr).toMatch(/--since/);
+    expect(result.stderr).toContain('not-a-real-ref');
+    // No docs written — dry-run contract preserved
+    expect(existsSync(join(fixtureDir, 'handover', '00-INDEX.md'))).toBe(false);
+  });
+});

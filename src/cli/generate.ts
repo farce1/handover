@@ -83,6 +83,27 @@ class EarlyExitNoChangesError extends Error {
 }
 
 /**
+ * Check whether the prior on-disk output for a renderer exists.
+ *
+ * Phase 32-04 (CR-02): the render-loop reused-branch must NOT return
+ * `reused: true` when the prior file is missing — INDEX would otherwise link
+ * to a non-existent path. This helper is exported so the branch can be
+ * regression-tested in isolation (src/cli/generate.test.ts) without standing
+ * up the full Promise.allSettled render loop.
+ */
+export async function checkPriorOutput(
+  outputDir: string,
+  filename: string,
+): Promise<{ exists: boolean; lastRenderedAt?: string }> {
+  try {
+    const s = await stat(join(outputDir, filename));
+    return { exists: true, lastRenderedAt: s.mtime.toISOString() };
+  } catch {
+    return { exists: false };
+  }
+}
+
+/**
  * Map a file extension to a human-readable language name.
  */
 function extToLanguage(ext: string): string {
@@ -134,9 +155,22 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       const graph = await loadDepGraph(rootDir);
       let changedFiles: Set<string> | undefined;
       if (options.since) {
-        const gitResult = await getGitChangedFiles(rootDir, options.since);
-        if (gitResult.kind === 'ok') {
-          changedFiles = gitResult.changedFiles;
+        try {
+          const gitResult = await getGitChangedFiles(rootDir, options.since);
+          if (gitResult.kind === 'ok') {
+            changedFiles = gitResult.changedFiles;
+          } else {
+            // WR-01 follow-on: surface fallback reason like the non-dry-run path
+            // (mirrors src/cli/generate.ts non-dry-run --since branch).
+            process.stderr.write(`--since ignored: ${gitResult.reason}\n`);
+          }
+        } catch (err) {
+          // CR-01 fix: getGitChangedFiles throws on invalid ref (src/cache/git-fingerprint.ts:32-42).
+          // Surface to stderr but keep dry-run contract: exit 0, zero LLM calls, friendly preview.
+          // changedFiles stays undefined → computeDryRunDecision degrades to branch 3 (no changedFiles).
+          process.stderr.write(
+            `warning: --since "${options.since}" could not be resolved: ${(err as Error).message}\n`,
+          );
         }
       }
       const decision = computeDryRunDecision({
@@ -959,21 +993,23 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
                 !filterDecision.fullRegen &&
                 !filterDecision.affected.has(doc.id)
               ) {
-                let lastRenderedAt: string | undefined;
-                try {
-                  const s = await stat(join(outputDir, doc.filename));
-                  lastRenderedAt = s.mtime.toISOString();
-                } catch {
-                  lastRenderedAt = undefined; // prior output missing — render label without timestamp
+                const { exists: priorExists, lastRenderedAt } = await checkPriorOutput(
+                  outputDir,
+                  doc.filename,
+                );
+                if (priorExists) {
+                  return {
+                    doc,
+                    content: '',
+                    skipped: false,
+                    reused: true,
+                    lastRenderedAt,
+                    durationMs: Date.now() - docStart,
+                  };
                 }
-                return {
-                  doc,
-                  content: '',
-                  skipped: false,
-                  reused: true,
-                  lastRenderedAt,
-                  durationMs: Date.now() - docStart,
-                };
+                // CR-02 fix: prior output missing — fall through and render normally so the
+                // INDEX link resolves. Contradicts dep-graph's "unaffected" verdict, but
+                // correctness beats efficiency for a one-off case (user deleted the doc).
               }
 
               const content = doc.render(ctx);
