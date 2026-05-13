@@ -25,7 +25,7 @@ See milestone archives in `.planning/milestones/`.
 **Milestone Goal:** Put `handover` where developers already work (GitHub CI + a real init wizard) and make regeneration surgical, cost-aware, and quality-tracked.
 
 - [x] **Phase 31: Init Wizard Upgrade + Action Scaffolding** — Provider detection, scope auto-detect, `.gitignore` patching, `--upgrade` / `--yes` modes; `handover/regenerate-docs` repo created as a composite action with `token` input defined  (code complete; Plan 04 + Plan 05 manual checkpoints pending)
-- [ ] **Phase 32: Source→Doc Dependency Graph** — `SourceDocGraph` class, persisted `dep-graph.json`, `--dry-run` mode, renderer-level surgical skipping for `--since` runs (3/4 plans shipped; gap-closure Plan 04 pending — CR-01 + CR-02 fixes)
+- [x] **Phase 32: Source→Doc Dependency Graph** — `SourceDocGraph` class, persisted `dep-graph.json`, `--dry-run` mode, renderer-level surgical skipping for `--since` runs (3/4 plans shipped; gap-closure Plan 04 pending — CR-01 + CR-02 fixes) (completed 2026-05-13)
 - [ ] **Phase 33: Cost Telemetry** — Per-renderer cost/token/time persisted to `.handover/telemetry.db`, `handover cost` subcommand, rotation, and `costWarningThreshold` wiring
 - [ ] **Phase 34: Config-Driven Model Routing** — `renderers:` config key, `resolveRoundModel()`, `modelHint` classification for all 14 renderers, `CACHE_VERSION` bump, per-renderer fallback
 - [ ] **Phase 35: Eval Harness** — `handover eval` subcommand, LLM-as-judge scorer, versioned rubric, 5-10 golden YAML cases, observability mode posting to `$GITHUB_STEP_SUMMARY` and sticky PR comment
@@ -78,7 +78,7 @@ Plans:
 - [x] 32-03-PLAN.md — Wave 3: Wire `--dry-run` + `--json` flags into Commander; 5 minimal edits to `src/cli/generate.ts` (early-exit, `--since` filter, render-loop skip, status 'reused' assembly, post-run graph rebuild); 4 integration tests in `tests/integration/dry-run.test.ts`; 3-scenario human-verify checkpoint
 
 **Wave 4** *(gap closure — no plan-DAG dependency; touches already-shipped wired code)*
-- [ ] 32-04-PLAN.md — Wave 4 (gap closure): Fix CR-01 (`--dry-run --since <invalid-ref>` exits 1 instead of preview — wrap `getGitChangedFiles` in try/catch + handle 'fallback' kind explicitly per WR-01) and CR-02 (`reused: true` returned even when prior on-disk output is missing — add `priorExists` guard and fall through to render); add 2 regression tests in `tests/integration/dry-run.test.ts`
+- [x] 32-04-PLAN.md — Wave 4 (gap closure): Fix CR-01 (`--dry-run --since <invalid-ref>` exits 1 instead of preview — wrap `getGitChangedFiles` in try/catch + handle 'fallback' kind explicitly per WR-01) and CR-02 (`reused: true` returned even when prior on-disk output is missing — add `priorExists` guard and fall through to render); add 2 regression tests in `tests/integration/dry-run.test.ts`
 **UI hint**: no
 
 ### Phase 33: Cost Telemetry
@@ -143,7 +143,7 @@ Plans:
 | 21-26 | v6.0 | 13/13 | Complete | 2026-02-28 |
 | 27-30 | v7.0 | 14/14 | Complete | 2026-03-02 |
 | 31. Init Wizard + Action Scaffold | v8.0 | 0/5 | Planned | - |
-| 32. Source→Doc Dep Graph | v8.0 | 3/4 | Gap closure (Plan 04 pending) | - |
+| 32. Source→Doc Dep Graph | v8.0 | 4/4 | Complete   | 2026-05-13 |
 | 33. Cost Telemetry | v8.0 | 0/? | Not started | - |
 | 34. Config-Driven Model Routing | v8.0 | 0/? | Not started | - |
 | 35. Eval Harness | v8.0 | 0/? | Not started | - |
