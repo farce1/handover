@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { isCI, isTTY } from '@clack/prompts';
 import { hashContent, AnalysisCache } from '../analyzers/cache.js';
@@ -25,6 +25,16 @@ import { createProvider, validateProviderConfig } from '../providers/factory.js'
 import { PROVIDER_PRESETS } from '../providers/presets.js';
 import { RoundCache } from '../cache/round-cache.js';
 import { getGitChangedFiles } from '../cache/git-fingerprint.js';
+import {
+  loadDepGraph,
+  buildDepGraph,
+  saveDepGraph,
+  filterRenderersByChangedFiles,
+  computeDryRunDecision,
+  formatDryRun,
+  formatDryRunJson,
+} from '../regen/dep-graph.js';
+import type { FilterDecision } from '../regen/dep-graph.js';
 import { createRenderer } from '../ui/renderer.js';
 import { computeParallelSavings } from '../ui/components.js';
 import { ROUND_NAMES } from '../ai-rounds/types.js';
@@ -62,6 +72,8 @@ export interface GenerateOptions {
   cache?: boolean;
   stream?: boolean;
   since?: string;
+  dryRun?: boolean; // NEW (Phase 32 D-15..D-19)
+  json?: boolean; // NEW (Phase 32 D-16 — modifier on --dry-run)
 }
 
 class EarlyExitNoChangesError extends Error {
@@ -112,6 +124,29 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     // Set verbosity
     if (options.verbose) {
       logger.setVerbose(true);
+    }
+
+    // --dry-run early exit: load graph, compute decision, print, exit 0.
+    // Runs BEFORE auth/provider/config/onboarding to guarantee ZERO LLM calls (Phase 32 SC-2).
+    if (options.dryRun) {
+      const rootDir = process.cwd();
+      const selectedDocs = resolveSelectedDocs(options.only, DOCUMENT_REGISTRY);
+      const graph = await loadDepGraph(rootDir);
+      let changedFiles: Set<string> | undefined;
+      if (options.since) {
+        const gitResult = await getGitChangedFiles(rootDir, options.since);
+        if (gitResult.kind === 'ok') {
+          changedFiles = gitResult.changedFiles;
+        }
+      }
+      const decision = computeDryRunDecision({
+        selectedDocs,
+        graph,
+        changedFiles,
+        since: options.since,
+      });
+      process.stdout.write(options.json ? formatDryRunJson(decision) : formatDryRun(decision));
+      return;
     }
 
     // First-run onboarding: run before loading config so newly created
@@ -280,6 +315,9 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     let packedContext: PackedContext | undefined;
     let analysisFingerprint = '';
     let isEmptyRepo = false;
+    // Phase 32 D-09: dep-graph filter decision computed in static-analysis step,
+    // consumed by render step to skip unaffected renderers.
+    let filterDecision: FilterDecision | null = null;
     let migrationWarned = false;
 
     const deferredAnalysis = new Proxy({} as StaticAnalysisResult, {
@@ -526,6 +564,14 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
               gitChangedFiles = gitResult.changedFiles;
               isGitIncremental = true;
+
+              // NEW (Phase 32 D-21): consult dep-graph for surgical renderer filtering.
+              // Missing/corrupt/stale graph → loadDepGraph returns null → safe full regen (SC-5).
+              const graph = await loadDepGraph(rootDir);
+              if (graph) {
+                filterDecision = filterRenderersByChangedFiles(gitChangedFiles, graph);
+              }
+              // else: filterDecision stays null → render loop renders everything
             }
           }
 
@@ -905,14 +951,53 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           const renderResults = await Promise.allSettled(
             docsToRender.map(async (doc) => {
               const docStart = Date.now();
+
+              // Phase 32 D-09: dep-graph said this renderer is unaffected → skip + report 'reused'.
+              // filterDecision is null when no --since OR no graph existed (full regen path).
+              if (
+                filterDecision &&
+                !filterDecision.fullRegen &&
+                !filterDecision.affected.has(doc.id)
+              ) {
+                let lastRenderedAt: string | undefined;
+                try {
+                  const s = await stat(join(outputDir, doc.filename));
+                  lastRenderedAt = s.mtime.toISOString();
+                } catch {
+                  lastRenderedAt = undefined; // prior output missing — render label without timestamp
+                }
+                return {
+                  doc,
+                  content: '',
+                  skipped: false,
+                  reused: true,
+                  lastRenderedAt,
+                  durationMs: Date.now() - docStart,
+                };
+              }
+
               const content = doc.render(ctx);
 
               if (content === '') {
-                return { doc, content: '', skipped: true, durationMs: Date.now() - docStart };
+                return {
+                  doc,
+                  content: '',
+                  skipped: true,
+                  reused: false,
+                  lastRenderedAt: undefined,
+                  durationMs: Date.now() - docStart,
+                };
               }
 
               await writeFile(join(outputDir, doc.filename), content, 'utf-8');
-              return { doc, content, skipped: false, durationMs: Date.now() - docStart };
+              return {
+                doc,
+                content,
+                skipped: false,
+                reused: false,
+                lastRenderedAt: undefined,
+                durationMs: Date.now() - docStart,
+              };
             }),
           );
 
@@ -937,6 +1022,16 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
                 status: 'not-generated',
                 reason: `Render failed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
               });
+            } else if (result.value.reused) {
+              // Phase 32 D-09: renderer skipped via dep-graph; prior output remains on disk.
+              statuses.push({
+                id: doc.id,
+                filename: doc.filename,
+                title: doc.title,
+                status: 'reused',
+                lastRenderedAt: result.value.lastRenderedAt,
+              });
+              sequentialEstimateMs += result.value.durationMs;
             } else if (result.value.skipped) {
               statuses.push({
                 id: doc.id,
@@ -997,6 +1092,20 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           // Notify renderer of INDEX completion
           displayState.renderedDocs.push('00-INDEX.md');
           renderer.onDocRendered(displayState);
+
+          // Phase 32 D-06: rebuild + persist the graph after a successful full run.
+          // --since runs are read-only — they never update the graph. Failure is non-fatal
+          // (mirrors RoundCache.ensureGitignored graceful-degradation at round-cache.ts:211-213).
+          if (!options.since) {
+            try {
+              const graph = await buildDepGraph(DOCUMENT_REGISTRY, rootDir);
+              await saveDepGraph(rootDir, graph);
+            } catch (err) {
+              if (options.verbose) {
+                logger.warn(`Failed to persist dep-graph: ${(err as Error).message}`);
+              }
+            }
+          }
 
           return { generatedDocs: statuses, outputDir };
         },
