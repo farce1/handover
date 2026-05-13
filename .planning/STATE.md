@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v8.0
 milestone_name: Distribution & Smarter Regen
-status: awaiting-user-verify
-stopped_at: Phase 31 manual verification checkpoints open; Phase 32 context gathered
-last_updated: "2026-05-13T09:44:27.362Z"
-last_activity: 2026-05-13 -- Phase 32 context gathered (32-CONTEXT.md written; 4 gray areas captured)
+status: executing
+stopped_at: Phase 32 context gathered (.planning/phases/32-source-doc-dependency-graph/32-CONTEXT.md)
+last_updated: "2026-05-13T10:30:42.832Z"
+last_activity: 2026-05-13 -- Phase 32 execution started
 progress:
   total_phases: 6
-  completed_phases: 0
-  total_plans: 5
+  completed_phases: 1
+  total_plans: 8
   completed_plans: 5
-  percent: 100
+  percent: 63
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** Every person (or LLM) who encounters this repo should understand what handover does, how to use it, and how to contribute — within minutes, not hours.
-**Current focus:** v8.0 roadmap created — 6 phases (31-36), 37 requirements mapped; Phase 31 fully planned (5 plans across 3 waves)
+**Current focus:** Phase 32 — source-doc-dependency-graph
 
 ## Current Position
 
-Phase: Phase 31 — Init Wizard Upgrade + Action Scaffolding (code complete; awaiting manual verification)
-Plan: 31-05 (Wave 2 — done; Task 3 6-scenario human-verify pending)
-Status: All 5 plans landed; full test suite 443/443 GREEN; phase-level verifier (gsd-verifier) not run yet (gsd-sdk unavailable — surfaced as a known follow-up)
-Last activity: 2026-05-12 -- Phase 31 Plan 05 complete (init.ts rewritten, @clack ^1.3.0, --upgrade flag, integration test active)
+Phase: 32 (source-doc-dependency-graph) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 32
+Last activity: 2026-05-13 -- Phase 32 execution started
 
 ## Performance Metrics
 

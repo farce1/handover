@@ -69,7 +69,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 **Wave 1**
-- [ ] 32-01-PLAN.md — Wave 1: Extend DocumentSpec (`requiredSources`) + DocumentStatus (`'reused'` + `lastRenderedAt`); add `withSelfRef()` helper; curate `requiredSources` for all 14 registry entries; teach INDEX `statusLabel` the new case
+- [x] 32-01-PLAN.md — Wave 1: Extend DocumentSpec (`requiredSources`) + DocumentStatus (`'reused'` + `lastRenderedAt`); add `withSelfRef()` helper; curate `requiredSources` for all 14 registry entries; teach INDEX `statusLabel` the new case
 
 **Wave 2** *(depends_on 32-01)*
 - [ ] 32-02-PLAN.md — Wave 2: Build the `src/regen/dep-graph.ts` module — `GRAPH_VERSION`, `INFRASTRUCTURE_PATHS`, Zod schema, `buildDepGraph`/`saveDepGraph`/`loadDepGraph`, pure `filterRenderersByChangedFiles`, `computeDryRunDecision`, `formatDryRun`, `formatDryRunJson` (Phase 36 contract); ≥9 describe blocks at 90/90/85/90 coverage
@@ -140,7 +140,7 @@ Plans:
 | 21-26 | v6.0 | 13/13 | Complete | 2026-02-28 |
 | 27-30 | v7.0 | 14/14 | Complete | 2026-03-02 |
 | 31. Init Wizard + Action Scaffold | v8.0 | 0/5 | Planned | - |
-| 32. Source→Doc Dep Graph | v8.0 | 0/3 | Planned | - |
+| 32. Source→Doc Dep Graph | v8.0 | 1/3 | In Progress|  |
 | 33. Cost Telemetry | v8.0 | 0/? | Not started | - |
 | 34. Config-Driven Model Routing | v8.0 | 0/? | Not started | - |
 | 35. Eval Harness | v8.0 | 0/? | Not started | - |
