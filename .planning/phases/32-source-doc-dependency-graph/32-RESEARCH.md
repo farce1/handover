@@ -825,28 +825,28 @@ export async function runDryRun(rootDir: string, options: GenerateOptions): Prom
 | A5 | Plotting all 14 renderers' `requiredSources` patterns is a planner exercise, not research; this RESEARCH.md provides the helper (`withSelfRef`) and the rule (D-10), planner picks the specific globs per renderer | Wire-In Points | Medium — if `requiredSources` are mis-curated (too narrow), some real changes won't trigger renderer regen. Mitigated by D-04: unclaimed files force full regen. **Plan should include a curation pass** where the planner reads each renderer to identify what it reads (analyzers, rounds, registry, types) |
 | A6 | The graph-rebuild step (`saveDepGraph` after full run) does NOT need to run inside the DAG — it can be a post-step appended to the render execute body. The render step already runs at the end of the DAG, so the new write happens AFTER all renderers complete | Wire-In Points | Low — wrapping in try/catch makes it non-fatal; if graph write fails, next run does it |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `INFRASTRUCTURE_PATHS` apply to changed-file paths only, or also strip infra files from each renderer's expanded list at build time?**
    - What we know: D-11 says graph builder "filters resolved source nodes against this list." That implies build-time filtering of each renderer's expanded list.
    - What's also needed: a separate at-lookup check on `changedFiles` (so `src/utils/logger.ts` in changedFiles short-circuits to "no match"). Both ARE needed (defense in depth).
-   - Recommendation: apply BOTH (build-time filter on expanded lists + lookup-time filter on changedFiles via `graph.infrastructureFiles`). The double-guard is cheap and aligns with success criterion #4.
+   - **RESOLVED:** apply BOTH (build-time filter on expanded lists + lookup-time filter on changedFiles via `graph.infrastructureFiles`). The double-guard is cheap and aligns with success criterion #4. Plan 02 `buildDepGraph` + `filterRenderersByChangedFiles` both apply the filter.
 
 2. **Should `--dry-run` (no `--since`) consult the graph at all?**
    - What we know: D-17 says "no source filter was applied. Output explicitly states `(no --since: dep-graph not consulted)`."
-   - Implication: when only `--dry-run` (no `--since`), output lists ALL selected renderers (or `--only`-filtered set) as `wouldExecute` with no reasons. `graphVersion` is still useful to surface (so users see whether a graph file exists). No actual filtering happens.
+   - **RESOLVED:** when only `--dry-run` (no `--since`), output lists ALL selected renderers (or `--only`-filtered set) as `wouldExecute` with no reasons. `graphVersion` is still surfaced (so users see whether a graph file exists). No actual filtering happens. Implemented in Plan 02 `computeDryRunDecision` branch 2.
 
 3. **Should the wire-in at `generate.ts:514` modify the existing branch, or refactor into a helper?**
    - What we know: D-21 says "after `getGitChangedFiles` resolves, call `filterRenderersByChangedFiles(...)`." That's a minimal addition.
-   - Recommendation for planner: do the minimal addition; the function is small and pure. No need to extract a `runIncrementalGenerate(...)` helper for this phase. Future phases (35 eval, 36 action) might warrant a helper.
+   - **RESOLVED:** minimal addition (no helper extraction); the function is small and pure. Future phases (35 eval, 36 action) may warrant a helper. Implemented in Plan 03 Edit D.
 
 4. **Should `00-index` appear in `wouldSkip` even though it always renders?**
    - What we know: INDEX always renders (it's the summary of statuses). It has no `requiredSources`.
-   - Recommendation: include `00-index` in `wouldExecute` always (with `reasons: ['(always renders)']`) so the count matches user expectation (14 docs, not 13). Alternatively, omit from both lists. Planner picks; CONTEXT doesn't specify. Bias toward inclusion for transparency.
+   - **RESOLVED:** include `00-index` in `wouldExecute` always (with `reasons: ['(always renders)']`) so the count matches user expectation (14 docs, not 13). Bias toward inclusion for transparency. Implemented in Plan 02 `computeDryRunDecision` branch 4 and asserted in Plan 03 Task 2 integration tests.
 
 5. **What's the right `requiredSources` for the analyzers-shaped renderers (07-dependencies, 12-testing, 13-deployment, 08-environment)?**
    - These renderers consume static analyzer outputs (package manifests, test files, env vars).
-   - Recommendation for planner: include the analyzer source files (e.g. `src/analyzers/dependency-graph.ts` for 07-dependencies), the inventoried file types (e.g. `package.json`, `Cargo.toml` for 07-dependencies), and the renderer's own source. The planner needs to do this curation pass for all 14 — research provides the rule, not the per-renderer list.
+   - **RESOLVED:** include the analyzer source files (e.g. `src/analyzers/dependency-graph.ts` for 07-dependencies), the inventoried file types (e.g. `package.json`, `Cargo.toml` for 07-dependencies), and the renderer's own source. Per-renderer curation table delivered in Plan 01 `<renderer_to_source_curation>` block.
 
 ## Environment Availability
 
