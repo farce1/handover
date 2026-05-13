@@ -35,6 +35,8 @@ program
     '--since <ref>',
     'Only re-analyze files changed since this git ref (e.g. HEAD~3, main, v1.0)',
   )
+  .option('--dry-run', 'Preview which renderers would execute; no LLM calls')
+  .option('--json', 'Emit JSON output (used with --dry-run)')
   .option('--stream', 'Show streaming token output during AI rounds')
   .option('-v, --verbose', 'Show detailed output')
   .action(runGenerate);
