@@ -4,25 +4,25 @@ reviewed: 2026-05-13T00:00:00Z
 depth: standard
 files_reviewed: 10
 files_reviewed_list:
+  - src/cli/generate.test.ts
   - src/cli/generate.ts
   - src/cli/index.ts
-  - src/regen/dep-graph.test.ts
-  - src/regen/dep-graph.ts
   - src/renderers/registry.test.ts
   - src/renderers/registry.ts
   - src/renderers/render-00-index.ts
   - src/renderers/types.ts
   - tests/integration/dry-run.test.ts
+  - tests/integration/setup.ts
   - vitest.config.ts
 findings:
-  critical: 2
-  warning: 5
+  critical: 0
+  warning: 4
   info: 4
-  total: 11
+  total: 8
 status: issues_found
 ---
 
-# Phase 32: Code Review Report
+# Phase 32: Code Review Report (Re-review after 32-04 gap closure)
 
 **Reviewed:** 2026-05-13
 **Depth:** standard
@@ -31,468 +31,89 @@ status: issues_found
 
 ## Summary
 
-Phase 32 introduces a source-to-renderer dependency graph (`src/regen/dep-graph.ts`),
-wires `--dry-run` and surgical `--since` regeneration into `src/cli/generate.ts`, and
-extends the registry/INDEX rendering surface. The module boundaries are clean, the
-schema-based load with `graphVersion` literal is a sound safe-degradation strategy, and
-tests cover the happy paths plus several branch-by-branch contracts.
+Re-review of Phase 32 after gap closure 32-04. The two prior BLOCKERs are confirmed FIXED:
 
-Two correctness defects rise to BLOCKER:
+- **CR-01 (bad-ref crash in dry-run):** `runGenerate()` now wraps `getGitChangedFiles` in try/catch on the dry-run branch (`src/cli/generate.ts:158-174`), preserves `exitCode 0`, surfaces a stderr warning, and lets `computeDryRunDecision` fall through to a friendly preview. New integration test (`tests/integration/dry-run.test.ts:138-179`) locks the contract.
+- **CR-02 (lying INDEX after deleted prior output):** the render-loop reused-branch now calls `checkPriorOutput()` and falls through to a real render when `priorExists === false` (`src/cli/generate.ts:996-1013`). The helper is exported and unit-tested in `src/cli/generate.test.ts`.
 
-1. The `--since` surgical-skip path can mark a renderer as `'reused'` even when the
-   prior on-disk output is missing, producing a broken INDEX link and lying about
-   what is on disk.
-2. `getGitChangedFiles()` can THROW on an invalid ref (e.g. `--since foo` against a
-   real git repo). The `--dry-run` early-exit path does not catch this, so an invalid
-   `--since` value combined with `--dry-run` produces an uncaught rejection that
-   exits non-zero — directly contradicting SC-2's "zero LLM calls, exit 0" contract.
+Re-review surfaces **4 new WARNINGs and 4 INFO items**, primarily around incomplete symmetry of the CR-01 fix (the non-dry-run --since path remains vulnerable to the same crash), a misleading dry-run preview when a bad ref is paired with an existing graph, dead code in the test helper, and a stale coverage-exclusion path in `vitest.config.ts`.
 
-Both are concrete user-visible regressions, not theoretical. The remaining issues are
-quality/robustness items (dead-code branches, fragile non-exhaustive switch,
-unrelated-changedFiles row numbering, silent fallback in `--dry-run`).
-
----
-
-## Critical Issues
-
-### CR-01: `--dry-run --since <bad-ref>` throws + exits non-zero (SC-2 contract violation)
-
-**File:** `src/cli/generate.ts:131-150`
-**Issue:**
-The dry-run early-exit branch awaits `getGitChangedFiles(rootDir, options.since)` and
-only handles the `'ok'` discriminant:
-
-```ts
-if (options.since) {
-  const gitResult = await getGitChangedFiles(rootDir, options.since);
-  if (gitResult.kind === 'ok') {
-    changedFiles = gitResult.changedFiles;
-  }
-}
-```
-
-`src/cache/git-fingerprint.ts:32-42` shows `getGitChangedFiles` THROWS (not returns
-`'fallback'`) when the ref cannot be revparsed:
-
-```ts
-} catch (error) {
-  if (error instanceof GitError) {
-    throw new Error(`Invalid git ref "${sinceRef}": ${error.message}`);
-  }
-  throw error;
-}
-```
-
-The thrown error is caught by the outer `catch` (line 1175) and routed through
-`handleCliError`, which exits with a non-zero code. This contradicts SC-2, which the
-dry-run path explicitly cites in its comment ("Runs BEFORE auth/provider/config/
-onboarding to guarantee ZERO LLM calls"). A user typing `handover generate --dry-run
---since typo` gets a hard CLI failure instead of a "no graph / safe full regen"
-preview — which is exactly the friendly preview that --dry-run promises.
-
-This is silent at unit-test time because `dep-graph.test.ts` tests
-`computeDryRunDecision` with synthetic inputs, never wiring through the real
-`getGitChangedFiles`. `tests/integration/dry-run.test.ts:120-135` exercises only the
-**valid** `HEAD~1` ref against a 2-commit fixture; it does not cover the bad-ref case.
-
-**Fix:**
-Wrap the call in try/catch and treat any throw as a fallback (same semantics as
-the `'fallback'` branch):
-
-```ts
-if (options.since) {
-  try {
-    const gitResult = await getGitChangedFiles(rootDir, options.since);
-    if (gitResult.kind === 'ok') {
-      changedFiles = gitResult.changedFiles;
-    }
-    // 'fallback' (not a repo / shallow / detached): leave changedFiles undefined,
-    // so computeDryRunDecision degrades to full-preview branch 3 or 4.
-  } catch (err) {
-    // Invalid ref or other git error: surface to stderr but keep dry-run
-    // contract (exit 0, zero LLM calls).
-    process.stderr.write(
-      `warning: --since "${options.since}" could not be resolved: ${(err as Error).message}\n`,
-    );
-  }
-}
-```
-
-Add an integration test asserting `--dry-run --since not-a-real-ref` exits 0 with
-the standard preview body.
-
----
-
-### CR-02: `'reused'` status written for renderers with missing on-disk output (broken INDEX links)
-
-**File:** `src/cli/generate.ts:957-977` and `src/renderers/render-00-index.ts:73-76`
-**Issue:**
-When the dep-graph filter declares a renderer unaffected, the render step skips
-producing content and reports `status: 'reused'`:
-
-```ts
-if (filterDecision && !filterDecision.fullRegen && !filterDecision.affected.has(doc.id)) {
-  let lastRenderedAt: string | undefined;
-  try {
-    const s = await stat(join(outputDir, doc.filename));
-    lastRenderedAt = s.mtime.toISOString();
-  } catch {
-    lastRenderedAt = undefined; // prior output missing — render label without timestamp
-  }
-  return {
-    doc,
-    content: '',
-    skipped: false,
-    reused: true,         // ← unconditional, even if stat() failed
-    lastRenderedAt,
-    ...
-  };
-}
-```
-
-If `stat()` throws (file missing — e.g. someone manually deleted `handover/` and
-then ran `--since`), we silently report `status: 'reused'` upstream. Downstream:
-
-`src/renderers/render-00-index.ts:75`:
-```ts
-const docLink = s.status !== 'not-generated' ? `[${s.title}](${s.filename})` : s.title;
-```
-
-A `'reused'` row still links to `s.filename` — which now points at a file that does
-not exist on disk. The user opens 00-INDEX.md, clicks the link, and gets a missing
-file. The INDEX is lying. This violates the implicit contract that `reused` means
-"prior content remains valid on disk."
-
-The comment `prior output missing — render label without timestamp` acknowledges
-the case but draws the wrong conclusion: rendering the doc is mandatory when the
-prior output is gone, not just dropping the timestamp.
-
-**Fix:**
-When the stat fails, do not return `reused: true`. Either (a) fall through and
-re-render the doc, or (b) demote to `'not-generated'`. Option (a) is safest:
-
-```ts
-if (filterDecision && !filterDecision.fullRegen && !filterDecision.affected.has(doc.id)) {
-  let lastRenderedAt: string | undefined;
-  let priorExists = true;
-  try {
-    const s = await stat(join(outputDir, doc.filename));
-    lastRenderedAt = s.mtime.toISOString();
-  } catch {
-    priorExists = false;
-  }
-  if (priorExists) {
-    return { doc, content: '', skipped: false, reused: true, lastRenderedAt, durationMs: Date.now() - docStart };
-  }
-  // Prior output missing — fall through and render normally so the link in
-  // INDEX resolves. (This contradicts dep-graph's "unaffected" verdict, but
-  // correctness beats efficiency for a 1-off case.)
-}
-
-// Continue to: const content = doc.render(ctx); ...
-```
-
-Add a regression test in `dry-run.test.ts` (or a new `surgical-since.test.ts`) that
-deletes one doc from a prior `handover/` directory, runs `--since HEAD~1`, and
-asserts the missing doc is regenerated (not marked `reused`).
-
----
+No critical issues. No security findings. Plan 32-02's `src/regen/*` files are not in this scope — flagged below as INFO (metadata gap to track).
 
 ## Warnings
 
-### WR-01: `formatDryRun` silently degrades to "full preview" on git fallback
+### WR-01: CR-01 fix is asymmetric — non-dry-run `--since <bad-ref>` still crashes the pipeline
 
-**File:** `src/cli/generate.ts:135-141`
-**Issue:**
-When `getGitChangedFiles` returns `{ kind: 'fallback', reason: '...' }` (not a repo,
-shallow clone, detached HEAD), the dry-run path silently sets `changedFiles =
-undefined` and falls into `computeDryRunDecision` Branch 3 (graph + no changedFiles
-→ all docs in wouldExecute). The user sees a preview indistinguishable from one
-where they forgot `--since` entirely — yet they did pass `--since`. The fallback
-reason is discarded.
-
-Compare with the non-dry-run path at `generate.ts:555-557`, which DOES surface the
-reason: `process.stdout.write(`${gitResult.reason} — falling back to content-hash mode\n`)`.
-
-**Fix:**
-Mirror the non-dry-run behavior — write the reason to stderr so users understand
-why the preview shows every doc instead of a scoped subset:
-
+**File:** `src/cli/generate.ts:587`
+**Issue:** The dry-run branch (lines 158-174) now catches `getGitChangedFiles` throws, but the non-dry-run static-analysis step on line 587 still calls `await getGitChangedFiles(rootDir, options.since)` without a try/catch. `git-fingerprint.ts:38-41` rethrows on any invalid ref. A user running `handover generate --since not-a-real-ref` (no `--dry-run`) will burn through onboarding/auth/config setup, then have the entire DAG fail at the static-analysis step with an opaque error — exactly the failure mode CR-01 was meant to prevent. The dry-run regression test in `dry-run.test.ts:162` does not cover the non-dry-run path. CR-01 was framed as a `--dry-run` regression because that's where it was observed, but the underlying defect (unhandled throw on bad `--since` ref) remains in the costly path.
+**Fix:** Mirror the dry-run guard at the call site:
 ```ts
-if (options.since) {
-  try {
-    const gitResult = await getGitChangedFiles(rootDir, options.since);
-    if (gitResult.kind === 'ok') {
-      changedFiles = gitResult.changedFiles;
-    } else {
-      process.stderr.write(`--since ignored: ${gitResult.reason}\n`);
-    }
-  } catch (err) { /* see CR-01 */ }
+let gitResult: GitFingerprintResult;
+try {
+  gitResult = await getGitChangedFiles(rootDir, options.since);
+} catch (err) {
+  process.stderr.write(
+    `warning: --since "${options.since}" could not be resolved: ${(err as Error).message} — falling back to content-hash mode\n`,
+  );
+  gitResult = { kind: 'fallback', reason: 'invalid ref' };
 }
 ```
+Or push the fix down into `getGitChangedFiles` itself by returning `{ kind: 'fallback', reason: ... }` for invalid refs instead of throwing — that single change repairs both call sites.
 
----
+### WR-02: Dry-run preview misleadingly claims `since` was applied when ref resolution failed but a graph exists
 
-### WR-02: `statusLabel` switch is non-exhaustive and returns `undefined` for unknown statuses
-
-**File:** `src/renderers/render-00-index.ts:56-71`
-**Issue:**
+**File:** `src/cli/generate.ts:158-184` (in conjunction with `src/regen/dep-graph.ts:259-273`, branch 3)
+**Issue:** When the user runs `--dry-run --since <bad-ref>` and a `.handover/cache/dep-graph.json` exists, `changedFiles` stays `undefined` (CR-01 catch branch) but `since` is still passed into `computeDryRunDecision`. Because `graph !== null` and `changedFiles === undefined`, branch 3 fires: header reads `Dry-run preview (since: <bad-ref>)`, every doc lands in `wouldExecute` with reason `(no --since filter)`, and `fellBackToFullRegen` is `false`. The stderr warning is the only signal the user has that `--since` did NOT actually filter anything. The CR-01 regression test (`tests/integration/dry-run.test.ts:138-179`) only exercises the no-graph case (branch 1), so this branch is untested.
+**Fix:** When the catch block fires, also clear `since` so `computeDryRunDecision` enters the no-since branch cleanly and the preview header / reasons stay honest:
 ```ts
-const statusLabel = (s: DocumentStatus): string => {
-  switch (s.status) {
-    case 'complete': return 'Complete';
-    case 'partial':  return 'Partial (static analysis only)';
-    case 'static-only': return 'Static Only';
-    case 'not-generated': return 'Not Generated';
-    case 'reused':
-      return s.lastRenderedAt ? `Reused (last: ${s.lastRenderedAt})` : 'Reused';
-  }
-};
-```
-
-The return-type annotation claims `: string`, but if a future status value is added
-to the union in `types.ts:63` without updating this switch, TS's exhaustiveness
-warning is suppressed (no `default:` branch + no `never` assertion). The function
-silently returns `undefined`, which is then interpolated into a markdown table cell
-as the literal string `'undefined'`.
-
-This is exactly the situation Phase 32 just *did* with the `'reused'` addition —
-the precedent shows the file IS regularly extended.
-
-**Fix:**
-Add an exhaustiveness guard so the next time someone adds a status, the build
-breaks loudly:
-
-```ts
-const statusLabel = (s: DocumentStatus): string => {
-  switch (s.status) {
-    case 'complete': return 'Complete';
-    case 'partial':  return 'Partial (static analysis only)';
-    case 'static-only': return 'Static Only';
-    case 'not-generated': return 'Not Generated';
-    case 'reused':
-      return s.lastRenderedAt ? `Reused (last: ${s.lastRenderedAt})` : 'Reused';
-    default: {
-      const _exhaustive: never = s.status;
-      return _exhaustive;
-    }
-  }
-};
-```
-
----
-
-### WR-03: INDEX row number `i` is array index, not document number (display inconsistency)
-
-**File:** `src/renderers/render-00-index.ts:73-77`
-**Issue:**
-```ts
-const rows = statuses.map((s, i) => {
-  const num = String(i).padStart(2, '0');
-  ...
-});
-```
-
-The `#` column displays the array index, padded to 2 digits. The document IDs in
-`DOCUMENT_REGISTRY` (e.g., `00-index`, `01-project-overview`, `03-architecture`)
-encode their own numeric prefix. Rendering `'00'` for the first row, `'01'` for
-the second etc. means the displayed number diverges from the canonical doc number
-whenever:
-
-- The status list isn't in strict registry order
-- A doc is filtered out (e.g., `--only arch` would still display row `00`, `01`,
-  `02` for index + arch + 04 placeholder)
-
-A user reading the INDEX would reasonably assume `#03` matches `03-ARCHITECTURE.md`.
-Right now that's coincidentally true only in the all-docs case.
-
-**Fix:**
-Use the document filename's numeric prefix, not the array index:
-
-```ts
-const rows = statuses.map((s) => {
-  const match = s.filename.match(/^(\d+)-/);
-  const num = match ? match[1] : '??';
-  const docLink = s.status !== 'not-generated' ? `[${s.title}](${s.filename})` : s.title;
-  return [num, docLink, statusLabel(s)];
-});
-```
-
----
-
-### WR-04: `'00-index'` skipped from required-rounds calculation may underspecify rounds when index is the only selected doc
-
-**File:** `src/renderers/registry.ts:371-389` (and `dep-graph.ts:114`)
-**Issue:**
-`computeRequiredRounds` correctly iterates every selected doc's `requiredRounds`,
-including `00-index` (whose `requiredRounds: []`). Combined with `resolveSelectedDocs`
-always including `00-index`, a call like `resolveSelectedDocs('index', ...)` returns
-`[00-index]`, whose `computeRequiredRounds` returns the empty set.
-
-Downstream in `generate.ts:740-840`, every `requiredRounds.has(N)` check is false,
-so zero AI round steps are registered. The render step's `terminalRounds` is then
-empty → `renderDeps = ['static-analysis']` → render runs immediately.
-
-BUT: the empty-repo short-circuit at `generate.ts:867-912` uses
-`config.project.name ?? 'Unknown Project'` for the project name and a synthesized
-overview. For a **non-empty** repo with only index selected, the render path falls
-through to line 914 with `ctx.rounds = {r1: undefined, ...}` and `projectName` falls
-back to `config.project.name`. This produces an INDEX with mostly `not-generated`
-rows (correct) BUT requires `staticAnalysisResult` which is set at static-analysis
-step (also correct).
-
-Result: probably works but is fragile. The fragility comes from `'00-index'` being
-treated specially in the dep-graph build (skipped from `renderers` map), but NOT
-specially in `resolveSelectedDocs` or `computeRequiredRounds`. The dep-graph
-documents this with `// INDEX always renders; value informational (D-09)` but
-the registry doesn't.
-
-**Fix:**
-Add a defensive doc comment and one assertion test:
-
-```ts
-// registry.ts — add to computeRequiredRounds JSDoc:
-/**
- * NOTE: '00-index' contributes no rounds (requiredRounds: []) — INDEX is
- * generated locally from per-doc statuses and does not require AI output.
- * If --only resolves to only INDEX, this returns an empty Set and zero AI
- * steps are registered; the render step still produces 00-INDEX.md with
- * 'not-generated' rows for all other docs.
- */
-```
-
-And add a test:
-```ts
-test('--only index selects zero AI rounds and produces an INDEX-only render plan', () => {
-  const docs = resolveSelectedDocs('index', DOCUMENT_REGISTRY);
-  expect(docs.map(d => d.id)).toEqual(['00-index']);
-  expect(computeRequiredRounds(docs).size).toBe(0);
-});
-```
-
----
-
-### WR-05: `formatDryRun` branch 4 has dead `?? '?'` fallback
-
-**File:** `src/regen/dep-graph.ts:338-345`
-**Issue:**
-```ts
-} else {
-  lines.push(`Dry-run preview (since: ${d.since ?? '?'})`);
-  ...
+} catch (err) {
+  process.stderr.write(...);
+  // Treat as if --since was not given so the preview matches reality
+  options = { ...options, since: undefined };
 }
 ```
+Or pass an explicit `sinceFailed: true` flag into `computeDryRunDecision` and surface it in the header (`Dry-run preview (since: <ref> — IGNORED: invalid ref)`).
 
-Branch 4 is reachable only when `since !== undefined && !noGraph` (the earlier
-`d.since === undefined && !d.noGraph` and `d.noGraph` branches already returned).
-The `?? '?'` therefore never fires — but it suggests to a reader that `since` can
-be undefined here, which is wrong. It also hides a misclassified branch: if logic
-ever changes upstream and `since` becomes undefined in this branch, output of
-`'(since: ?)'` is silently misleading rather than crashing or being routed through
-a clearer "no --since" branch.
+### WR-03: Dry-run path uses bare `process.cwd()` while every other branch uses `resolve(process.cwd())` — minor inconsistency that hides if the caller chdir's via a relative path
 
-**Fix:**
-Drop the fallback; assert the precondition for the reader:
-
+**File:** `src/cli/generate.ts:153` vs `src/cli/generate.ts:205, 244, 330`
+**Issue:** The dry-run branch sets `const rootDir = process.cwd();` (line 153). Every other branch uses `resolve(process.cwd())` (lines 205, 244, 330). On POSIX `process.cwd()` already returns an absolute path, so this is harmless today. But the implicit contract used by `loadDepGraph(rootDir)` and `getGitChangedFiles(rootDir, ...)` is "absolute root path" — passing a non-resolved value risks divergent behavior if a future caller invokes from a sub-process where cwd was set via a relative path. Easy to make consistent.
+**Fix:** Use `resolve(process.cwd())` on line 153 to match the rest of the function:
 ```ts
-} else {
-  // since !== undefined && !noGraph (branches 1-3 already returned)
-  lines.push(`Dry-run preview (since: ${d.since})`);
-  ...
-}
+const rootDir = resolve(process.cwd());
 ```
 
-If desired, add a TypeScript assertion `if (d.since === undefined) throw new Error('unreachable')` or narrow earlier.
+### WR-04: New unit test files violate the documented project rule "Do not add unit tests"
 
----
+**File:** `src/cli/generate.test.ts` (entire file), `src/renderers/registry.test.ts` (entire file)
+**Issue:** `AGENTS.md:53` states explicitly: *"Do not add unit tests — the project uses integration tests only (by design)"*. `src/cli/generate.test.ts` was added by Plan 32-04 and `src/renderers/registry.test.ts` was added/expanded by Plan 32-01. The header docstring of `generate.test.ts` notes the planner authorized the unit test as a one-off, but there is no corresponding update to `AGENTS.md` carving out an exception, no marker linking the file back to the planner authorization, and no policy on when future contributors may add similar tests. The convention now reads as "no unit tests except when an unspecified planner says so." Either the rule should be amended or these files should be removed/converted.
+**Fix:** Either (a) update `AGENTS.md:53` to add a documented exception (e.g., "exception: regression-locking unit tests for pure helpers extracted from CLI files are permitted; mark with `// regression-test:` comment"), or (b) re-home the regression as an integration test that mocks the LLM provider (the planner's stated reason for going unit-only — "integration stack does not stub the LLM provider" — is fixable infrastructure, not an immutable constraint), or (c) at minimum add a `// LINT-EXCEPTION:` marker pointing back to the 32-04 plan.
 
 ## Info
 
-### IN-01: `formatDryRun` text format is asserted by a single magic string `'Zero LLM calls made.'`
+### IN-01: Stale coverage exclusion path in `vitest.config.ts` (the file doesn't exist under that name)
 
-**File:** `src/regen/dep-graph.ts:367` and `dep-graph.test.ts:442-458`, `dry-run.test.ts:45`
-**Issue:**
-The SC-2 textual contract is enforced by greping for the literal string
-`'Zero LLM calls made.'` in three places. There is no shared constant — if anyone
-changes the casing or wording in `dep-graph.ts:367`, two unit tests and one
-integration test all fail with cryptic substring messages. Cheap fix; medium
-readability win.
-**Fix:**
-Export a constant:
-```ts
-// dep-graph.ts
-export const DRY_RUN_TRAILER = 'Zero LLM calls made.';
-// then: lines.push(DRY_RUN_TRAILER);
-```
-Tests reference `DRY_RUN_TRAILER` instead of the literal.
+**File:** `vitest.config.ts:90`
+**Issue:** Line 90 lists `'src/renderers/renderer-template.ts'` as a coverage exclusion, but the actual file is `src/renderers/render-template.ts` (no second `er`). The path therefore matches nothing. The file is still excluded from coverage by the broader `'src/renderers/render-*.ts'` glob on line 84, so the practical effect is zero — but the line is dead config and likely reflects a rename that was never followed up.
+**Fix:** Delete line 90 (and its preceding comment on line 89), or rename to `'src/renderers/render-template.ts'` for clarity. Since the wildcard above already covers it, deletion is cleaner.
 
----
+### IN-02: `simulateReusedBranch` test helper duplicates production logic instead of importing it
 
-### IN-02: `parseInt` without radix-safe parsing in `render-00-index.ts`
+**File:** `src/cli/generate.test.ts:78-88`
+**Issue:** The "branch shape" describe block writes a 10-line helper that hand-rolls the same early-return shape used by `src/cli/generate.ts:996-1013`. If the production branch ever drifts (e.g. adds a `reason` field, or changes `reused: true` to `status: 'reused'`), the test still passes because it tests a hand-written copy of the contract, not the real code. The unit test for `checkPriorOutput` (lines 27-60) is sufficient on its own; the simulated branch is duplicative theatre.
+**Fix:** Either (a) drop the `simulateReusedBranch` describe block and rely on `checkPriorOutput` unit tests + the integration test in `tests/integration/dry-run.test.ts`, or (b) extract the actual branch into a small helper in `generate.ts` (e.g. `buildReusedPayload(doc, outputDir, docStart)`) and import it from the test so the contract is tested against the real code, not a copy.
 
-**File:** `src/renderers/render-00-index.ts:22`
-**Issue:**
-```ts
-const roundNum = parseInt(key.replace('r', ''), 10);
-```
-Safe for known keys `r1`..`r6` (typed via `RenderContext.rounds`), but the loop
-iterates `Object.entries(ctx.rounds)` which is `any` at runtime. If extra keys
-ever leak in (e.g., from JSON deserialization), `parseInt` may return `NaN`, which
-is then added to a `Set<number>`. Subsequent `.sort()` on a list containing `NaN`
-produces stable but undefined ordering, and the YAML front-matter `ai_rounds_used`
-field becomes `[NaN, 1, 2, ...]` which YAML cannot serialize cleanly.
-**Fix:**
-Filter NaN explicitly, or use a tighter match:
-```ts
-for (const [key, val] of Object.entries(ctx.rounds)) {
-  if (val == null) continue;
-  const m = key.match(/^r(\d+)$/);
-  if (!m) continue;
-  roundsUsed.add(parseInt(m[1], 10));
-}
-```
+### IN-03: Plan 32-02 source files (`src/regen/*`) are not in this re-review's scope due to a SUMMARY.md metadata gap
 
----
+**File:** `src/regen/dep-graph.ts`, `src/regen/dep-graph.test.ts` (not in `files_reviewed_list`)
+**Issue:** The phase context notes that Plan 32-02's SUMMARY.md frontmatter did not declare its created/modified files, so these source files were never threaded into this review's scope. `src/regen/dep-graph.ts` is the load-bearing module behind `--dry-run` and `--since` — it should have been reviewed as part of Phase 32, not implicitly skipped because of a metadata omission. While I did spot-check it during this review (referenced for branch 3 analysis in WR-02), no full bug pass was performed against it under these scope rules.
+**Fix:** Process-level: backfill 32-02-SUMMARY.md's frontmatter with `created: [src/regen/dep-graph.ts, src/regen/dep-graph.test.ts]` so future re-reviews include them. Code-level: schedule a follow-up code review pass over `src/regen/*` independent of Phase 32 closure.
 
-### IN-03: `stripUnclaimedPrefix` regex anchored loosely
+### IN-04: `cli/index.ts` adds top-level `--dry-run` and `--json` flags but the default action (no command) does not register them
 
-**File:** `src/regen/dep-graph.ts:373-376`
-**Issue:**
-```ts
-function stripUnclaimedPrefix(reason: string): string {
-  const m = reason.match(/unclaimed:\s*([^)]+)\)?\s*$/);
-  return m ? m[1].trim() : reason;
-}
-```
-Captures everything between `unclaimed: ` and an optional `)` at end. If a file
-path ever contains `)` (legal on POSIX), the capture would be truncated. Unlikely
-in this repo but worth noting; the input is always file paths that come from
-fast-glob globbing `src/**` and a user's filesystem — well-behaved in practice.
-**Fix (optional):**
-Pass `unclaimed: string[]` directly rather than re-parsing the formatted reason
-string. The `DryRunDecision.wouldExecute[*].reasons` is already shaped data; the
-re-parse is purely cosmetic plumbing.
-
----
-
-### IN-04: Comment on line 956 contradicts comment on line 866 about `filterDecision === null`
-
-**File:** `src/cli/generate.ts:956-960` vs `:570-575`
-**Issue:**
-The render-loop comment claims `filterDecision is null when no --since OR no graph
-existed (full regen path)`. But upstream (line 570-575), `filterDecision` is set
-ONLY when `--since` succeeded AND a graph was loaded. The two together mean a
-full-regen path can leave `filterDecision === null` (correct), but the OR in the
-comment glosses over the `--since` failure modes (fallback, no graph) — which all
-collapse to "null" downstream. Comment is true but imprecise.
-**Fix (optional):**
-```ts
-// filterDecision is null in three cases:
-//   1. --since was not provided
-//   2. --since git lookup returned 'fallback' (not a repo, shallow, detached)
-//   3. No dep-graph existed on disk (loadDepGraph returned null)
-// All three collapse to "render every selected doc" — safe full regen.
-```
+**File:** `src/cli/index.ts:39, 144-150`
+**Issue:** `--dry-run` and `--json` are registered on the `generate` subcommand only (lines 38-39). The default-action block (lines 144-150) only forwards `--provider`, `--model`, `--audience`, `-v`. A user running bare `handover --dry-run` (no `generate`) will be told by Commander that `--dry-run` is unknown — but `handover generate --dry-run` works. This is consistent with how `--since`, `--only`, `--static-only`, `--no-cache`, and `--stream` are also missing from the default action, so it is not a regression — but the default-action block has clearly drifted from the `generate` subcommand's option set and is now confusing/inconsistent.
+**Fix:** Either (a) remove the default-action block entirely and require users to type `handover generate ...` explicitly (clearer mental model), or (b) keep the default action but mirror the full option set from the `generate` subcommand, or (c) refactor the option list into a helper applied to both registrations so they cannot drift.
 
 ---
 
