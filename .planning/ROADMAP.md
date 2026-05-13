@@ -66,7 +66,17 @@ Plans:
   3. The dependency graph is persisted to `.handover/cache/dep-graph.json` with a `graphVersion` field; deleting the file or bumping `graphVersion` causes a full rebuild rather than a corrupt state
   4. Infrastructure files (logger, config loader, shared types) do not appear as source nodes in the graph — a change to `logger.ts` alone does not trigger any renderer
   5. A user with no existing dep-graph file (first run or manually deleted) gets a complete full regeneration as a safe degradation, with no error
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+- [ ] 32-01-PLAN.md — Wave 1: Extend DocumentSpec (`requiredSources`) + DocumentStatus (`'reused'` + `lastRenderedAt`); add `withSelfRef()` helper; curate `requiredSources` for all 14 registry entries; teach INDEX `statusLabel` the new case
+
+**Wave 2** *(depends_on 32-01)*
+- [ ] 32-02-PLAN.md — Wave 2: Build the `src/regen/dep-graph.ts` module — `GRAPH_VERSION`, `INFRASTRUCTURE_PATHS`, Zod schema, `buildDepGraph`/`saveDepGraph`/`loadDepGraph`, pure `filterRenderersByChangedFiles`, `computeDryRunDecision`, `formatDryRun`, `formatDryRunJson` (Phase 36 contract); ≥9 describe blocks at 90/90/85/90 coverage
+
+**Wave 3** *(depends_on 32-01 + 32-02)*
+- [ ] 32-03-PLAN.md — Wave 3: Wire `--dry-run` + `--json` flags into Commander; 5 minimal edits to `src/cli/generate.ts` (early-exit, `--since` filter, render-loop skip, status 'reused' assembly, post-run graph rebuild); 4 integration tests in `tests/integration/dry-run.test.ts`; 3-scenario human-verify checkpoint
+**UI hint**: no
 
 ### Phase 33: Cost Telemetry
 **Goal**: Users can see exactly what each renderer costs per run and be alerted when a run exceeds their configured threshold, with data persisted for trend analysis
@@ -130,7 +140,7 @@ Plans:
 | 21-26 | v6.0 | 13/13 | Complete | 2026-02-28 |
 | 27-30 | v7.0 | 14/14 | Complete | 2026-03-02 |
 | 31. Init Wizard + Action Scaffold | v8.0 | 0/5 | Planned | - |
-| 32. Source→Doc Dep Graph | v8.0 | 0/? | Not started | - |
+| 32. Source→Doc Dep Graph | v8.0 | 0/3 | Planned | - |
 | 33. Cost Telemetry | v8.0 | 0/? | Not started | - |
 | 34. Config-Driven Model Routing | v8.0 | 0/? | Not started | - |
 | 35. Eval Harness | v8.0 | 0/? | Not started | - |
