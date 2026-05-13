@@ -134,9 +134,22 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       const graph = await loadDepGraph(rootDir);
       let changedFiles: Set<string> | undefined;
       if (options.since) {
-        const gitResult = await getGitChangedFiles(rootDir, options.since);
-        if (gitResult.kind === 'ok') {
-          changedFiles = gitResult.changedFiles;
+        try {
+          const gitResult = await getGitChangedFiles(rootDir, options.since);
+          if (gitResult.kind === 'ok') {
+            changedFiles = gitResult.changedFiles;
+          } else {
+            // WR-01 follow-on: surface fallback reason like the non-dry-run path
+            // (mirrors src/cli/generate.ts non-dry-run --since branch).
+            process.stderr.write(`--since ignored: ${gitResult.reason}\n`);
+          }
+        } catch (err) {
+          // CR-01 fix: getGitChangedFiles throws on invalid ref (src/cache/git-fingerprint.ts:32-42).
+          // Surface to stderr but keep dry-run contract: exit 0, zero LLM calls, friendly preview.
+          // changedFiles stays undefined → computeDryRunDecision degrades to branch 3 (no changedFiles).
+          process.stderr.write(
+            `warning: --since "${options.since}" could not be resolved: ${(err as Error).message}\n`,
+          );
         }
       }
       const decision = computeDryRunDecision({
