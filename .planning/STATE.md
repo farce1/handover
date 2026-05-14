@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v8.0
 milestone_name: Distribution & Smarter Regen
 status: executing
-stopped_at: Phase 32 context gathered (.planning/phases/32-source-doc-dependency-graph/32-CONTEXT.md)
-last_updated: "2026-05-13T12:54:04.323Z"
-last_activity: 2026-05-13
+stopped_at: Phase 33 context gathered (.planning/phases/33-cost-telemetry/33-CONTEXT.md)
+last_updated: "2026-05-14T00:00:00.000Z"
+last_activity: 2026-05-14
 progress:
   total_phases: 6
   completed_phases: 2
@@ -91,9 +91,9 @@ Additional for Phase 31:
 
 ## Session Continuity
 
-Last session: 2026-05-13
-Stopped at: Phase 32 context gathered (.planning/phases/32-source-doc-dependency-graph/32-CONTEXT.md)
-Resume with: /gsd-plan-phase 32 to plan Phase 32 — or /gsd-verify-work 31 (after Phase 31 manual scenarios pass)
+Last session: 2026-05-14
+Stopped at: Phase 33 context gathered (.planning/phases/33-cost-telemetry/33-CONTEXT.md)
+Resume with: /gsd-plan-phase 33 to plan Phase 33 — or /gsd-verify-work 31 (after Phase 31 manual scenarios pass)
 Open checkpoints:
 
 - Plan 04 Task 4 (human-verify) — user to run 5 browser checks against https://github.com/farce1/regenerate-docs (see 31-04-SUMMARY.md)
