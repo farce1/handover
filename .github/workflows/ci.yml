@@ -41,8 +41,12 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test -- --coverage
+      # Build before tests: the integration tests in tests/integration/ run the
+      # compiled CLI from dist/ (see tests/integration/setup.ts → CLI_PATH).
+      # On a fresh CI checkout dist/ does not exist, so building must precede
+      # `npm test` or every integration test fails with ENOENT / exit 1.
       - run: npm run build
+      - run: npm test -- --coverage
       - name: Upload coverage to Codecov
         if: matrix.node-version == 20
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
