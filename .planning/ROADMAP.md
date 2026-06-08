@@ -91,7 +91,15 @@ Plans:
   3. After accumulating more than 90 days of runs, old records are automatically rotated out — the database does not grow without bound
   4. A user who has set `costWarningThreshold` in their config sees a warning in the CLI output when a run exceeds that threshold, sourced from the actual persisted run data
   5. The `renderer_runs` table has an index on `(renderer, ran_at)` so `handover cost` queries complete in milliseconds regardless of history size
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+**Wave 1**
+- [ ] 33-01-PLAN.md — Wave 1: Build `src/regen/telemetry/` module — db lifecycle (WAL + user_version drop-and-recreate), Zod schemas (TELEM-03 boundary), atomic writer, attribution-math reader (`_unconsumed` orphan bucket), two-transaction rotation, barrel index
+- [ ] 33-04-PLAN.md — Wave 1 (parallel): Extend `src/cli/init.ts` `GITIGNORE_ENTRIES` with `.handover/telemetry.db-wal` and `.handover/telemetry.db-shm` (WAL sidecar fix per RESEARCH §F-02); 3 regression tests in init-detectors.test.ts
+
+**Wave 2** *(depends_on 33-01)*
+- [ ] 33-02-PLAN.md — Wave 2: `handover cost` CLI subcommand — text + JSON (formatVersion: 1) output, --runs/--since-date/--renderer/--view/--json flags, empty-DB friendly exit, corrupt-DB HandoverError exit; Commander registration in src/cli/index.ts with lazy import
+- [ ] 33-03-PLAN.md — Wave 2 (parallel): Wire telemetry into `src/cli/generate.ts` end-of-run (between line ~1170 totals and ~1210 onComplete); D-19 try/catch graceful-degradation; D-13 separate-transaction rotation; D-17 threshold-warning reorder (data source moves to persisted totals); 4 integration tests in generate.test.ts
 
 ### Phase 34: Config-Driven Model Routing
 **Goal**: Users can assign cheap models to boilerplate renderers and expensive models to synthesis-heavy ones via config, with routing transparently shown in generate output and cache entries correctly scoped per model
@@ -144,7 +152,7 @@ Plans:
 | 27-30 | v7.0 | 14/14 | Complete | 2026-03-02 |
 | 31. Init Wizard + Action Scaffold | v8.0 | 0/5 | Planned | - |
 | 32. Source→Doc Dep Graph | v8.0 | 4/4 | Complete    | 2026-05-13 |
-| 33. Cost Telemetry | v8.0 | 0/? | Not started | - |
+| 33. Cost Telemetry | v8.0 | 0/4 | Planned | - |
 | 34. Config-Driven Model Routing | v8.0 | 0/? | Not started | - |
 | 35. Eval Harness | v8.0 | 0/? | Not started | - |
 | 36. GitHub Action Complete | v8.0 | 0/? | Not started | - |
