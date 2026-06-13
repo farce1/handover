@@ -1,25 +1,12 @@
 import type { ParsedFile } from '../parsing/types.js';
 import { resolveToKnownPath } from './import-resolution.js';
 
-/**
- * File-level internal import dependency graph.
- *
- * Built statically from AST import data (no LLM). This is the factual ground
- * truth that downstream rounds can use to (a) validate LLM-asserted module
- * relationships, (b) order analysis dependencies-first, and (c) drive faithful
- * dependency diagrams.
- */
-/**
- * A directed graph over string nodes with both forward (`dependencies`) and
- * reverse (`dependents`) adjacency. Any graph of this shape can be ordered by
- * {@link dependenciesFirstOrder} — file-level and module-level graphs alike.
- */
+/** A directed graph over string nodes, orderable by {@link dependenciesFirstOrder}. */
 export interface DirectedGraph {
-  /** All participating nodes, sorted. */
   nodes: string[];
-  /** Forward edges: node -> set of nodes it depends on. */
+  /** node -> nodes it depends on. */
   dependencies: Map<string, Set<string>>;
-  /** Reverse edges: node -> set of nodes that depend on it. */
+  /** node -> nodes that depend on it. */
   dependents: Map<string, Set<string>>;
 }
 
@@ -27,25 +14,14 @@ export interface DirectedGraph {
 export type ImportGraph = DirectedGraph;
 
 export interface TopoResult {
-  /**
-   * Dependencies-first ordering: a file appears only after every internal file
-   * it imports. Files involved in a cycle are omitted (see `cyclicNodes`).
-   */
+  /** Dependencies-first order: a node appears only after everything it imports. */
   order: string[];
-  /** True when one or more import cycles prevented a complete ordering. */
   hasCycles: boolean;
-  /**
-   * Sorted file paths that could not be ordered: those participating in an
-   * import cycle, plus any that transitively depend on one.
-   */
+  /** Nodes left unordered: those in an import cycle, or transitively depending on one. */
   cyclicNodes: string[];
 }
 
-/**
- * Build a directed import graph from parsed files. Edges are recorded only for
- * imports that resolve to a known internal file path; external packages and
- * unresolved imports are ignored.
- */
+/** Build a directed import graph from parsed files; edges only for resolved internal imports. */
 export function buildImportGraph(files: ParsedFile[], knownPaths: Set<string>): ImportGraph {
   const dependencies = new Map<string, Set<string>>();
   const dependents = new Map<string, Set<string>>();
@@ -73,29 +49,21 @@ export function buildImportGraph(files: ParsedFile[], knownPaths: Set<string>): 
     }
   }
 
-  return {
-    nodes: [...nodes].sort(),
-    dependencies,
-    dependents,
-  };
+  return { nodes: [...nodes].sort(), dependencies, dependents };
 }
 
 /**
- * Produce a dependencies-first ordering of the graph via wave-based Kahn's
- * algorithm. Within each wave, nodes are emitted in alphabetical order so the
- * result is deterministic. Nodes left over after the algorithm terminates are
- * part of an import cycle and are reported separately.
+ * Dependencies-first ordering via wave-based Kahn's algorithm. Within each wave
+ * nodes are emitted alphabetically so the result is deterministic; nodes left
+ * over are part of (or blocked by) a cycle.
  */
 export function dependenciesFirstOrder(graph: DirectedGraph): TopoResult {
-  // Remaining unmet dependencies per node.
   const remaining = new Map<string, number>();
   for (const node of graph.nodes) {
     remaining.set(node, graph.dependencies.get(node)?.size ?? 0);
   }
 
   const order: string[] = [];
-
-  // Initial wave: nodes with no internal dependencies.
   let ready = graph.nodes.filter((node) => remaining.get(node) === 0).sort();
 
   while (ready.length > 0) {
@@ -103,28 +71,18 @@ export function dependenciesFirstOrder(graph: DirectedGraph): TopoResult {
 
     for (const node of ready) {
       order.push(node);
-
-      // Decrement each dependent's unmet-dependency count; the order we visit
-      // them here is irrelevant because `next` is sorted before the next wave.
       for (const dependent of graph.dependents.get(node) ?? []) {
         const count = (remaining.get(dependent) ?? 0) - 1;
         remaining.set(dependent, count);
-        if (count === 0) {
-          next.push(dependent);
-        }
+        if (count === 0) next.push(dependent);
       }
     }
 
     ready = next.sort();
   }
 
-  // Anything not emitted is part of a cycle.
   const emitted = new Set(order);
   const cyclicNodes = graph.nodes.filter((node) => !emitted.has(node)).sort();
 
-  return {
-    order,
-    hasCycles: cyclicNodes.length > 0,
-    cyclicNodes,
-  };
+  return { order, hasCycles: cyclicNodes.length > 0, cyclicNodes };
 }

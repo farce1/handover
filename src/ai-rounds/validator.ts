@@ -1,5 +1,7 @@
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 import type { ValidationResult } from './types.js';
+import { buildImportGraph } from '../analyzers/import-graph.js';
+import { aggregateModuleGraph } from '../analyzers/module-graph.js';
 
 // ─── File path claim validation ─────────────────────────────────────────────
 
@@ -135,6 +137,47 @@ function extractImportClaims(
   return claims;
 }
 
+// ─── Module relationship validation ──────────────────────────────────────────
+
+/**
+ * Validate Round 2 module relationships against the real module-level import
+ * graph: kept when a real import connects the two modules in either direction,
+ * dropped when none does, skipped when an endpoint is not a known module.
+ */
+export function validateModuleRelationships(
+  modules: Array<{ name: string; files: string[] }>,
+  relationships: Array<{ from: string; to: string }>,
+  analysis: StaticAnalysisResult,
+): { valid: Array<{ from: string; to: string }>; dropped: Array<{ from: string; to: string }> } {
+  const knownPaths = new Set(
+    analysis.fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path),
+  );
+
+  const fileToModule = new Map<string, string>();
+  for (const mod of modules) {
+    for (const file of mod.files) fileToModule.set(file, mod.name);
+  }
+
+  const moduleGraph = aggregateModuleGraph(
+    buildImportGraph(analysis.ast.files, knownPaths),
+    (file) => fileToModule.get(file) ?? null,
+  );
+  const moduleNames = new Set(modules.map((m) => m.name));
+
+  const valid: Array<{ from: string; to: string }> = [];
+  const dropped: Array<{ from: string; to: string }> = [];
+
+  for (const rel of relationships) {
+    if (!moduleNames.has(rel.from) || !moduleNames.has(rel.to)) continue;
+    const connected =
+      Boolean(moduleGraph.dependencies.get(rel.from)?.has(rel.to)) ||
+      Boolean(moduleGraph.dependencies.get(rel.to)?.has(rel.from));
+    (connected ? valid : dropped).push(rel);
+  }
+
+  return { valid, dropped };
+}
+
 // ─── Combined round claim validation ────────────────────────────────────────
 
 /**
@@ -155,8 +198,25 @@ export function validateRoundClaims(
   const importClaims = extractImportClaims(roundNumber, output);
   const importResult = validateImportClaims(importClaims, analysis);
 
-  const total = filePathClaims.length + importClaims.length;
-  const corrected = fileResult.dropped.length + importResult.dropped.length;
+  // Round 2: validate module-name relationships against the real module graph.
+  let moduleRelTotal = 0;
+  let moduleRelDropped = 0;
+  if (roundNumber === 2) {
+    const modules = output['modules'];
+    const relationships = output['relationships'];
+    if (Array.isArray(modules) && modules.length > 0 && Array.isArray(relationships)) {
+      const moduleResult = validateModuleRelationships(
+        modules as Array<{ name: string; files: string[] }>,
+        relationships as Array<{ from: string; to: string }>,
+        analysis,
+      );
+      moduleRelTotal = moduleResult.valid.length + moduleResult.dropped.length;
+      moduleRelDropped = moduleResult.dropped.length;
+    }
+  }
+
+  const total = filePathClaims.length + importClaims.length + moduleRelTotal;
+  const corrected = fileResult.dropped.length + importResult.dropped.length + moduleRelDropped;
   const validated = total - corrected;
 
   return {

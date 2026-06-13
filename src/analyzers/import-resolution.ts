@@ -1,17 +1,7 @@
 import type { ParsedFile } from '../parsing/types.js';
 
-/**
- * Internal import resolution helpers (shared).
- *
- * Resolves relative import sources to concrete internal file paths, trying the
- * common extension/`index` suffixes a module resolver would. External package
- * imports (no `.`/`..` prefix) resolve to `null`.
- *
- * Originally private to the context scorer (CTX-02); extracted so the import
- * dependency graph builder can share the exact same resolution semantics.
- */
-
-// ─── Commonly tried extensions for import resolution ────────────────────────
+// Resolves relative import sources to concrete internal file paths. Shared by the
+// context scorer and the import graph so they resolve imports identically.
 
 export const EXTENSION_SUFFIXES = [
   '',
@@ -26,30 +16,19 @@ export const EXTENSION_SUFFIXES = [
   '/index.js',
 ];
 
-/**
- * JavaScript-style import extensions. Under NodeNext/ESM resolution, TypeScript
- * sources are imported with these extensions (e.g. `./foo.js` resolves to
- * `foo.ts` on disk), so they are stripped before retrying the suffix list.
- */
+// Under NodeNext/ESM, TS sources are imported with JS extensions (`./foo.js` ->
+// `foo.ts` on disk), so these are stripped before retrying the suffix list.
 const JS_IMPORT_EXTENSION = /\.(?:js|jsx|mjs|cjs)$/;
 
-// ─── Path resolution helpers ────────────────────────────────────────────────
-
-/**
- * Resolve an import path relative to the importing file's directory.
- * Returns null for external packages (no `.` or `..` prefix).
- */
+/** Resolve `importSource` against `fromDir`; null for external (non-relative) packages. */
 export function resolveImportPath(fromDir: string, importSource: string): string | null {
-  // Skip external packages
   if (!importSource.startsWith('.') && !importSource.startsWith('..')) {
     return null;
   }
 
-  // Join fromDir + importSource and collapse segments
   const parts = fromDir ? fromDir.split('/') : [];
-  const importParts = importSource.split('/');
 
-  for (const segment of importParts) {
+  for (const segment of importSource.split('/')) {
     if (segment === '.' || segment === '') {
       continue;
     } else if (segment === '..') {
@@ -62,19 +41,11 @@ export function resolveImportPath(fromDir: string, importSource: string): string
   return parts.join('/');
 }
 
-/**
- * Strip file extension for extensionless import matching.
- * e.g., "src/utils/helpers.ts" -> "src/utils/helpers"
- */
 export function stripExtension(filePath: string): string {
   return filePath.replace(/\.[^./]+$/, '');
 }
 
-/**
- * Resolve a single import from a source file to a concrete known internal file
- * path, trying common extension/`index` suffixes. Returns null for external
- * packages and for imports that don't resolve to any known path.
- */
+/** Resolve a single import to a known internal file path, or null. */
 export function resolveToKnownPath(
   fromPath: string,
   importSource: string,
@@ -85,37 +56,27 @@ export function resolveToKnownPath(
   const resolved = resolveImportPath(fromDir, importSource);
   if (resolved === null) return null;
 
-  // Base paths to try the suffix list against:
-  //  1. the resolved path as-is — handles extensionless specifiers (`./b` -> b.ts)
-  //  2. the path with a JS-style extension stripped — handles NodeNext/ESM
-  //     specifiers that target a TS source (`./b.js` -> b.ts)
-  // The exact path is tried first (suffix ''), so a real `.js` file still wins
-  // over a `.ts` sibling when both exist.
-  const bases = [resolved];
-  if (JS_IMPORT_EXTENSION.test(resolved)) {
-    bases.push(resolved.replace(JS_IMPORT_EXTENSION, ''));
-  }
+  // Try the resolved path as-is (extensionless specifiers), then with a JS-style
+  // extension stripped (NodeNext specifiers targeting a TS source). The exact
+  // path wins first, so a real `.js` file still beats a `.ts` sibling.
+  const bases = JS_IMPORT_EXTENSION.test(resolved)
+    ? [resolved, resolved.replace(JS_IMPORT_EXTENSION, '')]
+    : [resolved];
 
   for (const base of bases) {
     for (const suffix of EXTENSION_SUFFIXES) {
-      const candidate = base + suffix;
-      if (knownPaths.has(candidate)) {
-        return candidate;
-      }
+      if (knownPaths.has(base + suffix)) return base + suffix;
     }
   }
 
   return null;
 }
 
-/**
- * Build a reverse-import map: for each file path, how many unique files import it.
- */
+/** Map each internal file path to the number of distinct files that import it. */
 export function buildReverseImportMap(
   files: ParsedFile[],
   knownPaths: Set<string>,
 ): Map<string, number> {
-  // Track which importers reference which paths (avoid double-counting)
   const importerSets = new Map<string, Set<string>>();
 
   for (const file of files) {
@@ -132,7 +93,6 @@ export function buildReverseImportMap(
     }
   }
 
-  // Convert sets to counts
   const result = new Map<string, number>();
   for (const [path, importers] of importerSets) {
     result.set(path, importers.size);
