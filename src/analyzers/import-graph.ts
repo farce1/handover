@@ -9,14 +9,22 @@ import { resolveToKnownPath } from './import-resolution.js';
  * relationships, (b) order analysis dependencies-first, and (c) drive faithful
  * dependency diagrams.
  */
-export interface ImportGraph {
-  /** All participating internal file paths, sorted. */
+/**
+ * A directed graph over string nodes with both forward (`dependencies`) and
+ * reverse (`dependents`) adjacency. Any graph of this shape can be ordered by
+ * {@link dependenciesFirstOrder} — file-level and module-level graphs alike.
+ */
+export interface DirectedGraph {
+  /** All participating nodes, sorted. */
   nodes: string[];
-  /** Forward edges: file -> set of internal files it imports. */
+  /** Forward edges: node -> set of nodes it depends on. */
   dependencies: Map<string, Set<string>>;
-  /** Reverse edges: file -> set of internal files that import it. */
+  /** Reverse edges: node -> set of nodes that depend on it. */
   dependents: Map<string, Set<string>>;
 }
+
+/** File-level import dependency graph (nodes are internal file paths). */
+export type ImportGraph = DirectedGraph;
 
 export interface TopoResult {
   /**
@@ -78,7 +86,7 @@ export function buildImportGraph(files: ParsedFile[], knownPaths: Set<string>): 
  * result is deterministic. Nodes left over after the algorithm terminates are
  * part of an import cycle and are reported separately.
  */
-export function dependenciesFirstOrder(graph: ImportGraph): TopoResult {
+export function dependenciesFirstOrder(graph: DirectedGraph): TopoResult {
   // Remaining unmet dependencies per node.
   const remaining = new Map<string, number>();
   for (const node of graph.nodes) {
