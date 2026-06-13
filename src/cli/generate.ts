@@ -74,6 +74,7 @@ export interface GenerateOptions {
   since?: string;
   dryRun?: boolean; // NEW (Phase 32 D-15..D-19)
   json?: boolean; // NEW (Phase 32 D-16 — modifier on --dry-run)
+  compress?: boolean;
 }
 
 class EarlyExitNoChangesError extends Error {
@@ -194,6 +195,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     const cliOverrides: Record<string, unknown> = {};
     if (options.provider) cliOverrides.provider = options.provider;
     if (options.model) cliOverrides.model = options.model;
+    if (options.compress) cliOverrides.compress = true;
 
     const config = loadConfig(cliOverrides);
 
@@ -653,6 +655,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
             estimateTokensFn,
             getFileContent,
             isIncremental ? changedFiles : undefined, // Only pass on incremental runs
+            config.compress,
           );
 
           // Update analysis cache for next run's change detection

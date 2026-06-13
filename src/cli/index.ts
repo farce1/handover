@@ -38,6 +38,7 @@ program
   .option('--dry-run', 'Preview which renderers would execute; no LLM calls')
   .option('--json', 'Emit JSON output (used with --dry-run)')
   .option('--stream', 'Show streaming token output during AI rounds')
+  .option('--compress', 'Pack files as signature summaries only (fit larger repos)')
   .option('-v, --verbose', 'Show detailed output')
   .action(runGenerate);
 
