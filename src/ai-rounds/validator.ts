@@ -5,6 +5,13 @@ import { aggregateModuleGraph } from '../analyzers/module-graph.js';
 
 // ─── File path claim validation ─────────────────────────────────────────────
 
+/** Set of all known file paths from static analysis. */
+function knownFilePaths(analysis: StaticAnalysisResult): Set<string> {
+  return new Set(
+    analysis.fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path),
+  );
+}
+
 /**
  * Validate file path claims against known files from static analysis.
  * Drops claims that reference non-existent files (trust code over model).
@@ -13,9 +20,7 @@ export function validateFileClaims(
   claimedPaths: string[],
   analysis: StaticAnalysisResult,
 ): { valid: string[]; dropped: string[] } {
-  const knownPaths = new Set(
-    analysis.fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path),
-  );
+  const knownPaths = knownFilePaths(analysis);
 
   const valid: string[] = [];
   const dropped: string[] = [];
@@ -149,17 +154,13 @@ export function validateModuleRelationships(
   relationships: Array<{ from: string; to: string }>,
   analysis: StaticAnalysisResult,
 ): { valid: Array<{ from: string; to: string }>; dropped: Array<{ from: string; to: string }> } {
-  const knownPaths = new Set(
-    analysis.fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path),
-  );
-
   const fileToModule = new Map<string, string>();
   for (const mod of modules) {
     for (const file of mod.files) fileToModule.set(file, mod.name);
   }
 
-  const moduleGraph = aggregateModuleGraph(
-    buildImportGraph(analysis.ast.files, knownPaths),
+  const moduleDeps = aggregateModuleGraph(
+    buildImportGraph(analysis.ast.files, knownFilePaths(analysis)),
     (file) => fileToModule.get(file) ?? null,
   );
   const moduleNames = new Set(modules.map((m) => m.name));
@@ -170,12 +171,34 @@ export function validateModuleRelationships(
   for (const rel of relationships) {
     if (!moduleNames.has(rel.from) || !moduleNames.has(rel.to)) continue;
     const connected =
-      Boolean(moduleGraph.dependencies.get(rel.from)?.has(rel.to)) ||
-      Boolean(moduleGraph.dependencies.get(rel.to)?.has(rel.from));
-    (connected ? valid : dropped).push(rel);
+      Boolean(moduleDeps.get(rel.from)?.has(rel.to)) ||
+      Boolean(moduleDeps.get(rel.to)?.has(rel.from));
+    if (connected) {
+      valid.push(rel);
+    } else {
+      dropped.push(rel);
+    }
   }
 
   return { valid, dropped };
+}
+
+/** Validate Round 2 module relationships, or return empty for other rounds / malformed output. */
+function validateRound2Relationships(
+  roundNumber: number,
+  output: Record<string, unknown>,
+  analysis: StaticAnalysisResult,
+): { valid: Array<{ from: string; to: string }>; dropped: Array<{ from: string; to: string }> } {
+  const modules = output['modules'];
+  const relationships = output['relationships'];
+  if (roundNumber !== 2 || !Array.isArray(modules) || !Array.isArray(relationships)) {
+    return { valid: [], dropped: [] };
+  }
+  return validateModuleRelationships(
+    modules as Array<{ name: string; files: string[] }>,
+    relationships as Array<{ from: string; to: string }>,
+    analysis,
+  );
 }
 
 // ─── Combined round claim validation ────────────────────────────────────────
@@ -199,24 +222,12 @@ export function validateRoundClaims(
   const importResult = validateImportClaims(importClaims, analysis);
 
   // Round 2: validate module-name relationships against the real module graph.
-  let moduleRelTotal = 0;
-  let moduleRelDropped = 0;
-  if (roundNumber === 2) {
-    const modules = output['modules'];
-    const relationships = output['relationships'];
-    if (Array.isArray(modules) && modules.length > 0 && Array.isArray(relationships)) {
-      const moduleResult = validateModuleRelationships(
-        modules as Array<{ name: string; files: string[] }>,
-        relationships as Array<{ from: string; to: string }>,
-        analysis,
-      );
-      moduleRelTotal = moduleResult.valid.length + moduleResult.dropped.length;
-      moduleRelDropped = moduleResult.dropped.length;
-    }
-  }
+  const moduleRel = validateRound2Relationships(roundNumber, output, analysis);
 
-  const total = filePathClaims.length + importClaims.length + moduleRelTotal;
-  const corrected = fileResult.dropped.length + importResult.dropped.length + moduleRelDropped;
+  const total =
+    filePathClaims.length + importClaims.length + moduleRel.valid.length + moduleRel.dropped.length;
+  const corrected =
+    fileResult.dropped.length + importResult.dropped.length + moduleRel.dropped.length;
   const validated = total - corrected;
 
   return {

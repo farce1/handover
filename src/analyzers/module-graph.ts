@@ -1,44 +1,24 @@
-import type { DirectedGraph, ImportGraph } from './import-graph.js';
+import { getOrCreateSet } from './import-resolution.js';
 
 /**
- * Aggregate a file-level import graph into a module-level dependency graph.
- *
- * `fileToModule` maps each file to its owning module, or `null` to exclude it
- * (e.g. vendored/generated code). Intra-module imports are dropped; every module
- * owning at least one file becomes a node, even with no edges.
+ * Aggregate a file-level import map into module-level dependencies using a
+ * file->module mapping (null excludes the file). Intra-module imports are dropped.
  */
 export function aggregateModuleGraph(
-  fileGraph: ImportGraph,
+  fileImports: Map<string, Set<string>>,
   fileToModule: (filePath: string) => string | null,
-): DirectedGraph {
-  const nodes = new Set<string>();
+): Map<string, Set<string>> {
   const dependencies = new Map<string, Set<string>>();
-  const dependents = new Map<string, Set<string>>();
 
-  const ensure = (map: Map<string, Set<string>>, key: string): Set<string> => {
-    let set = map.get(key);
-    if (!set) {
-      set = new Set<string>();
-      map.set(key, set);
-    }
-    return set;
-  };
-
-  for (const file of fileGraph.nodes) {
-    const mod = fileToModule(file);
-    if (mod !== null) nodes.add(mod);
-  }
-
-  for (const [file, deps] of fileGraph.dependencies) {
+  for (const [file, deps] of fileImports) {
     const from = fileToModule(file);
     if (from === null) continue;
     for (const dep of deps) {
       const to = fileToModule(dep);
       if (to === null || to === from) continue;
-      ensure(dependencies, from).add(to);
-      ensure(dependents, to).add(from);
+      getOrCreateSet(dependencies, from).add(to);
     }
   }
 
-  return { nodes: [...nodes].sort(), dependencies, dependents };
+  return dependencies;
 }

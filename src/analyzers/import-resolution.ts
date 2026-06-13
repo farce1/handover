@@ -45,6 +45,16 @@ export function stripExtension(filePath: string): string {
   return filePath.replace(/\.[^./]+$/, '');
 }
 
+/** Return the Set at `key`, creating and inserting an empty one if absent. */
+export function getOrCreateSet<K, V>(map: Map<K, Set<V>>, key: K): Set<V> {
+  let set = map.get(key);
+  if (!set) {
+    set = new Set<V>();
+    map.set(key, set);
+  }
+  return set;
+}
+
 /** Resolve a single import to a known internal file path, or null. */
 export function resolveToKnownPath(
   fromPath: string,
@@ -83,13 +93,7 @@ export function buildReverseImportMap(
     for (const imp of file.imports) {
       const resolved = resolveToKnownPath(file.path, imp.source, knownPaths);
       if (resolved === null) continue;
-
-      let importers = importerSets.get(resolved);
-      if (!importers) {
-        importers = new Set<string>();
-        importerSets.set(resolved, importers);
-      }
-      importers.add(file.path);
+      getOrCreateSet(importerSets, resolved).add(file.path);
     }
   }
 
