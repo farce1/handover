@@ -32,6 +32,15 @@ export function aggregateModuleGraph(
   return dependencies;
 }
 
+/** True when a real import connects the two modules in either direction. */
+export function moduleEdgeExists(
+  moduleDeps: Map<string, Set<string>>,
+  from: string,
+  to: string,
+): boolean {
+  return Boolean(moduleDeps.get(from)?.has(to)) || Boolean(moduleDeps.get(to)?.has(from));
+}
+
 /**
  * Compute real module-level dependencies from static analysis and a module
  * decomposition (each module's file membership). Edges reflect actual

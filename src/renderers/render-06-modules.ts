@@ -1,6 +1,7 @@
 import type { RenderContext } from './types.js';
 import { codeRef, buildTable } from './utils.js';
 import { buildModuleDiagram } from './mermaid.js';
+import { moduleDependencyGraph, moduleEdgeExists } from '../analyzers/module-graph.js';
 import { renderDocument, collectRoundsUsed, pushStructuredBlock } from './render-template.js';
 
 // ─── renderModules ─────────────────────────────────────────────────────────
@@ -19,6 +20,11 @@ export function renderModules(ctx: RenderContext): string {
   const modules = hasR2 ? r2.modules : deriveModulesFromFileTree(ctx);
 
   if (modules.length === 0) return '';
+
+  // Real cross-module import graph — grounds the relationships table and diagram.
+  const moduleDeps = hasR2
+    ? moduleDependencyGraph(ctx.staticAnalysis, r2.modules)
+    : new Map<string, Set<string>>();
 
   const roundsUsed = collectRoundsUsed(ctx, 1, 2);
 
@@ -112,14 +118,17 @@ export function renderModules(ctx: RenderContext): string {
         });
       }
 
-      // ── Module Relationships ────────────────────────────────────────
-      if (hasR2 && r2.relationships.length > 0) {
+      // ── Module Relationships (only those backed by a real import) ────
+      const verifiedRelationships = hasR2
+        ? r2.relationships.filter((rel) => moduleEdgeExists(moduleDeps, rel.from, rel.to))
+        : [];
+      if (verifiedRelationships.length > 0) {
         lines.push('## Module Relationships');
         lines.push('');
         lines.push(
           buildTable(
             ['From', 'To', 'Type', 'Evidence'],
-            r2.relationships.map((rel) => [rel.from, rel.to, rel.type, rel.evidence]),
+            verifiedRelationships.map((rel) => [rel.from, rel.to, rel.type, rel.evidence]),
           ),
         );
         lines.push('');
@@ -136,7 +145,7 @@ export function renderModules(ctx: RenderContext): string {
       }
 
       // ── Diagrams ────────────────────────────────────────────────────
-      const diagram = buildModuleDiagram(ctx);
+      const diagram = buildModuleDiagram(ctx, moduleDeps);
       if (diagram) {
         lines.push('## Diagrams');
         lines.push('');
