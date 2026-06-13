@@ -1080,3 +1080,70 @@ describe('generateSignatureSummary', () => {
     expect(result).toBe('// FILE: src/private-only.ts (12 lines)');
   });
 });
+
+// ─── packFiles() compress mode ──────────────────────────────────────────────────
+
+describe('packFiles compress mode', () => {
+  const parsed = mkParsedFile({
+    path: 'src/a.ts',
+    functions: [
+      {
+        kind: 'function',
+        name: 'doThing',
+        parameters: [],
+        typeParameters: [],
+        isAsync: false,
+        isGenerator: false,
+        visibility: 'public',
+        decorators: [],
+        line: 1,
+        endLine: 5,
+      },
+    ],
+    exports: [{ name: 'doThing', kind: 'function', isReExport: false, isTypeOnly: false, line: 1 }],
+  });
+  const content = 'export function doThing() {\n  return 42;\n}\n';
+
+  test('represents AST files by their signature summary', async () => {
+    const result = await packFiles(
+      [mkScored('src/a.ts', 50)],
+      mkASTResult([parsed]),
+      mkBudget(10000),
+      charTokens,
+      mkContentFn({ 'src/a.ts': content }),
+      undefined,
+      true,
+    );
+
+    expect(result.files[0].tier).toBe('signatures');
+    expect(result.files[0].content).toBe(generateSignatureSummary(parsed));
+    expect(result.files[0].content).not.toContain('return 42');
+  });
+
+  test('is off by default: a small AST file stays full', async () => {
+    const result = await packFiles(
+      [mkScored('src/a.ts', 50)],
+      mkASTResult([parsed]),
+      mkBudget(10000),
+      charTokens,
+      mkContentFn({ 'src/a.ts': content }),
+    );
+
+    expect(result.files[0].tier).toBe('full');
+    expect(result.files[0].content).toBe(content);
+  });
+
+  test('takes precedence over the changed-file full tier', async () => {
+    const result = await packFiles(
+      [mkScored('src/a.ts', 50)],
+      mkASTResult([parsed]),
+      mkBudget(10000),
+      charTokens,
+      mkContentFn({ 'src/a.ts': content }),
+      new Set(['src/a.ts']),
+      true,
+    );
+
+    expect(result.files[0].tier).toBe('signatures');
+  });
+});

@@ -209,6 +209,7 @@ export async function packFiles(
   estimateTokensFn: (text: string) => number,
   getFileContent: (path: string) => Promise<string>,
   changedFiles?: Set<string>,
+  compress?: boolean,
 ): Promise<PackedContext> {
   // ── Empty input guard ──────────────────────────────────────────────────
   if (scored.length === 0) {
@@ -260,7 +261,7 @@ export async function packFiles(
     totalEstimatedTokens += estimateTokensFn(content);
   }
 
-  if (totalEstimatedTokens <= budget.fileContentBudget) {
+  if (totalEstimatedTokens <= budget.fileContentBudget && !compress) {
     // Everything fits -- include all files as 'full'
     const files: PackedFile[] = scored.map((s) => {
       const content = contentMap.get(s.path) ?? '';
@@ -310,8 +311,30 @@ export async function packFiles(
       continue;
     }
 
-    const fullTokens = estimateTokensFn(content);
     const parsed = astMap.get(entry.path);
+
+    // ── Compress mode: represent every file by its signature summary ──
+    if (compress) {
+      const summary = parsed
+        ? generateSignatureSummary(parsed)
+        : generateFallbackSummary(entry.path, content);
+      const summaryTokens = estimateTokensFn(summary);
+      if (summaryTokens <= remaining) {
+        packedFiles.push({
+          path: entry.path,
+          tier: 'signatures',
+          content: summary,
+          tokens: summaryTokens,
+          score: entry.score,
+        });
+        remaining -= summaryTokens;
+      } else {
+        packedFiles.push({ path: entry.path, tier: 'skip', content: '', tokens: 0, score: entry.score });
+      }
+      continue;
+    }
+
+    const fullTokens = estimateTokensFn(content);
 
     // ── Changed-file priority: force full tier for changed files (budget-enforced) ──
     if (changedFiles && changedFiles.size > 0 && changedFiles.has(entry.path)) {

@@ -76,6 +76,7 @@ export const HandoverConfigSchema = z
     timeout: z.number().int().positive().optional(),
     output: z.string().default('./handover'),
     audience: z.enum(['human', 'ai']).default('human'),
+    compress: z.boolean().default(false),
     include: z.array(z.string()).default(['**/*']),
     exclude: z.array(z.string()).default([]),
     context: z.string().optional(),
