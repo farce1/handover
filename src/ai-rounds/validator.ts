@@ -1,16 +1,8 @@
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 import type { ValidationResult } from './types.js';
-import { buildImportGraph } from '../analyzers/import-graph.js';
-import { aggregateModuleGraph } from '../analyzers/module-graph.js';
+import { moduleDependencyGraph, knownFilePaths } from '../analyzers/module-graph.js';
 
 // ─── File path claim validation ─────────────────────────────────────────────
-
-/** Set of all known file paths from static analysis. */
-function knownFilePaths(analysis: StaticAnalysisResult): Set<string> {
-  return new Set(
-    analysis.fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path),
-  );
-}
 
 /**
  * Validate file path claims against known files from static analysis.
@@ -154,15 +146,7 @@ export function validateModuleRelationships(
   relationships: Array<{ from: string; to: string }>,
   analysis: StaticAnalysisResult,
 ): { valid: Array<{ from: string; to: string }>; dropped: Array<{ from: string; to: string }> } {
-  const fileToModule = new Map<string, string>();
-  for (const mod of modules) {
-    for (const file of mod.files) fileToModule.set(file, mod.name);
-  }
-
-  const moduleDeps = aggregateModuleGraph(
-    buildImportGraph(analysis.ast.files, knownFilePaths(analysis)),
-    (file) => fileToModule.get(file) ?? null,
-  );
+  const moduleDeps = moduleDependencyGraph(analysis, modules);
   const moduleNames = new Set(modules.map((m) => m.name));
 
   const valid: Array<{ from: string; to: string }> = [];

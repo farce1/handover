@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { ParsedFile } from '../parsing/types.js';
+import type { StaticAnalysisResult } from './types.js';
 import { buildImportGraph } from './import-graph.js';
-import { aggregateModuleGraph } from './module-graph.js';
+import { aggregateModuleGraph, moduleDependencyGraph } from './module-graph.js';
 
 function mkFile(path: string, importSources: string[] = []): ParsedFile {
   return {
@@ -54,5 +55,32 @@ describe('aggregateModuleGraph', () => {
     const noVendor = (p: string): string | null => (p.startsWith('vendor/') ? null : topDir(p));
 
     expect(aggregateModuleGraph(fileGraph, noVendor).get('a')).toBeUndefined();
+  });
+});
+
+// Minimal StaticAnalysisResult: only directoryTree (files) and ast.files are read.
+function mkAnalysis(files: ParsedFile[]): StaticAnalysisResult {
+  return {
+    fileTree: { directoryTree: files.map((f) => ({ path: f.path, type: 'file' as const })) },
+    ast: { files },
+  } as unknown as StaticAnalysisResult;
+}
+
+describe('moduleDependencyGraph', () => {
+  it('derives module edges from real cross-module file imports', () => {
+    const analysis = mkAnalysis([mkFile('a/x.ts', ['../b/y.js']), mkFile('b/y.ts', [])]);
+    const modules = [
+      { name: 'a', files: ['a/x.ts'] },
+      { name: 'b', files: ['b/y.ts'] },
+    ];
+
+    expect(moduleDependencyGraph(analysis, modules).get('a')).toEqual(new Set(['b']));
+  });
+
+  it('drops intra-module imports', () => {
+    const analysis = mkAnalysis([mkFile('a/x.ts', ['./y.js']), mkFile('a/y.ts', [])]);
+    const modules = [{ name: 'a', files: ['a/x.ts', 'a/y.ts'] }];
+
+    expect(moduleDependencyGraph(analysis, modules).get('a')).toBeUndefined();
   });
 });
