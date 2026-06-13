@@ -1,7 +1,16 @@
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 import type { ValidationResult } from './types.js';
+import { buildImportGraph } from '../analyzers/import-graph.js';
+import { aggregateModuleGraph } from '../analyzers/module-graph.js';
 
 // ─── File path claim validation ─────────────────────────────────────────────
+
+/** Set of all known file paths from static analysis. */
+function knownFilePaths(analysis: StaticAnalysisResult): Set<string> {
+  return new Set(
+    analysis.fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path),
+  );
+}
 
 /**
  * Validate file path claims against known files from static analysis.
@@ -11,9 +20,7 @@ export function validateFileClaims(
   claimedPaths: string[],
   analysis: StaticAnalysisResult,
 ): { valid: string[]; dropped: string[] } {
-  const knownPaths = new Set(
-    analysis.fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path),
-  );
+  const knownPaths = knownFilePaths(analysis);
 
   const valid: string[] = [];
   const dropped: string[] = [];
@@ -135,6 +142,65 @@ function extractImportClaims(
   return claims;
 }
 
+// ─── Module relationship validation ──────────────────────────────────────────
+
+/**
+ * Validate Round 2 module relationships against the real module-level import
+ * graph: kept when a real import connects the two modules in either direction,
+ * dropped when none does, skipped when an endpoint is not a known module.
+ */
+export function validateModuleRelationships(
+  modules: Array<{ name: string; files: string[] }>,
+  relationships: Array<{ from: string; to: string }>,
+  analysis: StaticAnalysisResult,
+): { valid: Array<{ from: string; to: string }>; dropped: Array<{ from: string; to: string }> } {
+  const fileToModule = new Map<string, string>();
+  for (const mod of modules) {
+    for (const file of mod.files) fileToModule.set(file, mod.name);
+  }
+
+  const moduleDeps = aggregateModuleGraph(
+    buildImportGraph(analysis.ast.files, knownFilePaths(analysis)),
+    (file) => fileToModule.get(file) ?? null,
+  );
+  const moduleNames = new Set(modules.map((m) => m.name));
+
+  const valid: Array<{ from: string; to: string }> = [];
+  const dropped: Array<{ from: string; to: string }> = [];
+
+  for (const rel of relationships) {
+    if (!moduleNames.has(rel.from) || !moduleNames.has(rel.to)) continue;
+    const connected =
+      Boolean(moduleDeps.get(rel.from)?.has(rel.to)) ||
+      Boolean(moduleDeps.get(rel.to)?.has(rel.from));
+    if (connected) {
+      valid.push(rel);
+    } else {
+      dropped.push(rel);
+    }
+  }
+
+  return { valid, dropped };
+}
+
+/** Validate Round 2 module relationships, or return empty for other rounds / malformed output. */
+function validateRound2Relationships(
+  roundNumber: number,
+  output: Record<string, unknown>,
+  analysis: StaticAnalysisResult,
+): { valid: Array<{ from: string; to: string }>; dropped: Array<{ from: string; to: string }> } {
+  const modules = output['modules'];
+  const relationships = output['relationships'];
+  if (roundNumber !== 2 || !Array.isArray(modules) || !Array.isArray(relationships)) {
+    return { valid: [], dropped: [] };
+  }
+  return validateModuleRelationships(
+    modules as Array<{ name: string; files: string[] }>,
+    relationships as Array<{ from: string; to: string }>,
+    analysis,
+  );
+}
+
 // ─── Combined round claim validation ────────────────────────────────────────
 
 /**
@@ -155,8 +221,13 @@ export function validateRoundClaims(
   const importClaims = extractImportClaims(roundNumber, output);
   const importResult = validateImportClaims(importClaims, analysis);
 
-  const total = filePathClaims.length + importClaims.length;
-  const corrected = fileResult.dropped.length + importResult.dropped.length;
+  // Round 2: validate module-name relationships against the real module graph.
+  const moduleRel = validateRound2Relationships(roundNumber, output, analysis);
+
+  const total =
+    filePathClaims.length + importClaims.length + moduleRel.valid.length + moduleRel.dropped.length;
+  const corrected =
+    fileResult.dropped.length + importResult.dropped.length + moduleRel.dropped.length;
   const validated = total - corrected;
 
   return {

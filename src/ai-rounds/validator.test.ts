@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { validateFileClaims, validateImportClaims, validateRoundClaims } from './validator.js';
+import {
+  validateFileClaims,
+  validateImportClaims,
+  validateModuleRelationships,
+  validateRoundClaims,
+} from './validator.js';
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 
 // ─── Factory: minimal StaticAnalysisResult ────────────────────────────────────
@@ -371,5 +376,74 @@ describe('validateRoundClaims', () => {
     expect(result.total).toBe(0);
     expect(result.validated).toBe(0);
     expect(result.corrected).toBe(0);
+  });
+});
+
+// ─── validateModuleRelationships() tests ──────────────────────────────────────
+
+describe('validateModuleRelationships', () => {
+  const analysis = mkAnalysisWithImports(
+    ['a/x.ts', 'b/y.ts', 'c/z.ts'],
+    [{ path: 'a/x.ts', imports: [{ source: '../b/y.js' }] }],
+  );
+  const modules = [
+    { name: 'a', files: ['a/x.ts'] },
+    { name: 'b', files: ['b/y.ts'] },
+    { name: 'c', files: ['c/z.ts'] },
+  ];
+
+  test('confirms a relationship backed by a real cross-module import', () => {
+    const result = validateModuleRelationships(modules, [{ from: 'a', to: 'b' }], analysis);
+    expect(result.valid).toEqual([{ from: 'a', to: 'b' }]);
+    expect(result.dropped).toEqual([]);
+  });
+
+  test('drops a relationship with no real import in either direction', () => {
+    const result = validateModuleRelationships(modules, [{ from: 'a', to: 'c' }], analysis);
+    expect(result.valid).toEqual([]);
+    expect(result.dropped).toEqual([{ from: 'a', to: 'c' }]);
+  });
+
+  test('accepts a relationship backed by an import in the reverse direction', () => {
+    const result = validateModuleRelationships(modules, [{ from: 'b', to: 'a' }], analysis);
+    expect(result.valid).toEqual([{ from: 'b', to: 'a' }]);
+  });
+
+  test('skips relationships whose endpoints are not known modules', () => {
+    const result = validateModuleRelationships(
+      modules,
+      [
+        { from: 'a', to: 'unknown' },
+        { from: 'x', to: 'y' },
+      ],
+      analysis,
+    );
+    expect(result.valid).toEqual([]);
+    expect(result.dropped).toEqual([]);
+  });
+});
+
+describe('validateRoundClaims round 2 module relationships', () => {
+  test('counts module relationships and drops unsupported ones', () => {
+    const analysis = mkAnalysisWithImports(
+      ['a/x.ts', 'b/y.ts', 'c/z.ts'],
+      [{ path: 'a/x.ts', imports: [{ source: '../b/y.js' }] }],
+    );
+    const output = {
+      modules: [
+        { name: 'a', files: ['a/x.ts'] },
+        { name: 'b', files: ['b/y.ts'] },
+        { name: 'c', files: ['c/z.ts'] },
+      ],
+      relationships: [
+        { from: 'a', to: 'b', type: 'imports', evidence: 'x' },
+        { from: 'a', to: 'c', type: 'imports', evidence: 'y' },
+      ],
+    };
+
+    const result = validateRoundClaims(2, output, analysis);
+
+    expect(result.corrected).toBe(1);
+    expect(result.total).toBeGreaterThanOrEqual(2);
   });
 });
