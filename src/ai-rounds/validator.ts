@@ -1,6 +1,6 @@
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 import type { ValidationResult } from './types.js';
-import { moduleDependencyGraph, knownFilePaths } from '../analyzers/module-graph.js';
+import { moduleDependencyGraph, moduleEdgeExists, knownFilePaths } from '../analyzers/module-graph.js';
 
 // ─── File path claim validation ─────────────────────────────────────────────
 
@@ -154,10 +154,7 @@ export function validateModuleRelationships(
 
   for (const rel of relationships) {
     if (!moduleNames.has(rel.from) || !moduleNames.has(rel.to)) continue;
-    const connected =
-      Boolean(moduleDeps.get(rel.from)?.has(rel.to)) ||
-      Boolean(moduleDeps.get(rel.to)?.has(rel.from));
-    if (connected) {
+    if (moduleEdgeExists(moduleDeps, rel.from, rel.to)) {
       valid.push(rel);
     } else {
       dropped.push(rel);

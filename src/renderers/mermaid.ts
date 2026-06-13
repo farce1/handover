@@ -125,7 +125,10 @@ export function buildFeatureFlowDiagram(ctx: RenderContext): string {
  * real cross-module imports (from the AST), not LLM-asserted relationships.
  * Capped at ~15 nodes. Placed in 06-MODULES, Diagrams section.
  */
-export function buildModuleDiagram(ctx: RenderContext): string {
+export function buildModuleDiagram(
+  ctx: RenderContext,
+  moduleDeps?: Map<string, Set<string>>,
+): string {
   const r2 = ctx.rounds.r2?.data;
   if (!r2) return '';
 
@@ -141,8 +144,8 @@ export function buildModuleDiagram(ctx: RenderContext): string {
     emitted.add(mod.name);
   }
 
-  const moduleDeps = moduleDependencyGraph(ctx.staticAnalysis, r2.modules);
-  for (const [from, tos] of moduleDeps) {
+  const deps = moduleDeps ?? moduleDependencyGraph(ctx.staticAnalysis, r2.modules);
+  for (const [from, tos] of deps) {
     if (!emitted.has(from)) continue;
     for (const to of tos) {
       if (emitted.has(to)) lines.push(`  ${sanitizeId(from)} --> ${sanitizeId(to)}`);
