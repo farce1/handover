@@ -1,4 +1,5 @@
 import type { RenderContext } from './types.js';
+import { moduleDependencyGraph } from '../analyzers/module-graph.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -120,10 +121,9 @@ export function buildFeatureFlowDiagram(ctx: RenderContext): string {
 // ─── buildModuleDiagram ─────────────────────────────────────────────────────
 
 /**
- * Build a graph LR diagram from Round 2 (Module Detection) data.
- * Nodes are modules, edges are relationships. Capped at ~15 nodes.
- *
- * Placed in 06-MODULES, Diagrams section.
+ * Build a graph LR diagram from Round 2 modules. Nodes are modules; edges are
+ * real cross-module imports (from the AST), not LLM-asserted relationships.
+ * Capped at ~15 nodes. Placed in 06-MODULES, Diagrams section.
  */
 export function buildModuleDiagram(ctx: RenderContext): string {
   const r2 = ctx.rounds.r2?.data;
@@ -134,21 +134,18 @@ export function buildModuleDiagram(ctx: RenderContext): string {
   lines.push('graph LR');
 
   const NODE_CAP = 15;
-  const emittedNodes = new Set<string>();
+  const emitted = new Set<string>();
 
-  // Emit module nodes
   for (const mod of r2.modules.slice(0, NODE_CAP)) {
-    const nodeId = sanitizeId(mod.name);
-    lines.push(`  ${nodeId}["${mod.name}"]`);
-    emittedNodes.add(nodeId);
+    lines.push(`  ${sanitizeId(mod.name)}["${mod.name}"]`);
+    emitted.add(mod.name);
   }
 
-  // Emit relationship edges
-  for (const rel of r2.relationships) {
-    const fromId = sanitizeId(rel.from);
-    const toId = sanitizeId(rel.to);
-    if (emittedNodes.has(fromId) && emittedNodes.has(toId)) {
-      lines.push(`  ${fromId} -->|${rel.type}| ${toId}`);
+  const moduleDeps = moduleDependencyGraph(ctx.staticAnalysis, r2.modules);
+  for (const [from, tos] of moduleDeps) {
+    if (!emitted.has(from)) continue;
+    for (const to of tos) {
+      if (emitted.has(to)) lines.push(`  ${sanitizeId(from)} --> ${sanitizeId(to)}`);
     }
   }
 

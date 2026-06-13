@@ -1,4 +1,13 @@
+import type { StaticAnalysisResult } from './types.js';
+import { buildImportGraph } from './import-graph.js';
 import { getOrCreateSet } from './import-resolution.js';
+
+/** Set of all known file paths from static analysis. */
+export function knownFilePaths(analysis: StaticAnalysisResult): Set<string> {
+  return new Set(
+    analysis.fileTree.directoryTree.filter((e) => e.type === 'file').map((e) => e.path),
+  );
+}
 
 /**
  * Aggregate a file-level import map into module-level dependencies using a
@@ -21,4 +30,24 @@ export function aggregateModuleGraph(
   }
 
   return dependencies;
+}
+
+/**
+ * Compute real module-level dependencies from static analysis and a module
+ * decomposition (each module's file membership). Edges reflect actual
+ * cross-module imports, not asserted relationships.
+ */
+export function moduleDependencyGraph(
+  analysis: StaticAnalysisResult,
+  modules: Array<{ name: string; files: string[] }>,
+): Map<string, Set<string>> {
+  const fileToModule = new Map<string, string>();
+  for (const mod of modules) {
+    for (const file of mod.files) fileToModule.set(file, mod.name);
+  }
+
+  return aggregateModuleGraph(
+    buildImportGraph(analysis.ast.files, knownFilePaths(analysis)),
+    (file) => fileToModule.get(file) ?? null,
+  );
 }
