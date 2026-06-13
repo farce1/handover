@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { resolve, relative } from 'node:path';
 import { loadConfig } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
 import { handleCliError } from '../utils/errors.js';
@@ -23,7 +23,8 @@ export async function runCheck(options: CheckOptions): Promise<void> {
 
     const config = loadConfig({});
     const rootDir = resolve(process.cwd());
-    const outputDir = config.output.replace(/^\.\//, '').replace(/\/+$/, '');
+    // Repo-relative, forward-slash form so it prefix-matches git's paths.
+    const outputDir = relative(rootDir, resolve(rootDir, config.output)).replace(/\\/g, '/');
 
     const graph = await loadDepGraph(rootDir);
     if (!graph) {
@@ -32,13 +33,22 @@ export async function runCheck(options: CheckOptions): Promise<void> {
       return;
     }
 
-    const git = await getGitChangedFiles(rootDir, options.since ?? 'HEAD');
+    const since = options.since ?? 'HEAD';
+    // Invalid ref → exit 2 (cannot determine), distinct from the stale code (1).
+    const git = await getGitChangedFiles(rootDir, since).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`Cannot compare against "${since}": ${message}\n`);
+      process.exitCode = 2;
+      return undefined;
+    });
+    if (!git) return;
     if (git.kind === 'fallback') {
       process.stderr.write(`Skipping staleness check: ${git.reason}.\n`);
       return;
     }
 
-    // The tool's own cache/state dir is not a source change.
+    // Ignore the tool's own cache/state dir. Any other unclaimed non-infra change
+    // conservatively flags the whole corpus stale (consistent with `generate --since`).
     const changedFiles = new Set([...git.changedFiles].filter((f) => !f.startsWith('.handover/')));
 
     const result = detectStaleDocs({
