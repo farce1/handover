@@ -139,6 +139,16 @@ program
     await runServe(opts);
   });
 
+program
+  .command('check')
+  .description('Exit non-zero when generated docs are stale relative to source changes')
+  .option('--since <ref>', 'Git ref to compare against (default: HEAD / working tree)')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (opts) => {
+    const { runCheck } = await import('./check.js');
+    await runCheck(opts);
+  });
+
 program.addCommand(createAuthCommand());
 
 // Default action: run generate when no command specified
