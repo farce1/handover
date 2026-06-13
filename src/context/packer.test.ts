@@ -1132,4 +1132,18 @@ describe('packFiles compress mode', () => {
     expect(result.files[0].tier).toBe('full');
     expect(result.files[0].content).toBe(content);
   });
+
+  test('takes precedence over the changed-file full tier', async () => {
+    const result = await packFiles(
+      [mkScored('src/a.ts', 50)],
+      mkASTResult([parsed]),
+      mkBudget(10000),
+      charTokens,
+      mkContentFn({ 'src/a.ts': content }),
+      new Set(['src/a.ts']),
+      true,
+    );
+
+    expect(result.files[0].tier).toBe('signatures');
+  });
 });
