@@ -1,6 +1,6 @@
 import type { StaticAnalysisResult } from '../analyzers/types.js';
-import type { ParsedFile } from '../parsing/types.js';
 import type { FilePriority, ScoreBreakdown } from './types.js';
+import { buildReverseImportMap, stripExtension } from '../analyzers/import-resolution.js';
 
 // ─── Lock files to exclude (zero handover value, machine-generated) ─────────
 
@@ -69,87 +69,6 @@ export const SCORE_MIN = 0 as const;
 
 /** Maximum possible score (cap) */
 export const SCORE_MAX = 100 as const;
-
-// ─── Commonly tried extensions for import resolution ────────────────────────
-
-const EXTENSION_SUFFIXES = ['', '.ts', '.js', '.tsx', '.jsx', '/index.ts', '/index.js'];
-
-// ─── Path resolution helpers ────────────────────────────────────────────────
-
-/**
- * Resolve an import path relative to the importing file's directory.
- * Returns null for external packages (no `.` or `..` prefix).
- */
-function resolveImportPath(fromDir: string, importSource: string): string | null {
-  // Skip external packages
-  if (!importSource.startsWith('.') && !importSource.startsWith('..')) {
-    return null;
-  }
-
-  // Join fromDir + importSource and collapse segments
-  const parts = fromDir ? fromDir.split('/') : [];
-  const importParts = importSource.split('/');
-
-  for (const segment of importParts) {
-    if (segment === '.' || segment === '') {
-      continue;
-    } else if (segment === '..') {
-      parts.pop();
-    } else {
-      parts.push(segment);
-    }
-  }
-
-  return parts.join('/');
-}
-
-/**
- * Build a reverse-import map: for each file path, how many unique files import it.
- */
-function buildReverseImportMap(files: ParsedFile[], knownPaths: Set<string>): Map<string, number> {
-  // Track which importers reference which paths (avoid double-counting)
-  const importerSets = new Map<string, Set<string>>();
-
-  for (const file of files) {
-    const fromDir = file.path.includes('/')
-      ? file.path.substring(0, file.path.lastIndexOf('/'))
-      : '';
-
-    for (const imp of file.imports) {
-      const resolved = resolveImportPath(fromDir, imp.source);
-      if (resolved === null) continue;
-
-      // Try matching with common extensions
-      for (const suffix of EXTENSION_SUFFIXES) {
-        const candidate = resolved + suffix;
-        if (knownPaths.has(candidate)) {
-          let importers = importerSets.get(candidate);
-          if (!importers) {
-            importers = new Set<string>();
-            importerSets.set(candidate, importers);
-          }
-          importers.add(file.path);
-          break; // Found a match; stop trying extensions
-        }
-      }
-    }
-  }
-
-  // Convert sets to counts
-  const result = new Map<string, number>();
-  for (const [path, importers] of importerSets) {
-    result.set(path, importers.size);
-  }
-  return result;
-}
-
-/**
- * Strip file extension for extensionless import matching.
- * e.g., "src/utils/helpers.ts" -> "src/utils/helpers"
- */
-function stripExtension(filePath: string): string {
-  return filePath.replace(/\.[^./]+$/, '');
-}
 
 // ─── Main scorer ────────────────────────────────────────────────────────────
 
