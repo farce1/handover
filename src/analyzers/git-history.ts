@@ -1,5 +1,6 @@
 import { simpleGit } from 'simple-git';
 import { logger } from '../utils/logger.js';
+import { detectBranchStrategy } from './git-branch-strategy.js';
 import type {
   AnalysisContext,
   AnalyzerResult,
@@ -65,30 +66,7 @@ export async function analyzeGitHistory(
     const branchNames = branches.all;
 
     // Detect branching strategy from naming patterns
-    const hasReleaseBranches = branchNames.some((b) => /release[/-]/.test(b));
-    const hasDevelop = branchNames.some((b) => /(?:^|\/)(?:develop|dev)$/.test(b));
-    const hasFeatureBranches = branchNames.some((b) => /feature[/-]/.test(b));
-    const hasHotfix = branchNames.some((b) => /hotfix[/-]/.test(b));
-
-    let strategy: BranchPattern['strategy'] = 'unknown';
-    const evidence: string[] = [];
-
-    if (hasDevelop && hasReleaseBranches) {
-      strategy = 'git-flow';
-      evidence.push('develop branch present');
-      evidence.push('release branches found');
-      if (hasHotfix) evidence.push('hotfix branches found');
-      if (hasFeatureBranches) evidence.push('feature branches found');
-    } else if (hasFeatureBranches && !hasDevelop) {
-      strategy = 'feature-branch';
-      evidence.push('feature branches without develop');
-      if (hasReleaseBranches) evidence.push('release branches found');
-    } else if (branchNames.length <= 3) {
-      strategy = 'trunk-based';
-      evidence.push(`${branchNames.length} total branches (<=3 suggests trunk-based)`);
-    } else {
-      evidence.push(`${branchNames.length} branches, no clear naming convention`);
-    }
+    const { strategy, evidence } = detectBranchStrategy(branchNames);
 
     // Identify active (within 30 days) and stale (90+ days) branches
     const now = Date.now();
