@@ -39,6 +39,7 @@ program
   .option('--json', 'Emit JSON output (used with --dry-run)')
   .option('--stream', 'Show streaming token output during AI rounds')
   .option('--compress', 'Pack files as signature summaries only (fit larger repos)')
+  .option('--html', 'Also build a browsable HTML site from the generated docs')
   .option('-v, --verbose', 'Show detailed output')
   .action(runGenerate);
 
