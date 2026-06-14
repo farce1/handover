@@ -73,23 +73,42 @@ describe('buildSite', () => {
     { filename: '06-MODULES.md', markdown: '# Modules\n' },
   ];
 
-  it('maps each markdown doc to a standalone HTML page', () => {
+  it('maps each markdown doc to a standalone HTML page plus a root index', () => {
     const pages = buildSite(docs);
 
-    expect(pages.map((p) => p.filename)).toEqual(['00-INDEX.html', '06-MODULES.html']);
-    expect(pages[0].html).toContain('<!doctype html>');
-    expect(pages[0].html).toContain('<title>Index</title>');
-    expect(pages[0].html).toContain('Welcome</h1>');
+    expect(pages.map((p) => p.filename)).toEqual([
+      'index.html',
+      '00-INDEX.html',
+      '06-MODULES.html',
+    ]);
+    const indexDoc = pages.find((p) => p.filename === '00-INDEX.html')!;
+    expect(indexDoc.html).toContain('<!doctype html>');
+    expect(indexDoc.html).toContain('<title>Index</title>');
+    expect(indexDoc.html).toContain('Welcome</h1>');
+  });
+
+  it('emits a root index.html that redirects to the first page for host roots', () => {
+    const index = buildSite(docs).find((p) => p.filename === 'index.html')!;
+
+    expect(index.html.toLowerCase()).toContain('refresh');
+    expect(index.html).toContain('00-INDEX.html');
+  });
+
+  it('does not add a redirect when a doc already produces index.html', () => {
+    const pages = buildSite([{ filename: 'index.md', markdown: '# Home\n' }]);
+
+    expect(pages.filter((p) => p.filename === 'index.html')).toHaveLength(1);
+    expect(pages[0].html).toContain('Home</h1>');
   });
 
   it('rewrites internal doc links to their HTML pages', () => {
-    const index = buildSite(docs)[0].html;
+    const index = buildSite(docs).find((p) => p.filename === '00-INDEX.html')!.html;
 
     expect(index).toContain('href="06-MODULES.html"');
   });
 
   it('renders a shared nav linking every page, titled from front-matter or filename', () => {
-    const index = buildSite(docs)[0].html;
+    const index = buildSite(docs).find((p) => p.filename === '00-INDEX.html')!.html;
 
     expect(index).toContain('href="00-INDEX.html"');
     expect(index).toContain('href="06-MODULES.html"');
