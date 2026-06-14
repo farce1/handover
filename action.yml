@@ -15,8 +15,8 @@ inputs:
     description: 'API key for the provider. Pass a repository secret; exported to the provider env var named by api-key-env.'
     default: ''
   api-key-env:
-    description: 'Environment variable name the provider reads the key from (e.g. ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY).'
-    default: 'ANTHROPIC_API_KEY'
+    description: "Override the env var the key is exported to. Defaults to the provider's standard variable (e.g. OPENAI_API_KEY for openai)."
+    default: ''
   args:
     description: 'Extra arguments passed verbatim to `handover generate` (e.g. "--only 06-modules --compress").'
     default: ''
@@ -43,8 +43,23 @@ runs:
         HANDOVER_ARGS: ${{ inputs.args }}
       run: |
         set -euo pipefail
+        # Default the key's env var to the provider's standard one.
+        # Keep in sync with DEFAULT_API_KEY_ENV in src/config/defaults.ts.
+        key_env="${HANDOVER_API_KEY_ENV}"
+        if [ -z "${key_env}" ]; then
+          case "${HANDOVER_PROVIDER}" in
+            openai) key_env="OPENAI_API_KEY" ;;
+            groq) key_env="GROQ_API_KEY" ;;
+            together) key_env="TOGETHER_API_KEY" ;;
+            deepseek) key_env="DEEPSEEK_API_KEY" ;;
+            azure-openai) key_env="AZURE_OPENAI_API_KEY" ;;
+            gemini) key_env="GEMINI_API_KEY" ;;
+            custom) key_env="LLM_API_KEY" ;;
+            *) key_env="ANTHROPIC_API_KEY" ;;
+          esac
+        fi
         if [ -n "${HANDOVER_API_KEY}" ]; then
-          export "${HANDOVER_API_KEY_ENV}=${HANDOVER_API_KEY}"
+          export "${key_env}=${HANDOVER_API_KEY}"
         fi
         model_flag=""
         if [ -n "${HANDOVER_MODEL}" ]; then
