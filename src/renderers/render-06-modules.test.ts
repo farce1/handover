@@ -105,3 +105,18 @@ describe('renderModules — isolated modules', () => {
     expect(renderModules(ctx)).not.toContain('## Isolated Modules');
   });
 });
+
+describe('renderModules — file grounding', () => {
+  it('drops module files that do not exist in the codebase', () => {
+    const ctx = mkCtx(
+      [{ name: 'a', files: ['a/real.ts', 'a/ghost.ts'] }],
+      [],
+      [mkFile('a/real.ts', [])],
+    );
+
+    const doc = renderModules(ctx);
+
+    expect(doc).toContain('a/real.ts');
+    expect(doc).not.toContain('a/ghost.ts');
+  });
+});

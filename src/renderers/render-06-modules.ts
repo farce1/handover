@@ -5,6 +5,7 @@ import {
   moduleDependencyGraph,
   moduleEdgeExists,
   isolatedModules,
+  knownFilePaths,
 } from '../analyzers/module-graph.js';
 import { renderDocument, collectRoundsUsed, pushStructuredBlock } from './render-template.js';
 
@@ -21,13 +22,18 @@ export function renderModules(ctx: RenderContext): string {
   const r2 = ctx.rounds.r2?.data;
   const hasR2 = !!r2;
 
-  const modules = hasR2 ? r2.modules : deriveModulesFromFileTree(ctx);
+  // Drop hallucinated file claims: keep only files that exist in the codebase.
+  const known = knownFilePaths(ctx.staticAnalysis);
+  const modules = (hasR2 ? r2.modules : deriveModulesFromFileTree(ctx)).map((mod) => ({
+    ...mod,
+    files: mod.files.filter((f) => known.has(f)),
+  }));
 
   if (modules.length === 0) return '';
 
   // Real cross-module import graph — grounds the relationships table and diagram.
   const moduleDeps = hasR2
-    ? moduleDependencyGraph(ctx.staticAnalysis, r2.modules)
+    ? moduleDependencyGraph(ctx.staticAnalysis, modules)
     : new Map<string, Set<string>>();
 
   const roundsUsed = collectRoundsUsed(ctx, 1, 2);
