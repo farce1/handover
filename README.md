@@ -308,24 +308,23 @@ jobs:
 
 ### Inputs
 
-| Input               | Default              | Description                                                                       |
-| ------------------- | -------------------- | --------------------------------------------------------------------------------- |
-| `provider`          | `anthropic`          | LLM provider                                                                      |
-| `model`             | _(provider default)_ | Model override                                                                    |
-| `api-key`           | _(none)_             | Provider API key; pass a repository secret                                        |
-| `api-key-env`       | `ANTHROPIC_API_KEY`  | Env var the provider reads the key from (e.g. `OPENAI_API_KEY`, `GEMINI_API_KEY`) |
-| `args`              | _(none)_             | Extra args forwarded to `handover generate` (e.g. `--only 06-modules --compress`) |
-| `version`           | `latest`             | npm version of `handover-cli` to run                                              |
-| `working-directory` | `.`                  | Directory to run in (useful for monorepo packages)                                |
+| Input               | Default              | Description                                                                          |
+| ------------------- | -------------------- | ------------------------------------------------------------------------------------ |
+| `provider`          | `anthropic`          | LLM provider                                                                         |
+| `model`             | _(provider default)_ | Model override                                                                       |
+| `api-key`           | _(none)_             | Provider API key; pass a repository secret                                           |
+| `api-key-env`       | _(provider default)_ | Override the env var the key is exported to; defaults to the provider's standard one |
+| `args`              | _(none)_             | Extra args forwarded to `handover generate` (e.g. `--only 06-modules --compress`)    |
+| `version`           | `latest`             | npm version of `handover-cli` to run                                                 |
+| `working-directory` | `.`                  | Directory to run in (useful for monorepo packages)                                   |
 
-For a non-default provider, set both `provider` and `api-key-env`:
+For a non-default provider, set `provider` and `api-key` — the key is exported to that provider's standard env var automatically:
 
 ```yaml
 - uses: farce1/handover@v1
   with:
     provider: openai
     api-key: ${{ secrets.OPENAI_API_KEY }}
-    api-key-env: OPENAI_API_KEY
 ```
 
 To fail a PR when docs go stale instead of regenerating, run [`handover check`](#handover-check) as a CI step.
