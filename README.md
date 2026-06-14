@@ -255,6 +255,18 @@ handover check --since origin/main --json
 
 Exit codes: `0` up to date, `1` stale docs, `2` cannot determine (no dep-graph yet, or an unresolvable ref).
 
+### `handover build-site`
+
+Convert the generated markdown docs into a browsable, self-contained HTML site (written alongside the markdown in the output directory). Internal doc links are rewritten to the HTML pages and mermaid diagrams render in the browser.
+
+```bash
+handover generate
+handover build-site
+# open ./handover/00-INDEX.html
+```
+
+Each document becomes a standalone page with a shared sidebar; serve the output directory from any static host (e.g. GitHub Pages) or open the index locally.
+
 ### `handover analyze`
 
 Run static analysis and output a markdown report.
