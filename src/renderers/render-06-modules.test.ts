@@ -73,3 +73,35 @@ describe('renderModules — relationship table', () => {
     expect(doc).not.toContain('HALLUCINATED');
   });
 });
+
+describe('renderModules — isolated modules', () => {
+  it('flags modules with no real cross-module import edge', () => {
+    const ctx = mkCtx(
+      [
+        { name: 'a', files: ['a/x.ts'] },
+        { name: 'b', files: ['b/y.ts'] },
+        { name: 'c', files: ['c/z.ts'] },
+      ],
+      [{ from: 'a', to: 'b', type: 'imports', evidence: 'e' }],
+      [mkFile('a/x.ts', ['../b/y.js']), mkFile('b/y.ts', []), mkFile('c/z.ts', [])],
+    );
+
+    const doc = renderModules(ctx);
+
+    expect(doc).toContain('## Isolated Modules');
+    expect(doc).toContain('`c`');
+  });
+
+  it('omits the section when every module is connected', () => {
+    const ctx = mkCtx(
+      [
+        { name: 'a', files: ['a/x.ts'] },
+        { name: 'b', files: ['b/y.ts'] },
+      ],
+      [{ from: 'a', to: 'b', type: 'imports', evidence: 'e' }],
+      [mkFile('a/x.ts', ['../b/y.js']), mkFile('b/y.ts', [])],
+    );
+
+    expect(renderModules(ctx)).not.toContain('## Isolated Modules');
+  });
+});

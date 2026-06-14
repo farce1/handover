@@ -1,7 +1,11 @@
 import type { RenderContext } from './types.js';
 import { codeRef, buildTable } from './utils.js';
 import { buildModuleDiagram } from './mermaid.js';
-import { moduleDependencyGraph, moduleEdgeExists } from '../analyzers/module-graph.js';
+import {
+  moduleDependencyGraph,
+  moduleEdgeExists,
+  isolatedModules,
+} from '../analyzers/module-graph.js';
 import { renderDocument, collectRoundsUsed, pushStructuredBlock } from './render-template.js';
 
 // ─── renderModules ─────────────────────────────────────────────────────────
@@ -140,6 +144,22 @@ export function renderModules(ctx: RenderContext): string {
         lines.push('');
         for (const issue of r2.boundaryIssues) {
           lines.push(`- ${issue}`);
+        }
+        lines.push('');
+      }
+
+      // ── Isolated Modules (no real cross-module import, either direction) ──
+      // Only judged against a populated graph, else every module looks isolated.
+      const isolated = moduleDeps.size > 0 ? isolatedModules(moduleDeps, modules) : [];
+      if (isolated.length > 0) {
+        lines.push('## Isolated Modules');
+        lines.push('');
+        lines.push(
+          'No import connects these modules to the rest of the codebase — likely dead code or a decomposition seam worth reviewing.',
+        );
+        lines.push('');
+        for (const name of isolated) {
+          lines.push(`- \`${name}\``);
         }
         lines.push('');
       }
