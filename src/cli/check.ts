@@ -5,7 +5,12 @@ import { handleCliError } from '../utils/errors.js';
 import { loadDepGraph } from '../regen/dep-graph.js';
 import { getGitChangedFiles } from '../cache/git-fingerprint.js';
 import { DOCUMENT_REGISTRY } from '../renderers/registry.js';
-import { detectStaleDocs, formatStaleness, formatStalenessJson } from '../regen/staleness.js';
+import {
+  detectStaleDocs,
+  formatStaleness,
+  formatStalenessJson,
+  formatCheckStatusJson,
+} from '../regen/staleness.js';
 
 export interface CheckOptions {
   since?: string;
@@ -22,6 +27,18 @@ export async function runCheck(options: CheckOptions): Promise<void> {
   try {
     if (options.verbose) logger.setVerbose(true);
 
+    // Report a non-result outcome. In --json mode every path must still emit
+    // parseable JSON on stdout; otherwise the human-readable reason goes to stderr.
+    const reportStatus = (
+      status: 'skipped' | 'no-graph' | 'unresolved-ref',
+      reason: string,
+      exitCode: number,
+    ): void => {
+      if (options.json) process.stdout.write(formatCheckStatusJson(status, reason));
+      else process.stderr.write(`${reason}\n`);
+      if (exitCode) process.exitCode = exitCode;
+    };
+
     const config = loadConfig({});
     const rootDir = resolve(process.cwd());
     // Repo-relative, forward-slash form so it prefix-matches git's paths.
@@ -29,8 +46,7 @@ export async function runCheck(options: CheckOptions): Promise<void> {
 
     const graph = await loadDepGraph(rootDir);
     if (!graph) {
-      process.stderr.write('No dependency graph found. Run `handover generate` first.\n');
-      process.exitCode = 2;
+      reportStatus('no-graph', 'No dependency graph found. Run `handover generate` first.', 2);
       return;
     }
 
@@ -38,13 +54,12 @@ export async function runCheck(options: CheckOptions): Promise<void> {
     // Invalid ref → exit 2 (cannot determine), distinct from the stale code (1).
     const git = await getGitChangedFiles(rootDir, since).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`Cannot compare against "${since}": ${message}\n`);
-      process.exitCode = 2;
+      reportStatus('unresolved-ref', `Cannot compare against "${since}": ${message}`, 2);
       return undefined;
     });
     if (!git) return;
     if (git.kind === 'fallback') {
-      process.stderr.write(`Skipping staleness check: ${git.reason}.\n`);
+      reportStatus('skipped', `Skipping staleness check: ${git.reason}.`, 0);
       return;
     }
 
