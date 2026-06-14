@@ -36,6 +36,18 @@ describe('markdownToHtml', () => {
     expect(html).toContain('a --> b');
     expect(html).not.toContain('language-mermaid');
   });
+
+  it('escapes raw HTML so doc content cannot inject markup into the hosted site', () => {
+    const html = markdownToHtml('hello <script>alert(1)</script> and <img src=x onerror=alert(1)>');
+
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<img');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('drops HTML comments such as the ai:structured markers', () => {
+    expect(markdownToHtml('<!-- ai:structured -->\n\nbody')).not.toContain('ai:structured');
+  });
 });
 
 describe('rewriteMdLinks', () => {

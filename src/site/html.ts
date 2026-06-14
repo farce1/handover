@@ -14,6 +14,12 @@ marked.use({
       }
       return false;
     },
+    // Doc content derives from arbitrary codebases and the site is meant to be
+    // hosted, so never pass raw HTML through: drop comments, escape the rest.
+    html({ text }) {
+      if (/^<!--[\s\S]*-->\s*$/.test(text.trim())) return '';
+      return escapeHtml(text);
+    },
   },
 });
 
