@@ -16,7 +16,7 @@ export default defineConfig({
         // Each entry requires a written justification comment.
         // Do NOT add entries without justification. Do NOT enable thresholds.autoUpdate.
         // To add a new exclusion: add the path + justification comment and update this date.
-        // Last frozen: 2026-06-14 (added site/write.ts — integration-only fs glue)
+        // Last frozen: 2026-06-14 (qa/** narrowed to expose pure qa/evidence.ts to coverage)
 
         // Test files — not application code
         'src/**/*.test.ts',
@@ -146,8 +146,13 @@ export default defineConfig({
         'src/mcp/preflight.ts',
         // NOTE: mcp/tools.ts, mcp/errors.ts, and mcp/http-security.ts are intentionally testable
 
-        // QA session runtime — integration-only streaming lifecycle
-        'src/qa/**',
+        // QA session runtime — integration-only streaming lifecycle.
+        // NOTE: qa/evidence.ts is pure logic and intentionally NOT excluded (unit-tested).
+        'src/qa/answerer.ts',
+        'src/qa/schema.ts',
+        'src/qa/session-store.ts',
+        'src/qa/streaming-schema.ts',
+        'src/qa/streaming-session.ts',
 
         // Regeneration job runtime — filesystem/process orchestration
         'src/regeneration/**',
