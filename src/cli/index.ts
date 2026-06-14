@@ -151,6 +151,15 @@ program
     await runCheck(opts);
   });
 
+program
+  .command('build-site')
+  .description('Build a browsable HTML site from the generated markdown docs')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (opts) => {
+    const { runBuildSite } = await import('./build-site.js');
+    await runBuildSite(opts);
+  });
+
 program.addCommand(createAuthCommand());
 
 // Default action: run generate when no command specified
