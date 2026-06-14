@@ -16,7 +16,7 @@ export default defineConfig({
         // Each entry requires a written justification comment.
         // Do NOT add entries without justification. Do NOT enable thresholds.autoUpdate.
         // To add a new exclusion: add the path + justification comment and update this date.
-        // Last frozen: 2026-06-14 (added cli/build-site.ts — integration-only)
+        // Last frozen: 2026-06-14 (added site/write.ts — integration-only fs glue)
 
         // Test files — not application code
         'src/**/*.test.ts',
@@ -54,6 +54,8 @@ export default defineConfig({
         'src/cli/check.ts',
         // CLI entry point — integration-only (fs orchestration; HTML logic is unit-tested in src/site/html.ts)
         'src/cli/build-site.ts',
+        // Filesystem glue — integration-only (reads/writes the output dir; HTML logic is unit-tested in src/site/html.ts)
+        'src/site/write.ts',
         // CLI entry point — integration-only, requires full pipeline
         'src/cli/embedding-health.ts',
         // Interactive TTY onboarding wizard — integration-only

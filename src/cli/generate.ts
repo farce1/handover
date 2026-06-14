@@ -11,6 +11,7 @@ import { createStep } from '../orchestrator/step.js';
 import { runStaticAnalysis } from '../analyzers/coordinator.js';
 import { formatMarkdownReport } from '../analyzers/report.js';
 import { detectMonorepo } from './monorepo.js';
+import { writeSite } from '../site/write.js';
 import { createRound1Step } from '../ai-rounds/round-1-overview.js';
 import { createRound2Step } from '../ai-rounds/round-2-modules.js';
 import { createRound3Step } from '../ai-rounds/round-3-features.js';
@@ -75,6 +76,7 @@ export interface GenerateOptions {
   dryRun?: boolean; // NEW (Phase 32 D-15..D-19)
   json?: boolean; // NEW (Phase 32 D-16 — modifier on --dry-run)
   compress?: boolean;
+  html?: boolean;
 }
 
 class EarlyExitNoChangesError extends Error {
@@ -199,6 +201,20 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
     const config = loadConfig(cliOverrides);
 
+    // --html: after docs are written and the renderer has finished, build the
+    // browsable HTML site from the output dir. Non-fatal on failure.
+    const maybeBuildHtml = async (): Promise<void> => {
+      if (!options.html) return;
+      try {
+        const written = await writeSite(resolve(config.output));
+        process.stdout.write(
+          `Built ${written.length} HTML page(s) — open ${join(config.output, written[0] ?? '00-INDEX.html')}\n`,
+        );
+      } catch (err) {
+        logger.warn(`HTML site build failed: ${(err as Error).message}`);
+      }
+    };
+
     // Determine if provider is local (drives LOCAL badge and cost omission)
     const preset = PROVIDER_PRESETS[config.provider];
     const isLocal = preset?.isLocal ?? false;
@@ -301,6 +317,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       displayState.elapsedMs = Date.now() - analyzerStart;
       displayState.completionDocs = 1;
       renderer.onComplete(displayState);
+      await maybeBuildHtml();
       return;
     }
 
@@ -1211,6 +1228,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     }
 
     renderer.onComplete(displayState);
+    await maybeBuildHtml();
   } catch (err) {
     if (err instanceof EarlyExitNoChangesError) {
       return;

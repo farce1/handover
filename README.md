@@ -219,6 +219,7 @@ handover generate [options]
 | `--no-cache`        | Discard cached round results                              |
 | `--since <ref>`     | Only regenerate docs affected by changes since a git ref  |
 | `--compress`        | Pack files as signature summaries only (fit larger repos) |
+| `--html`            | Also build a browsable HTML site (see `build-site`)       |
 | `-v, --verbose`     | Verbose output                                            |
 
 ```bash
@@ -265,7 +266,7 @@ handover build-site
 # open ./handover/00-INDEX.html
 ```
 
-Each document becomes a standalone page with a shared sidebar; serve the output directory from any static host (e.g. GitHub Pages) or open the index locally.
+Each document becomes a standalone page with a shared sidebar; serve the output directory from any static host (e.g. GitHub Pages) or open the index locally. To generate the docs and the site in one step, run `handover generate --html`.
 
 ### `handover analyze`
 
