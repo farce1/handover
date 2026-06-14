@@ -32,6 +32,26 @@ export function aggregateModuleGraph(
   return dependencies;
 }
 
+/**
+ * Module names with no real cross-module import edge in either direction.
+ * Derived from the real import graph, so it flags components that are
+ * genuinely disconnected from the rest of the codebase (dead code or a
+ * decomposition seam), not merely unmentioned by the model.
+ */
+export function isolatedModules(
+  moduleDeps: Map<string, Set<string>>,
+  modules: Array<{ name: string }>,
+): string[] {
+  const connected = new Set<string>();
+  for (const [from, tos] of moduleDeps) {
+    if (tos.size === 0) continue;
+    connected.add(from);
+    for (const to of tos) connected.add(to);
+  }
+
+  return modules.map((m) => m.name).filter((name) => !connected.has(name));
+}
+
 /** True when a real import connects the two modules in either direction. */
 export function moduleEdgeExists(
   moduleDeps: Map<string, Set<string>>,

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { ParsedFile } from '../parsing/types.js';
 import type { StaticAnalysisResult } from './types.js';
 import { buildImportGraph } from './import-graph.js';
-import { aggregateModuleGraph, moduleDependencyGraph } from './module-graph.js';
+import { aggregateModuleGraph, moduleDependencyGraph, isolatedModules } from './module-graph.js';
 
 function mkFile(path: string, importSources: string[] = []): ParsedFile {
   return {
@@ -82,5 +82,28 @@ describe('moduleDependencyGraph', () => {
     const modules = [{ name: 'a', files: ['a/x.ts', 'a/y.ts'] }];
 
     expect(moduleDependencyGraph(analysis, modules).get('a')).toBeUndefined();
+  });
+});
+
+describe('isolatedModules', () => {
+  it('flags a module with no cross-module edge in either direction', () => {
+    const deps = new Map([['a', new Set(['b'])]]);
+    const modules = [{ name: 'a' }, { name: 'b' }, { name: 'c' }];
+
+    expect(isolatedModules(deps, modules)).toEqual(['c']);
+  });
+
+  it('does not flag a module that is only depended upon', () => {
+    const deps = new Map([['a', new Set(['b'])]]);
+    const modules = [{ name: 'a' }, { name: 'b' }];
+
+    expect(isolatedModules(deps, modules)).toEqual([]);
+  });
+
+  it('treats empty dependency sets as no connection', () => {
+    const deps = new Map([['a', new Set<string>()]]);
+    const modules = [{ name: 'a' }, { name: 'b' }];
+
+    expect(isolatedModules(deps, modules)).toEqual(['a', 'b']);
   });
 });
