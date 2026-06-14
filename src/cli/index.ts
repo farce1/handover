@@ -144,6 +144,7 @@ program
   .command('check')
   .description('Exit non-zero when generated docs are stale relative to source changes')
   .option('--since <ref>', 'Git ref to compare against (default: HEAD / working tree)')
+  .option('--json', 'Emit JSON output instead of a human-readable report')
   .option('-v, --verbose', 'Show detailed output')
   .action(async (opts) => {
     const { runCheck } = await import('./check.js');

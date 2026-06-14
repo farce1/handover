@@ -5,11 +5,12 @@ import { handleCliError } from '../utils/errors.js';
 import { loadDepGraph } from '../regen/dep-graph.js';
 import { getGitChangedFiles } from '../cache/git-fingerprint.js';
 import { DOCUMENT_REGISTRY } from '../renderers/registry.js';
-import { detectStaleDocs, formatStaleness } from '../regen/staleness.js';
+import { detectStaleDocs, formatStaleness, formatStalenessJson } from '../regen/staleness.js';
 
 export interface CheckOptions {
   since?: string;
   verbose?: boolean;
+  json?: boolean;
 }
 
 /**
@@ -58,7 +59,7 @@ export async function runCheck(options: CheckOptions): Promise<void> {
       outputDir,
     });
 
-    process.stdout.write(formatStaleness(result));
+    process.stdout.write(options.json ? formatStalenessJson(result) : formatStaleness(result));
     process.exitCode = result.stale.length > 0 ? 1 : 0;
   } catch (err) {
     handleCliError(err);
