@@ -22,7 +22,10 @@ export async function runBuildSite(options: BuildSiteOptions = {}): Promise<void
     let written: string[];
     try {
       written = await writeSite(outputDir);
-    } catch {
+    } catch (err) {
+      // Output dir missing is the expected "nothing to do" case; surface anything
+      // else (permissions, a bad entry) as a real error instead of masking it.
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
       process.stderr.write(`No docs found in ${config.output}. Run \`handover generate\` first.\n`);
       process.exitCode = 1;
       return;
