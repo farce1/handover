@@ -1,6 +1,7 @@
 import type { DocumentStatus, RenderContext } from './types.js';
 import { buildFrontMatter, buildTable } from './utils.js';
 import { structuredBlock } from './audience.js';
+import { aggregateValidation } from '../ai-rounds/validator.js';
 
 // ─── renderIndex ───────────────────────────────────────────────────────────
 
@@ -64,9 +65,7 @@ export function renderIndex(ctx: RenderContext, statuses: DocumentStatus[]): str
       case 'not-generated':
         return 'Not Generated';
       case 'reused':
-        return s.lastRenderedAt
-          ? `Reused (last: ${s.lastRenderedAt})`
-          : 'Reused';
+        return s.lastRenderedAt ? `Reused (last: ${s.lastRenderedAt})` : 'Reused';
     }
   };
 
@@ -88,6 +87,20 @@ export function renderIndex(ctx: RenderContext, statuses: DocumentStatus[]): str
   );
   lines.push(`- **Generation timestamp:** ${ctx.generatedAt}`);
   lines.push(`- **Handover version:** 0.1.0`);
+
+  // Surface claim grounding: how many file/relationship claims were verified
+  // against static analysis (handover's faithfulness signal), when any exist.
+  const grounding = aggregateValidation(
+    Object.values(ctx.rounds)
+      .filter((r) => r != null)
+      .map((r) => r.validation),
+  );
+  if (grounding.total > 0) {
+    const dropNote = grounding.corrected > 0 ? ` (${grounding.corrected} dropped as unbacked)` : '';
+    lines.push(
+      `- **Grounding:** ${grounding.validated}/${grounding.total} file references and relationships verified against static analysis${dropNote}`,
+    );
+  }
   lines.push('');
 
   // ── AI structured block ───────────────────────────────────────────────

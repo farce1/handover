@@ -1,6 +1,10 @@
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 import type { ValidationResult } from './types.js';
-import { moduleDependencyGraph, moduleEdgeExists, knownFilePaths } from '../analyzers/module-graph.js';
+import {
+  moduleDependencyGraph,
+  moduleEdgeExists,
+  knownFilePaths,
+} from '../analyzers/module-graph.js';
 
 // ─── File path claim validation ─────────────────────────────────────────────
 
@@ -180,6 +184,16 @@ function validateRound2Relationships(
     relationships as Array<{ from: string; to: string }>,
     analysis,
   );
+}
+
+// ─── Aggregation across rounds ───────────────────────────────────────────────
+
+/** Sum per-round claim-validation metrics into one total, recomputing dropRate. */
+export function aggregateValidation(results: ValidationResult[]): ValidationResult {
+  const validated = results.reduce((sum, r) => sum + r.validated, 0);
+  const corrected = results.reduce((sum, r) => sum + r.corrected, 0);
+  const total = results.reduce((sum, r) => sum + r.total, 0);
+  return { validated, corrected, total, dropRate: total > 0 ? corrected / total : 0 };
 }
 
 // ─── Combined round claim validation ────────────────────────────────────────
