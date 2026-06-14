@@ -19,6 +19,10 @@ const commandDefinitions = [
     command: ['generate', '--help'],
   },
   {
+    label: 'check',
+    command: ['check', '--help'],
+  },
+  {
     label: 'analyze',
     command: ['analyze', '--help'],
   },
