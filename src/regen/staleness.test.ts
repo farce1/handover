@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { DepGraph } from './dep-graph.js';
-import { detectStaleDocs, formatStaleness, formatStalenessJson } from './staleness.js';
+import {
+  detectStaleDocs,
+  formatStaleness,
+  formatStalenessJson,
+  formatCheckStatusJson,
+} from './staleness.js';
 
 function mkGraph(
   renderers: Record<string, string[]>,
@@ -92,6 +97,7 @@ describe('formatStalenessJson', () => {
 
     expect(payload).toEqual({
       formatVersion: 1,
+      status: 'checked',
       upToDate: true,
       fullRegen: false,
       stale: [],
@@ -106,10 +112,23 @@ describe('formatStalenessJson', () => {
       }),
     );
 
+    expect(payload.status).toBe('checked');
     expect(payload.upToDate).toBe(false);
     expect(payload.fullRegen).toBe(true);
     expect(payload.stale).toEqual([
       { renderer: '06-modules', filename: '06-MODULES.md', reasons: ['src/a.ts'] },
     ]);
+  });
+});
+
+describe('formatCheckStatusJson', () => {
+  it('emits a parseable status payload for non-result outcomes', () => {
+    const payload = JSON.parse(formatCheckStatusJson('skipped', 'shallow clone'));
+
+    expect(payload).toEqual({
+      formatVersion: 1,
+      status: 'skipped',
+      reason: 'shallow clone',
+    });
   });
 });

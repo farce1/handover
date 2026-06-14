@@ -78,10 +78,14 @@ export function formatStaleness(result: StalenessResult): string {
   return lines.join('\n');
 }
 
+function jsonLine(payload: object): string {
+  return JSON.stringify({ formatVersion: 1, ...payload }, null, 2) + '\n';
+}
+
 /** Machine-readable staleness report for `handover check --json` (CI consumption). */
 export function formatStalenessJson(result: StalenessResult): string {
-  const payload = {
-    formatVersion: 1,
+  return jsonLine({
+    status: 'checked',
     upToDate: result.stale.length === 0,
     fullRegen: result.fullRegen,
     stale: result.stale.map((d) => ({
@@ -89,6 +93,17 @@ export function formatStalenessJson(result: StalenessResult): string {
       filename: d.filename,
       reasons: d.reasons,
     })),
-  };
-  return JSON.stringify(payload, null, 2) + '\n';
+  });
+}
+
+/**
+ * Machine-readable payload for `handover check --json` paths that produce no
+ * staleness result (skipped fallback, missing graph, unresolvable ref), so a
+ * --json consumer always receives parseable JSON on stdout.
+ */
+export function formatCheckStatusJson(
+  status: 'skipped' | 'no-graph' | 'unresolved-ref',
+  reason: string,
+): string {
+  return jsonLine({ status, reason });
 }
