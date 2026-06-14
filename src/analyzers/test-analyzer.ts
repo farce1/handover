@@ -2,47 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import type { AnalysisContext, AnalyzerResult, TestResult } from './types.js';
 import { logger } from '../utils/logger.js';
-
-// ─── Framework detection patterns ───────────────────────────────────────────
-
-interface FrameworkPattern {
-  filePatterns: RegExp[];
-  configFiles: string[];
-  testPatterns: RegExp[];
-}
-
-const FRAMEWORK_PATTERNS: Record<string, FrameworkPattern> = {
-  vitest: {
-    filePatterns: [/\.test\.[tj]sx?$/, /\.spec\.[tj]sx?$/],
-    configFiles: ['vitest.config.ts', 'vitest.config.js', 'vitest.config.mts'],
-    testPatterns: [/\b(?:it|test|describe)\s*\(/g],
-  },
-  jest: {
-    filePatterns: [/\.test\.[tj]sx?$/, /\.spec\.[tj]sx?$/],
-    configFiles: ['jest.config.ts', 'jest.config.js', 'jest.config.mjs'],
-    testPatterns: [/\b(?:it|test|describe)\s*\(/g],
-  },
-  mocha: {
-    filePatterns: [/\.test\.[tj]sx?$/, /\.spec\.[tj]sx?$/],
-    configFiles: ['.mocharc.yml', '.mocharc.json', '.mocharc.js'],
-    testPatterns: [/\b(?:it|describe)\s*\(/g],
-  },
-  pytest: {
-    filePatterns: [/^test_.*\.py$/, /.*_test\.py$/],
-    configFiles: ['pytest.ini', 'pyproject.toml', 'setup.cfg'],
-    testPatterns: [/\bdef\s+test_/g],
-  },
-  go_test: {
-    filePatterns: [/_test\.go$/],
-    configFiles: [],
-    testPatterns: [/\bfunc\s+Test[A-Z]/g],
-  },
-  rust_test: {
-    filePatterns: [/tests\/.*\.rs$/],
-    configFiles: [],
-    testPatterns: [/#\[test\]/g, /#\[cfg\(test\)\]/g],
-  },
-};
+import { FRAMEWORK_PATTERNS, detectFrameworkForFile, countTestsInContent } from './test-detect.js';
 
 // ─── Main analyzer ──────────────────────────────────────────────────────────
 
@@ -50,8 +10,8 @@ const FRAMEWORK_PATTERNS: Record<string, FrameworkPattern> = {
  * Test analyzer (STAT-07).
  *
  * Identifies test files, detects test frameworks, and estimates test counts
- * by pattern matching across six framework patterns: vitest, jest, mocha,
- * pytest, go_test, and rust_test.
+ * using the pure detectors in test-detect.ts across six framework patterns:
+ * vitest, jest, mocha, pytest, go_test, and rust_test.
  */
 export async function analyzeTests(ctx: AnalysisContext): Promise<AnalyzerResult<TestResult>> {
   const start = performance.now();
@@ -69,19 +29,10 @@ export async function analyzeTests(ctx: AnalysisContext): Promise<AnalyzerResult
     // ── Identify test files ───────────────────────────────────────────────
 
     for (const file of ctx.files) {
-      const fileName = basename(file.path);
-
-      for (const [framework, patterns] of Object.entries(FRAMEWORK_PATTERNS)) {
-        const isTestFile = patterns.filePatterns.some((re) => re.test(fileName));
-        if (isTestFile) {
-          testFiles.push({
-            path: file.path,
-            framework,
-            testCount: 0, // Will be filled by content scanning
-          });
-          detectedFrameworks.add(framework);
-          break; // Only match first framework to avoid duplicates
-        }
+      const framework = detectFrameworkForFile(file.path);
+      if (framework) {
+        testFiles.push({ path: file.path, framework, testCount: 0 });
+        detectedFrameworks.add(framework);
       }
     }
 
@@ -132,15 +83,7 @@ export async function analyzeTests(ctx: AnalysisContext): Promise<AnalyzerResult
         if (!file) continue;
 
         const content = await readFile(file.absolutePath, 'utf-8');
-        const patterns = FRAMEWORK_PATTERNS[testFile.framework]?.testPatterns ?? [];
-        let count = 0;
-        for (const pattern of patterns) {
-          // Reset lastIndex for each file since we reuse global regexes
-          pattern.lastIndex = 0;
-          const matches = content.match(pattern);
-          count += matches?.length ?? 0;
-        }
-        testFile.testCount = count;
+        testFile.testCount = countTestsInContent(content, testFile.framework);
       } catch (err) {
         logger.debug(
           `Failed to read test file ${testFile.path}: ${err instanceof Error ? err.message : String(err)}`,
