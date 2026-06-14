@@ -77,3 +77,18 @@ export function formatStaleness(result: StalenessResult): string {
   lines.push('', 'Run `handover generate --since <ref>` to refresh them.', '');
   return lines.join('\n');
 }
+
+/** Machine-readable staleness report for `handover check --json` (CI consumption). */
+export function formatStalenessJson(result: StalenessResult): string {
+  const payload = {
+    formatVersion: 1,
+    upToDate: result.stale.length === 0,
+    fullRegen: result.fullRegen,
+    stale: result.stale.map((d) => ({
+      renderer: d.rendererId,
+      filename: d.filename,
+      reasons: d.reasons,
+    })),
+  };
+  return JSON.stringify(payload, null, 2) + '\n';
+}

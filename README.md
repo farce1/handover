@@ -237,16 +237,20 @@ handover generate --provider openai --model gpt-4o
 Exit non-zero when the generated docs are stale relative to source changes. Use as a CI gate alongside `handover generate` to fail PRs that change documented code without regenerating the docs.
 
 ```bash
-handover check [--since <ref>]
+handover check [--since <ref>] [--json]
 ```
 
 | Flag            | Description                                                 |
 | --------------- | ----------------------------------------------------------- |
 | `--since <ref>` | Git ref to compare against (default: `HEAD` / working tree) |
+| `--json`        | Emit a machine-readable report instead of human text        |
 
 ```bash
 # Fail CI if a PR changed documented source without regenerating docs
 handover check --since origin/main
+
+# Machine-readable result for custom CI tooling
+handover check --since origin/main --json
 ```
 
 Exit codes: `0` up to date, `1` stale docs, `2` cannot determine (no dep-graph yet, or an unresolvable ref).

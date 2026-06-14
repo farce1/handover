@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { DepGraph } from './dep-graph.js';
-import { detectStaleDocs, formatStaleness } from './staleness.js';
+import { detectStaleDocs, formatStaleness, formatStalenessJson } from './staleness.js';
 
-function mkGraph(renderers: Record<string, string[]>, infrastructureFiles: string[] = []): DepGraph {
+function mkGraph(
+  renderers: Record<string, string[]>,
+  infrastructureFiles: string[] = [],
+): DepGraph {
   return {
     graphVersion: 1,
     builtAt: '2026-01-01T00:00:00Z',
@@ -80,5 +83,33 @@ describe('formatStaleness', () => {
     expect(out).toContain('out of date');
     expect(out).toContain('06-MODULES.md');
     expect(out).toContain('src/a.ts');
+  });
+});
+
+describe('formatStalenessJson', () => {
+  it('emits a parseable up-to-date payload', () => {
+    const payload = JSON.parse(formatStalenessJson({ stale: [], fullRegen: false }));
+
+    expect(payload).toEqual({
+      formatVersion: 1,
+      upToDate: true,
+      fullRegen: false,
+      stale: [],
+    });
+  });
+
+  it('emits each stale doc with renderer, filename, and reasons', () => {
+    const payload = JSON.parse(
+      formatStalenessJson({
+        stale: [{ rendererId: '06-modules', filename: '06-MODULES.md', reasons: ['src/a.ts'] }],
+        fullRegen: true,
+      }),
+    );
+
+    expect(payload.upToDate).toBe(false);
+    expect(payload.fullRegen).toBe(true);
+    expect(payload.stale).toEqual([
+      { renderer: '06-modules', filename: '06-MODULES.md', reasons: ['src/a.ts'] },
+    ]);
   });
 });
