@@ -178,6 +178,7 @@ Run `handover init` for an interactive config wizard.
 | `model`                   | string   | Provider default | Model name                               |
 | `output`                  | string   | `./handover`     | Output directory                         |
 | `audience`                | string   | `human`          | `human` or `ai` for RAG-optimized output |
+| `compress`                | boolean  | `false`          | Pack files as signature summaries only   |
 | `include`                 | string[] | `["**/*"]`       | Glob patterns to include                 |
 | `exclude`                 | string[] | `[]`             | Glob patterns to exclude                 |
 | `context`                 | string   |                  | Additional project context               |
@@ -208,15 +209,17 @@ Run the full analysis and documentation pipeline.
 handover generate [options]
 ```
 
-| Flag                | Description                              |
-| ------------------- | ---------------------------------------- |
-| `--provider <name>` | LLM provider override                    |
-| `--model <name>`    | Model override                           |
-| `--only <docs>`     | Generate specific docs (comma-separated) |
-| `--audience <mode>` | `human` (default) or `ai`                |
-| `--static-only`     | Static analysis only, no AI calls (free) |
-| `--no-cache`        | Discard cached round results             |
-| `-v, --verbose`     | Verbose output                           |
+| Flag                | Description                                               |
+| ------------------- | --------------------------------------------------------- |
+| `--provider <name>` | LLM provider override                                     |
+| `--model <name>`    | Model override                                            |
+| `--only <docs>`     | Generate specific docs (comma-separated)                  |
+| `--audience <mode>` | `human` (default) or `ai`                                 |
+| `--static-only`     | Static analysis only, no AI calls (free)                  |
+| `--no-cache`        | Discard cached round results                              |
+| `--since <ref>`     | Only regenerate docs affected by changes since a git ref  |
+| `--compress`        | Pack files as signature summaries only (fit larger repos) |
+| `-v, --verbose`     | Verbose output                                            |
 
 ```bash
 # Full pipeline
@@ -228,6 +231,25 @@ handover generate --only overview,architecture,modules
 # Different provider
 handover generate --provider openai --model gpt-4o
 ```
+
+### `handover check`
+
+Exit non-zero when the generated docs are stale relative to source changes. Use as a CI gate alongside `handover generate` to fail PRs that change documented code without regenerating the docs.
+
+```bash
+handover check [--since <ref>]
+```
+
+| Flag            | Description                                                 |
+| --------------- | ----------------------------------------------------------- |
+| `--since <ref>` | Git ref to compare against (default: `HEAD` / working tree) |
+
+```bash
+# Fail CI if a PR changed documented source without regenerating docs
+handover check --since origin/main
+```
+
+Exit codes: `0` up to date, `1` stale docs, `2` cannot determine (no dep-graph yet, or an unresolvable ref).
 
 ### `handover analyze`
 
