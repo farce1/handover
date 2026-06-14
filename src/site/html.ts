@@ -100,6 +100,18 @@ function buildNav(entries: Array<{ href: string; title: string }>): string {
   return `<nav class="sidebar">\n    <ul>\n${items}\n    </ul>\n  </nav>`;
 }
 
+/** A root index.html that forwards to the real entry page (host roots serve index.html). */
+function redirectPage(target: string): string {
+  const safe = escapeHtml(target);
+  return `<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0; url=${safe}">
+<link rel="canonical" href="${safe}">
+<title>Redirecting…</title>
+<a href="${safe}">Continue to the documentation</a>
+`;
+}
+
 function renderPage(opts: { title: string; contentHtml: string; nav: string }): string {
   return `<!doctype html>
 <html lang="en">
@@ -145,8 +157,15 @@ export function buildSite(
 
   const nav = buildNav(resolved.map((r) => ({ href: r.htmlName, title: r.title })));
 
-  return resolved.map((r) => ({
+  const pages = resolved.map((r) => ({
     filename: r.htmlName,
     html: renderPage({ title: r.title, contentHtml: rewriteMdLinks(markdownToHtml(r.body)), nav }),
   }));
+
+  // Add a root index.html (host roots serve it) unless a doc already produced one.
+  if (pages.length > 0 && !pages.some((p) => p.filename === 'index.html')) {
+    pages.unshift({ filename: 'index.html', html: redirectPage(pages[0].filename) });
+  }
+
+  return pages;
 }
