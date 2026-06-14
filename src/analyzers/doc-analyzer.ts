@@ -3,37 +3,14 @@ import { basename, dirname } from 'node:path';
 import { isBinaryFile } from './file-discovery.js';
 import type { AnalysisContext, AnalyzerResult, DocResult } from './types.js';
 import { logger } from '../utils/logger.js';
+import { isReadmeFile, isInlineDocCandidate, hasInlineDoc } from './doc-detect.js';
 
 // ─── Documentation detection patterns ────────────────────────────────────────
-
-const README_PATTERN = /^readme(\.(md|txt|rst|adoc))?$/i;
 
 const DOC_FOLDER_PATTERNS = ['docs', 'doc', 'documentation', 'wiki', '.github'];
 
 /** Documentation file extensions */
 const DOC_EXTENSIONS = new Set(['.md', '.txt', '.rst', '.adoc']);
-
-/** Inline documentation patterns by language family */
-const INLINE_DOC_PATTERNS: Array<{
-  extensions: string[];
-  pattern: RegExp;
-}> = [
-  // JS/TS: JSDoc blocks
-  {
-    extensions: ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.mts', '.cts'],
-    pattern: /\/\*\*[\s\S]*?\*\//,
-  },
-  // Python: docstrings
-  {
-    extensions: ['.py', '.pyi'],
-    pattern: /(?:"""[\s\S]*?"""|'''[\s\S]*?''')/,
-  },
-  // Rust: rustdoc comments
-  {
-    extensions: ['.rs'],
-    pattern: /(?:\/\/\/|\/\/!)/,
-  },
-];
 
 // ─── Main analyzer ──────────────────────────────────────────────────────────
 
@@ -51,7 +28,7 @@ export async function analyzeDocs(ctx: AnalysisContext): Promise<AnalyzerResult<
     // ── Find READMEs ─────────────────────────────────────────────────────
 
     const readmes: string[] = ctx.files
-      .filter((f) => README_PATTERN.test(basename(f.path)))
+      .filter((f) => isReadmeFile(basename(f.path)))
       .map((f) => f.path);
 
     // ── Find docs folder ─────────────────────────────────────────────────
@@ -89,8 +66,8 @@ export async function analyzeDocs(ctx: AnalysisContext): Promise<AnalyzerResult<
       (f) =>
         !isBinaryFile(f.extension) &&
         !DOC_EXTENSIONS.has(f.extension) &&
-        !README_PATTERN.test(basename(f.path)) &&
-        INLINE_DOC_PATTERNS.some((p) => p.extensions.includes(f.extension)),
+        !isReadmeFile(basename(f.path)) &&
+        isInlineDocCandidate(f.extension),
     );
 
     const sampleFiles = sourceFiles.slice(0, 100);
@@ -99,14 +76,7 @@ export async function analyzeDocs(ctx: AnalysisContext): Promise<AnalyzerResult<
     for (const file of sampleFiles) {
       try {
         const content = await readFile(file.absolutePath, 'utf-8');
-
-        // Find the matching inline doc pattern for this file's extension
-        const hasInlineDoc = INLINE_DOC_PATTERNS.some((p) => {
-          if (!p.extensions.includes(file.extension)) return false;
-          return p.pattern.test(content);
-        });
-
-        if (hasInlineDoc) {
+        if (hasInlineDoc(content, file.extension)) {
           filesWithDocs++;
         }
       } catch (err) {
