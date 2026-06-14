@@ -275,6 +275,61 @@ Create a `.handover.yml` configuration file interactively.
 handover init
 ```
 
+## GitHub Action
+
+Regenerate the docs in CI and open a pull request whenever code changes. The action runs `handover generate` and leaves the output in your working tree; pair it with a commit or pull-request step.
+
+```yaml
+name: Handover docs
+on:
+  push:
+    branches: [main]
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: farce1/handover@v1
+        with:
+          provider: anthropic
+          api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+      - uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: 'docs: regenerate handover docs'
+          title: 'docs: regenerate handover docs'
+          branch: handover/update-docs
+```
+
+### Inputs
+
+| Input               | Default              | Description                                                                       |
+| ------------------- | -------------------- | --------------------------------------------------------------------------------- |
+| `provider`          | `anthropic`          | LLM provider                                                                      |
+| `model`             | _(provider default)_ | Model override                                                                    |
+| `api-key`           | _(none)_             | Provider API key; pass a repository secret                                        |
+| `api-key-env`       | `ANTHROPIC_API_KEY`  | Env var the provider reads the key from (e.g. `OPENAI_API_KEY`, `GEMINI_API_KEY`) |
+| `args`              | _(none)_             | Extra args forwarded to `handover generate` (e.g. `--only 06-modules --compress`) |
+| `version`           | `latest`             | npm version of `handover-cli` to run                                              |
+| `working-directory` | `.`                  | Directory to run in (useful for monorepo packages)                                |
+
+For a non-default provider, set both `provider` and `api-key-env`:
+
+```yaml
+- uses: farce1/handover@v1
+  with:
+    provider: openai
+    api-key: ${{ secrets.OPENAI_API_KEY }}
+    api-key-env: OPENAI_API_KEY
+```
+
+To fail a PR when docs go stale instead of regenerating, run [`handover check`](#handover-check) as a CI step.
+
 ## Language support
 
 | Language                | Parsing                | Notes                                 |

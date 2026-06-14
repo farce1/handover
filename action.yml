@@ -1,0 +1,58 @@
+name: 'Handover Docs'
+description: 'Generate AI-grounded handover documentation for a codebase with the handover CLI.'
+branding:
+  icon: 'book-open'
+  color: 'blue'
+
+inputs:
+  provider:
+    description: 'LLM provider (anthropic, openai, gemini, groq, together, deepseek, azure-openai, ollama, custom).'
+    default: 'anthropic'
+  model:
+    description: 'Model override. Defaults to the provider default when empty.'
+    default: ''
+  api-key:
+    description: 'API key for the provider. Pass a repository secret; exported to the provider env var named by api-key-env.'
+    default: ''
+  api-key-env:
+    description: 'Environment variable name the provider reads the key from (e.g. ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY).'
+    default: 'ANTHROPIC_API_KEY'
+  args:
+    description: 'Extra arguments passed verbatim to `handover generate` (e.g. "--only 06-modules --compress").'
+    default: ''
+  version:
+    description: 'npm version of handover-cli to run.'
+    default: 'latest'
+  working-directory:
+    description: 'Directory to run handover in (useful for monorepo packages).'
+    default: '.'
+
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      # Inputs are passed through env (not interpolated into the script) to
+      # prevent command injection from untrusted input values.
+      env:
+        HANDOVER_API_KEY: ${{ inputs.api-key }}
+        HANDOVER_API_KEY_ENV: ${{ inputs.api-key-env }}
+        HANDOVER_PROVIDER: ${{ inputs.provider }}
+        HANDOVER_MODEL: ${{ inputs.model }}
+        HANDOVER_VERSION: ${{ inputs.version }}
+        HANDOVER_ARGS: ${{ inputs.args }}
+      run: |
+        set -euo pipefail
+        if [ -n "${HANDOVER_API_KEY}" ]; then
+          export "${HANDOVER_API_KEY_ENV}=${HANDOVER_API_KEY}"
+        fi
+        model_flag=""
+        if [ -n "${HANDOVER_MODEL}" ]; then
+          model_flag="--model ${HANDOVER_MODEL}"
+        fi
+        # Intentional word-splitting on model_flag/HANDOVER_ARGS to expand flags.
+        # shellcheck disable=SC2086
+        npx --yes "handover-cli@${HANDOVER_VERSION}" generate \
+          --provider "${HANDOVER_PROVIDER}" \
+          ${model_flag} \
+          ${HANDOVER_ARGS}
