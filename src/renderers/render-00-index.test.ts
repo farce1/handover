@@ -7,11 +7,11 @@ function mkRound(validation: ValidationResult): RenderContext['rounds']['r2'] {
   return { validation } as unknown as RenderContext['rounds']['r2'];
 }
 
-function mkCtx(rounds: RenderContext['rounds']): RenderContext {
+function mkCtx(rounds: RenderContext['rounds'], audience: 'human' | 'ai' = 'human'): RenderContext {
   return {
     rounds,
     staticAnalysis: {},
-    audience: 'human',
+    audience,
     generatedAt: '2026-01-01T00:00:00Z',
     projectName: 'test',
   } as unknown as RenderContext;
@@ -43,5 +43,25 @@ describe('renderIndex — claim validation', () => {
 
   it('omits grounding entirely when no claims were validated', () => {
     expect(renderIndex(mkCtx({}), [])).not.toContain('verified against static analysis');
+  });
+
+  it('includes grounding in the AI structured block', () => {
+    const ctx = mkCtx(
+      { r2: mkRound({ validated: 8, corrected: 2, total: 10, dropRate: 0.2 }) },
+      'ai',
+    );
+
+    const doc = renderIndex(ctx, []);
+
+    expect(doc).toContain('ai:structured');
+    expect(doc).toContain('grounding:');
+    expect(doc).toContain('drop_rate: 0.2');
+  });
+
+  it('omits grounding from the AI structured block when no claims were validated', () => {
+    const doc = renderIndex(mkCtx({}, 'ai'), []);
+
+    expect(doc).toContain('ai:structured');
+    expect(doc).not.toContain('grounding:');
   });
 });

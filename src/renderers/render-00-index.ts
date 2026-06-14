@@ -104,7 +104,7 @@ export function renderIndex(ctx: RenderContext, statuses: DocumentStatus[]): str
   lines.push('');
 
   // ── AI structured block ───────────────────────────────────────────────
-  const aiBlock = structuredBlock(ctx.audience, {
+  const structuredData: Record<string, unknown> = {
     document_count: totalDocs,
     generated_count: generatedCount,
     statuses: statuses.map((s) => ({
@@ -113,7 +113,16 @@ export function renderIndex(ctx: RenderContext, statuses: DocumentStatus[]): str
       status: s.status,
       reason: s.reason,
     })),
-  });
+  };
+  if (grounding.total > 0) {
+    structuredData.grounding = {
+      validated: grounding.validated,
+      corrected: grounding.corrected,
+      total: grounding.total,
+      drop_rate: grounding.dropRate,
+    };
+  }
+  const aiBlock = structuredBlock(ctx.audience, structuredData);
   if (aiBlock) {
     lines.push(aiBlock);
   }
