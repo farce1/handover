@@ -4,6 +4,7 @@ import {
   validateImportClaims,
   validateModuleRelationships,
   validateRoundClaims,
+  aggregateValidation,
 } from './validator.js';
 import type { StaticAnalysisResult } from '../analyzers/types.js';
 
@@ -445,5 +446,28 @@ describe('validateRoundClaims round 2 module relationships', () => {
 
     expect(result.corrected).toBe(1);
     expect(result.total).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('aggregateValidation', () => {
+  test('sums metrics across rounds and recomputes the drop rate', () => {
+    const result = aggregateValidation([
+      { validated: 8, corrected: 2, total: 10, dropRate: 0.2 },
+      { validated: 10, corrected: 0, total: 10, dropRate: 0 },
+    ]);
+
+    expect(result.validated).toBe(18);
+    expect(result.corrected).toBe(2);
+    expect(result.total).toBe(20);
+    expect(result.dropRate).toBeCloseTo(0.1);
+  });
+
+  test('returns a zeroed result with no drop rate for an empty input', () => {
+    expect(aggregateValidation([])).toEqual({
+      validated: 0,
+      corrected: 0,
+      total: 0,
+      dropRate: 0,
+    });
   });
 });
