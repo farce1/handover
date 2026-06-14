@@ -39,7 +39,8 @@ export const FRAMEWORK_PATTERNS: Record<string, FrameworkPattern> = {
     testPatterns: [/\bfunc\s+Test[A-Z]/g],
   },
   rust_test: {
-    filePatterns: [/tests\/.*\.rs$/],
+    // (^|/) so only a real `tests/` segment matches, not e.g. `contests/`.
+    filePatterns: [/(?:^|\/)tests\/.*\.rs$/],
     configFiles: [],
     testPatterns: [/#\[test\]/g, /#\[cfg\(test\)\]/g],
   },

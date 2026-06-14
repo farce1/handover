@@ -24,6 +24,11 @@ describe('detectFrameworkForFile', () => {
     expect(detectFrameworkForFile('src/index.ts')).toBeNull();
     expect(detectFrameworkForFile('src/main.rs')).toBeNull();
   });
+
+  it('does not treat a directory merely ending in "tests" as a Rust test dir', () => {
+    expect(detectFrameworkForFile('src/contests/game.rs')).toBeNull();
+    expect(detectFrameworkForFile('crate/tests/it.rs')).toBe('rust_test');
+  });
 });
 
 describe('countTestsInContent', () => {
