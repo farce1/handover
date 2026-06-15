@@ -78,7 +78,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.6",
     "@astrojs/mdx": "^6.0.1",
-    "@astrojs/starlight": "^0.39.2",
+    "@astrojs/starlight": "^0.40.0",
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
     "@types/better-sqlite3": "^7.6.13",
