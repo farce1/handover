@@ -69,7 +69,8 @@ export function sectionIntro(text: string): string {
  * Pipe-escapes any | characters in cell content.
  */
 export function buildTable(headers: string[], rows: string[][]): string {
-  const escape = (cell: string): string => cell.replace(/\|/g, '\\|');
+  // Backslashes first, so cell content can't unescape the pipe escaping.
+  const escape = (cell: string): string => cell.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
 
   const headerRow = `| ${headers.map(escape).join(' | ')} |`;
   const separatorRow = `| ${headers.map(() => '---').join(' | ')} |`;
