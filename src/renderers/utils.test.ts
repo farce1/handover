@@ -39,6 +39,11 @@ describe('buildTable()', () => {
     expect(result).toContain('a \\| b');
   });
 
+  it('escapes backslashes so a trailing backslash cannot unescape a pipe', () => {
+    const result = buildTable(['Cmd'], [['a \\| b']]);
+    expect(result).toContain('a \\\\\\| b');
+  });
+
   it('handles single column tables correctly', () => {
     const result = buildTable(['X'], [['val1'], ['val2']]);
     expect(result).toBe('| X |\n| --- |\n| val1 |\n| val2 |');
